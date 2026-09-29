@@ -13,6 +13,11 @@
     <ApplicationIcon>app.ico</ApplicationIcon>
     <AssemblyName>DynamicIsland.Windows</AssemblyName>
     <RootNamespace>DynamicIsland.Windows</RootNamespace>
+    <Title>Sutra Island</Title>
+    <AssemblyTitle>Sutra Island</AssemblyTitle>
+    <Product>Sutra Island</Product>
+    <Company>Sutra Island</Company>
+    <Description>A live desktop island for Windows</Description>
     <Version>1.0.11</Version>
     <AssemblyVersion>1.0.11.0</AssemblyVersion>
     <FileVersion>1.0.11.0</FileVersion>

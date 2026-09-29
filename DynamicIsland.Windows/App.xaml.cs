@@ -5,12 +5,13 @@ using DynamicIsland.Windows.Services;
 using DynamicIsland.Windows.ViewModels;
 using DynamicIsland.Windows.Views;
 using DynamicIsland.Windows.Services.Q;
+using DynamicIsland.Windows.Infrastructure.CommandPalette;
 using DynamicIsland.Q.Core;
 using System.Windows.Media;
 
 namespace DynamicIsland.Windows;
 
-public partial class App : System.Windows.Application
+public partial class App : System.Windows.Application, ICommandPaletteHost
 {
     private static string ShowSettingsSignalName => "Local\\DynamicIsland.Windows.ShowSettings" + Infrastructure.AppDataPaths.InstanceSuffix;
     private Mutex? _singleInstance;
@@ -51,6 +52,10 @@ public partial class App : System.Windows.Application
     private CodexAppServerClient? _codexClient;
     private CodexAccountCoordinator? _codexAccount;
     private IQSessionController? _qSession;
+    private CommandPaletteWindow? _paletteWindow;
+    private CommandRunner? _paletteRunner;
+    private int _paletteHotkeyId;
+    private string _registeredPaletteHotkey = "";
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -105,8 +110,7 @@ public partial class App : System.Windows.Application
         };
 
         _startupService = new StartupService(_log);
-        if (_settings.LaunchOnStartup != _startupService.IsEnabled())
-            _startupService.SetEnabled(_settings.LaunchOnStartup);
+        _startupService.SetEnabled(_settings.LaunchOnStartup);
 
         _media = new MediaSessionService(_log);
         _audio = new AudioSessionService(_log);
@@ -178,6 +182,7 @@ public partial class App : System.Windows.Application
         _hotkeys.Register("Open settings", Interop.NativeMethods.HotkeyModifierControl | Interop.NativeMethods.HotkeyModifierAlt, (uint)'S',
             ShowSettings);
         RegisterQHotkey();
+        RegisterCommandPaletteHotkey();
         _clock.Start();
         _battery.Start();
         _audio.Start();
@@ -205,7 +210,7 @@ public partial class App : System.Windows.Application
         if (_settingsViewModel is null) return;
         if (_settingsWindow is null)
         {
-            _settingsWindow = new SettingsWindow(_settingsViewModel, _islandViewModel!);
+            _settingsWindow = new SettingsWindow(_settingsViewModel, _islandViewModel!, _islandWindow!);
             _settingsWindow.OpenTimerRequested += (_, _) => ShowTimerAlarm();
             _settingsWindow.IsVisibleChanged += (_, _) => UpdateKeepExpanded();
             _settingsWindow.Closing += (_, args) =>
@@ -251,12 +256,137 @@ public partial class App : System.Windows.Application
         if (_settings is null) return;
         _log?.SetDebugEnabled(_settings.DebugLogging);
         RegisterQHotkey();
+        RegisterCommandPaletteHotkeyIfChanged();
         ApplyGlobalTheme();
         _islandViewModel?.ApplySettings();
         _islandWindow?.ApplySettings();
         ApplyLiveActivitySettings();
         _tray?.SyncChecks();
     }
+
+    // Re-registers only when the stored combo actually changed (or a previous attempt failed),
+    // so ordinary settings tweaks don't churn the global hotkey table.
+    private void RegisterCommandPaletteHotkeyIfChanged()
+    {
+        if (_settings is null) return;
+        if (_paletteHotkeyId != 0 &&
+            string.Equals(_registeredPaletteHotkey, _settings.CommandPaletteHotkey, StringComparison.OrdinalIgnoreCase))
+            return;
+        RegisterCommandPaletteHotkey();
+    }
+
+    private void RegisterCommandPaletteHotkey()
+    {
+        if (_hotkeys is null || _settings is null || _settingsViewModel is null) return;
+        if (_paletteHotkeyId != 0)
+        {
+            _hotkeys.Unregister(_paletteHotkeyId);
+            _paletteHotkeyId = 0;
+        }
+        string? parseError = null;
+        if (!Infrastructure.HotkeyParser.TryParse(_settings.CommandPaletteHotkey,
+                out var modifiers, out var key, out var canonical, out parseError))
+        {
+            // Fall back to the default so the palette always has a way to open.
+            if (!Infrastructure.HotkeyParser.TryParse("Ctrl+Alt+K",
+                    out modifiers, out key, out canonical, out _))
+            {
+                _settingsViewModel.SetCommandPaletteStatus(parseError ?? "Invalid command palette shortcut.");
+                return;
+            }
+            _settings.CommandPaletteHotkey = canonical;
+            parseError ??= "Invalid shortcut — using Ctrl + Alt + K.";
+        }
+        else
+        {
+            _settings.CommandPaletteHotkey = canonical;
+        }
+        _paletteHotkeyId = _hotkeys.Register("Command palette", modifiers, key, ToggleCommandPalette);
+        _registeredPaletteHotkey = canonical;
+        if (_paletteHotkeyId == 0)
+        {
+            _settingsViewModel.SetCommandPaletteStatus(
+                Infrastructure.AppDataPaths.IsPreview
+                    ? "Shortcut inactive in preview mode."
+                    : $"Unavailable — {Infrastructure.HotkeyParser.Display(canonical)} may be used by another app.");
+        }
+        else
+        {
+            _settingsViewModel.SetCommandPaletteStatus(parseError ?? "");
+        }
+    }
+
+    private void ToggleCommandPalette()
+    {
+        if (_paletteWindow is { IsVisible: true })
+        {
+            _paletteWindow.Close();
+            return;
+        }
+        OpenCommandPalette();
+    }
+
+    private void OpenCommandPalette()
+    {
+        if (_islandWindow is null || _islandViewModel is null || _timerViewModel is null ||
+            _media is null || _audio is null || _timerAlarm is null) return;
+        _paletteWindow?.Close();
+        _paletteRunner ??= new CommandRunner(_islandViewModel, _media, _audio, _timerAlarm, _timerViewModel, this);
+        var viewModel = new CommandPaletteViewModel(_paletteRunner);
+        var window = new CommandPaletteWindow(viewModel, () => _settings?.ShowIslandInScreenshots ?? false);
+        const double paletteWidth = 560;
+        var left = _islandWindow.Left + _islandWindow.Width / 2 - paletteWidth / 2;
+        var shellBottom = _islandWindow.ShellBottomDips;
+        var top = _islandWindow.Top + (shellBottom > 0 ? shellBottom : 70) + 10;
+        var area = SystemParameters.WorkArea;
+        left = Math.Max(area.Left + 8, Math.Min(left, area.Right - paletteWidth - 8));
+        top = Math.Max(area.Top + 8, Math.Min(top, area.Bottom - 96));
+        window.Left = left;
+        window.Top = top;
+        window.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_paletteWindow, window)) _paletteWindow = null;
+        };
+        _paletteWindow = window;
+        window.Show();
+        window.Activate();
+    }
+
+    void ICommandPaletteHost.ShowSettings() => Dispatcher.BeginInvoke(ShowSettings);
+
+    void ICommandPaletteHost.ShowTimerPanel() => Dispatcher.BeginInvoke(() =>
+    {
+        _islandWindow?.ShowTimerPanel();
+        _islandWindow?.FocusTimerPanel();
+    });
+
+    void ICommandPaletteHost.ShowAlarmPanel() => Dispatcher.BeginInvoke(() =>
+    {
+        if (_islandWindow is null) return;
+        _islandWindow.ShowTimerPanel();
+        _islandWindow.ShowAlarmTab();
+        _islandWindow.FocusTimerPanel();
+    });
+
+    void ICommandPaletteHost.ShowStopwatchPanel() => Dispatcher.BeginInvoke(() =>
+    {
+        if (_islandWindow is null) return;
+        _islandWindow.ShowTimerPanel();
+        _islandWindow.ShowStopwatchTab();
+        _islandWindow.FocusTimerPanel();
+    });
+
+    void ICommandPaletteHost.OpenQ(string? question, QMode mode, bool compare) => Dispatcher.BeginInvoke(() =>
+    {
+        if (_islandViewModel is null || _islandWindow is null || _qScreen is null) return;
+        if (compare) _islandViewModel.QCompareEnabled = true;
+        else _islandViewModel.QCompareEnabled = false;
+        // StartQAsync runs its synchronous prefix (which resets the snapshot to Ask) before
+        // the first await, so switching to Say and prefilling after the call is safe.
+        _ = _islandViewModel.StartQAsync(_qScreen.LastForegroundTarget);
+        if (mode == QMode.Say) _islandViewModel.SetQMode(QMode.Say);
+        if (question is not null) _islandWindow.PrefillQPrompt(question);
+    });
 
     private void RegisterQHotkey()
     {
@@ -281,6 +411,7 @@ public partial class App : System.Windows.Application
         if (_settings.RealAudioSpectrum) _spectrum?.Start();
         else _spectrum?.Stop();
         if (_settings.ShowNextMeeting) _ = _calendar!.StartAsync(_liveSettingsApplied); else _calendar!.Stop();
+        _notifications?.Configure(TimeSpan.FromSeconds(_settings.NotificationPollSeconds));
         if (_settings.ShowNotifications) _ = _notifications!.StartAsync(_liveSettingsApplied); else _notifications!.Stop();
         if (!_liveSettingsApplied || _clipboardEnabled != _settings.ShowClipboard) { _clipboardEnabled = _settings.ShowClipboard; _clipboard!.Configure(_clipboardEnabled); }
         _liveSettingsApplied = true;
@@ -397,6 +528,7 @@ public partial class App : System.Windows.Application
         if (_isShuttingDown) return;
         _isShuttingDown = true;
         _log?.Info("Application shutting down");
+        _paletteWindow?.Close();
         _tray?.Dispose();
         _timerViewModel?.Dispose();
         _settingsWindow?.Close();

@@ -1,0 +1,162 @@
+<Window x:Class="DynamicIsland.Windows.Views.CommandPaletteWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="640" SizeToContent="Height" WindowStyle="None" ResizeMode="NoResize"
+        AllowsTransparency="True" Background="Transparent" ShowInTaskbar="False"
+        Topmost="True" ShowActivated="True" WindowStartupLocation="Manual"
+        FontFamily="Segoe UI Variable Text" Foreground="#F7FAFF"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        AutomationProperties.Name="Command palette">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="PaletteBooleanToVisibility" />
+
+        <!-- Island shell material: near-black translucent card, hairline rim, deep float. -->
+        <LinearGradientBrush x:Key="CardWash" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Offset="0" Color="#F514161C" />
+            <GradientStop Offset="1" Color="#F70D0F13" />
+        </LinearGradientBrush>
+
+        <Style x:Key="Keycap" TargetType="Border">
+            <Setter Property="Background" Value="#1AFFFFFF" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="7,3" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- The item container renders the whole row so selected/hover can recolour every part. -->
+        <Style x:Key="SuggestionItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Padding" Value="10,9" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="Foreground" Value="#F7FAFF" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd" CornerRadius="14" Background="Transparent"
+                                Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True"
+                                BorderThickness="1" BorderBrush="Transparent">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="IconTile" Width="36" Height="36" CornerRadius="11"
+                                        Background="#16FFFFFF" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock x:Name="GlyphText" Text="{Binding Glyph}"
+                                               FontFamily="Segoe Fluent Icons" FontSize="15"
+                                               Foreground="#C8D1DE" VerticalAlignment="Center"
+                                               HorizontalAlignment="Center" />
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="NameText" Text="{Binding Name}" FontWeight="SemiBold"
+                                               FontSize="14.5" Foreground="#F7FAFF" />
+                                    <TextBlock x:Name="DescText" Text="{Binding Description}" FontSize="12.5"
+                                               Foreground="#AAB5C6" Margin="0,1,0,0" />
+                                </StackPanel>
+                                <Border Grid.Column="2" Style="{StaticResource Keycap}"
+                                        Background="#12FFFFFF" VerticalAlignment="Center">
+                                    <TextBlock x:Name="ExampleText" Text="{Binding Example}" FontSize="11.5"
+                                               Foreground="#AAB5C6" />
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#14FFFFFF" />
+                                <Setter TargetName="IconTile" Property="Background" Value="#22FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#2E5AA7FF" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#335AA7FF" />
+                                <Setter TargetName="IconTile" Property="Background" Value="#3D5AA7FF" />
+                                <Setter TargetName="GlyphText" Property="Foreground" Value="#FFFFFFFF" />
+                                <Setter TargetName="NameText" Property="Foreground" Value="#FFFFFFFF" />
+                                <Setter TargetName="DescText" Property="Foreground" Value="#D6E4FF" />
+                                <Setter TargetName="ExampleText" Property="Foreground" Value="#D6E4FF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border Margin="14" CornerRadius="26" Background="{StaticResource CardWash}"
+            BorderBrush="#1EFFFFFF" BorderThickness="1">
+        <DockPanel Margin="12,12,12,10">
+
+            <!-- Search field: large type, inset well, SF-style keycaps. -->
+            <Border DockPanel.Dock="Top" CornerRadius="16" Background="#14FFFFFF"
+                    BorderBrush="#14FFFFFF" BorderThickness="1" Padding="16,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="17"
+                               Foreground="#8A93A3" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBox x:Name="QueryBox" Grid.Column="1" BorderThickness="0" Background="Transparent"
+                             Foreground="#F7FAFF" CaretBrush="#5AA7FF" FontSize="18" FontWeight="Medium"
+                             Padding="0" VerticalContentAlignment="Center" AcceptsReturn="False"
+                             Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.Name="Command" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Style="{StaticResource Keycap}" Margin="4,0,0,0">
+                            <TextBlock Text="&#x2191;&#x2193;" FontSize="11" Foreground="#AAB5C6" />
+                        </Border>
+                        <Border Style="{StaticResource Keycap}" Margin="4,0,0,0">
+                            <TextBlock Text="Esc" FontSize="11" Foreground="#AAB5C6" />
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Rectangle DockPanel.Dock="Top" Height="1" Fill="#12FFFFFF" Margin="14,10,14,6" />
+
+            <TextBlock x:Name="StatusText" DockPanel.Dock="Bottom" TextWrapping="Wrap" FontSize="12.5"
+                       Margin="6,8,6,0" Text="{Binding StatusMessage}"
+                       Visibility="{Binding HasStatus, Converter={StaticResource PaletteBooleanToVisibility}}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="#AAB5C6" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsStatusError}" Value="True">
+                                <Setter Property="Foreground" Value="#FF6B6B" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <Border DockPanel.Dock="Bottom" Margin="6,8,6,0">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock FontSize="11.5" Foreground="#6F7B8C">
+                        <Run Text="&#x21B5;" /> <Run Text="run" />
+                        <Run Text="   " />
+                        <Run Text="&#x2191;&#x2193;" /> <Run Text="navigate" />
+                        <Run Text="   " />
+                        <Run Text="Esc" /> <Run Text="dismiss" />
+                    </TextBlock>
+                    <TextBlock FontSize="11.5" Foreground="#4A5566" Margin="12,0,0,0"
+                               Text="Sutra Island" VerticalAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <!-- Row visuals live in the item container template; empty template keeps ItemTemplate present. -->
+            <ListBox x:Name="SuggestionList" BorderThickness="0" Background="Transparent"
+                     Focusable="False" IsSynchronizedWithCurrentItem="False"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     MaxHeight="360" ItemsSource="{Binding Suggestions}"
+                     ItemContainerStyle="{StaticResource SuggestionItemStyle}"
+                     SelectionChanged="SuggestionList_SelectionChanged"
+                     PreviewMouseLeftButtonUp="SuggestionList_PreviewMouseLeftButtonUp">
+                <ListBox.ItemTemplate>
+                    <DataTemplate />
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+    </Border>
+</Window>

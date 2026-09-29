@@ -38,11 +38,11 @@ public partial class IslandWindow : Window
     private bool _timerPanelHostShown;
     private bool _timerPanelHostAnimating;
     private bool _timerPanelClosing;
-    private bool _timerPanelPinnedByClick;
     private int _timerPanelAnimationGeneration;
     private bool _suppressExpandedAnimation;
     private bool _liveTimerVisible;
     private bool _lastIsStatsStyle;
+    private bool _lastCompactEqualizerVisible;
     private bool _lastShowAirPodsCard;
     private bool _lastShowWidgetsPanel;
     private bool _urgentAlertVisible;
@@ -61,16 +61,20 @@ public partial class IslandWindow : Window
     private double TimerPanelHeight => WindowSizingPolicy.BoundedDimension(600, AvailableWorkArea.Height, 24);
     private (double Width, double Height) AvailableWorkArea => _position.AvailableSize(this, _viewModel.Settings);
     private const double LiveTimerExtraHeight = 86d;
+    private const double CompactEqualizerMinimumWidth = 264d;
 
     public event EventHandler? OpenSettingsRequested;
     public event EventHandler? OpenQSettingsRequested;
     public event EventHandler? OpenClipboardRequested;
     public event EventHandler? RecenterRequested;
 
+    public FrameworkElement ExpandedPreviewVisual => GlassShell;
+
     public IslandWindow(IslandViewModel viewModel, TimerAlarmViewModel timerViewModel, WindowPositionService position, SettingsService settingsService, LoggingService log, ScreenContextService qScreen)
     {
         InitializeComponent();
         DataContext = _viewModel = viewModel;
+        SyncNotificationBanner();
         ApplyQTheme();
         _timerViewModel = timerViewModel;
         TimerPanelContent.DataContext = timerViewModel;
@@ -78,6 +82,7 @@ public partial class IslandWindow : Window
         _liveTimerVisible = timerViewModel.ShowLiveTimer;
         LiveTimerStrip.Visibility = _liveTimerVisible ? Visibility.Visible : Visibility.Collapsed;
         _lastIsStatsStyle = viewModel.IsStatsStyle;
+        _lastCompactEqualizerVisible = viewModel.ShowCompactEqualizer;
         _lastShowAirPodsCard = viewModel.ShowAirPodsCard;
         _lastShowWidgetsPanel = viewModel.ShowWidgetsPanel;
         _position = position;
@@ -116,7 +121,7 @@ public partial class IslandWindow : Window
             QContent.SizeChanged += (_, _) => UpdateAutoGrow();
             StatsExpandedContent.SizeChanged += (_, _) => UpdateAutoGrow();
             StatsOverlay.SizeChanged += (_, _) => UpdateAutoGrow();
-            GlassShell.SizeChanged += (_, _) => { ApplyRoundedShellClip(); UrgentAlertStrip.Margin = new Thickness(12, GlassShell.ActualHeight + 12, 12, 0); UrgentAlertStrip.MaxWidth = Math.Max(1, Math.Min(650, ActualWidth - 24)); };
+            GlassShell.SizeChanged += (_, _) => { ApplyRoundedShellClip(); UrgentAlertStrip.Margin = new Thickness(12, GlassShell.ActualHeight + 12, 12, 0); UrgentAlertStrip.MaxWidth = Math.Max(1, Math.Min(650, ActualWidth - 24)); PositionNotifBannerUnderShell(); };
             SyncUrgentAlertStrip(animate: false);
             // Let the first real render commit the compact HWND/content geometry before accepting
             // an expansion request. Without this warm-up, the first hover/click can race WPF's
@@ -276,6 +281,17 @@ public partial class IslandWindow : Window
             // transparent window at its old compact-state height and clips the bottom of the pill.
             ApplyLayout(animate: true);
         }
+        else if (e.PropertyName == nameof(IslandViewModel.ShowCompactEqualizer))
+        {
+            var isVisible = _viewModel.ShowCompactEqualizer;
+            if (isVisible == _lastCompactEqualizerVisible) return;
+            _lastCompactEqualizerVisible = isVisible;
+            // Spectrum samples also re-raise this binding property. Resize only when the
+            // option's visible state changes, and let compact mode widen smoothly to keep
+            // the track title, full equalizer, RAM, and clock from competing for 188 DIPs.
+            if (!_timerPanelOpen && !_viewModel.IsExpanded)
+                ApplyLayout(animate: true);
+        }
         else if (e.PropertyName == nameof(IslandViewModel.IsStatsStyle) || e.PropertyName == nameof(IslandViewModel.IsAppleStyle))
         {
             // Hardened: only re-layout when the actual visual mode changed. Spurious
@@ -302,6 +318,7 @@ public partial class IslandWindow : Window
             if (_timerPanelOpen) return;
             if (_lastQSurface == _viewModel.ShowQSurface && _lastQActive == _viewModel.IsQActive && _lastQComparison == _viewModel.QCompareEnabled) return;
             _lastQSurface = _viewModel.ShowQSurface; _lastQActive = _viewModel.IsQActive; _lastQComparison = _viewModel.QCompareEnabled;
+            _lastCompactEqualizerVisible = _viewModel.ShowCompactEqualizer;
             ApplyVisualMode();
             ApplyLayout(animate: false);
             if (_viewModel.ShowQSurface && _viewModel.IsExpanded)
@@ -343,6 +360,7 @@ public partial class IslandWindow : Window
         {
             if (_viewModel.IsAirPodsBannerActive) PlayAirPodsConnectionIntro();
             else ReturnFromAirPodsCompactBanner();
+            SyncNotificationBanner();
         }
         else if (e.PropertyName == nameof(IslandViewModel.HasUrgentAlert))
         {
@@ -377,8 +395,20 @@ public partial class IslandWindow : Window
         {
             // BannerSeq increments once per new Windows notification or volume warning,
             // so the entrance plays exactly once and never restarts mid-display.
-            PlayNotificationIntro();
+            SyncNotificationBanner();
+            if (NotifBanner.Visibility == Visibility.Visible) PlayNotificationIntro();
         }
+        else if (e.PropertyName == nameof(IslandViewModel.ShowBanner))
+        {
+            // The banner hangs below the shell: re-anchor it and grow/shrink the HWND with it.
+            SyncNotificationBanner();
+            PositionNotifBannerUnderShell();
+            ApplyLayout(animate: false);
+        }
+        else if (e.PropertyName == nameof(IslandViewModel.BannerApp) ||
+                 e.PropertyName == nameof(IslandViewModel.BannerTitle) ||
+                 e.PropertyName == nameof(IslandViewModel.BannerBody))
+            SyncNotificationBanner();
     }
 
     private void TimerViewModelOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -573,10 +603,34 @@ public partial class IslandWindow : Window
         });
     }
 
+    // The notification banner must hang directly below the island instead of floating at a
+    // fixed offset: track the shell's live height so it stays attached in compact and
+    // expanded states (same pattern as UrgentAlertStrip).
+    private void PositionNotifBannerUnderShell()
+    {
+        NotifBanner.Margin = new Thickness(0, GlassShell.Margin.Top + Math.Max(0d, GlassShell.ActualHeight) + 12d, 0, 0);
+    }
+
+    private void SyncNotificationBanner()
+    {
+        var app = _viewModel.BannerApp;
+        var title = _viewModel.BannerTitle;
+        var body = _viewModel.BannerBody;
+        var visible = _viewModel.ShowBanner && !_viewModel.IsAirPodsBannerActive &&
+                      (NotificationContent.HasVisibleText(title) || NotificationContent.HasVisibleText(body));
+        // Set the actual text before exposing the card. A WPF binding refresh can otherwise
+        // show a 60px card containing only the dismiss control for a frame or longer.
+        NotifAppText.Text = visible ? app : string.Empty;
+        NotifTitleText.Text = visible ? title : string.Empty;
+        NotifBodyText.Text = visible ? body : string.Empty;
+        NotifBanner.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     // The notification "combo" entrance: pop + blur-in, spring scale, then an accent glow pulse and a
     // light sweep across the card (see the NotifIntro storyboard in IslandWindow.xaml).
     private void PlayNotificationIntro()
     {
+        PositionNotifBannerUnderShell();
         // Tint the glow and the sweep to the current accent — the same colour as the app-name label.
         var accent = (_viewModel.AccentBrush as SolidColorBrush)?.Color ?? System.Windows.Media.Color.FromRgb(0x5A, 0xA7, 0xFF);
         NotifGlow.Color = accent;
@@ -622,6 +676,8 @@ public partial class IslandWindow : Window
         // canvas.  Previously this method ignored IslandWidth/IslandHeight and used a preset for
         // both states, so adjusting the mini island could distort the expanded layout.
         var compactWidth = Math.Clamp(_viewModel.Settings.IslandWidth, 72d, 360d);
+        if (_viewModel.ShowCompactEqualizer)
+            compactWidth = Math.Min(Math.Max(compactWidth, CompactEqualizerMinimumWidth), Math.Max(72d, AvailableWorkArea.Width - 24d));
         var compactHeight = Math.Clamp(_viewModel.Settings.IslandHeight, 38d, 90d);
         if (_viewModel.QShowCompactComparison)
         {
@@ -713,10 +769,22 @@ public partial class IslandWindow : Window
         var m = Metrics();
         UpdateTimerOrbLayout(m.cW, m.cH);
         UpdatePrivacyIndicatorLayout(m.cW, m.cH, animate);
-        var desiredWindowHeight = _timerPanelOpen ? Math.Max(m.winH, TimerPanelHeight + 20d) : m.winH;
-        if (Math.Abs(Width - m.winW) > 0.5 || Math.Abs(Height - desiredWindowHeight) > 0.5)
+        // The timer panel carries no drop shadow; keep just enough edge room for its 8px
+        // top offset so the panel never clips at the HWND boundary.
+        const double timerEdgePadding = 12d;
+        var desiredWindowHeight = _timerPanelOpen ? Math.Max(m.winH, TimerPanelHeight + timerEdgePadding) : m.winH;
+        var desiredWindowWidth = _timerPanelOpen ? Math.Max(m.winW, TimerPanelWidth + timerEdgePadding) : m.winW;
+        if (NotifBanner.Visibility == Visibility.Visible && !_timerPanelOpen)
         {
-            Width = m.winW;
+            // The notification banner hangs below the shell: reserve room for it while visible
+            // so the card never clips at the HWND edge (ShowBanner changes re-run ApplyLayout).
+            var shellH = _viewModel.IsExpanded ? ExpandedPillSize().H : m.cH;
+            const double bannerReserve = 170d;
+            desiredWindowHeight = Math.Max(desiredWindowHeight, GlassShell.Margin.Top + shellH + bannerReserve);
+        }
+        if (Math.Abs(Width - desiredWindowWidth) > 0.5 || Math.Abs(Height - desiredWindowHeight) > 0.5)
+        {
+            Width = desiredWindowWidth;
             Height = desiredWindowHeight;
         }
         // The transparent HWND stays anchored to the user's main-island position even while the
@@ -1084,6 +1152,7 @@ public partial class IslandWindow : Window
             return;
         }
 
+        TimerPanelHost.CacheMode = new BitmapCache { SnapsToDevicePixels = true };
         TimerPanelScale.ScaleX = startScaleX;
         TimerPanelScale.ScaleY = startScaleY;
         TimerPanelTranslate.X = startTranslateX;
@@ -1155,6 +1224,7 @@ public partial class IslandWindow : Window
             return;
         }
 
+        TimerPanelHost.CacheMode = new BitmapCache { SnapsToDevicePixels = true };
         TimerPanelScale.ScaleX = currentScaleX;
         TimerPanelScale.ScaleY = currentScaleY;
         TimerPanelTranslate.X = currentTranslateX;
@@ -1201,6 +1271,7 @@ public partial class IslandWindow : Window
         TimerPanelContent.BeginAnimation(UIElement.OpacityProperty, null);
         TimerPanelContent.Opacity = 1d;
         TimerPanelHost.Opacity = 1d;
+        TimerPanelHost.CacheMode = null;
         TimerPanelScale.ScaleX = TimerPanelScale.ScaleY = 1d;
         TimerPanelTranslate.X = TimerPanelTranslate.Y = 0d;
         TimerPanelHost.IsHitTestVisible = true;
@@ -1214,6 +1285,7 @@ public partial class IslandWindow : Window
         StopTimerPanelHostAnimations(preserveCurrent: false);
         TimerPanelHost.Visibility = Visibility.Collapsed;
         TimerPanelHost.Opacity = 0d;
+        TimerPanelHost.CacheMode = null;
         TimerPanelHost.IsHitTestVisible = false;
         TimerPanelContent.Visibility = Visibility.Collapsed;
         TimerPanelContent.IsHitTestVisible = false;
@@ -1562,9 +1634,14 @@ public partial class IslandWindow : Window
     }
     private void CollapseMenu_Click(object sender, RoutedEventArgs e) => _viewModel.IsExpanded = false;
 
-    private void OpenNotification_Click(object sender, RoutedEventArgs e)
+    private void OpenNotification_Click(object sender, MouseButtonEventArgs e)
     {
-        _viewModel.OpenCurrentNotificationCommand.Execute(null);
+        if (!_viewModel.ShowNotification) return;
+        if (e.OriginalSource is DependencyObject source &&
+            (ReferenceEquals(source, NotifDismissButton) || NotifDismissButton.IsAncestorOf(source)))
+            _viewModel.DismissCurrentNotificationCommand.Execute(null);
+        else
+            _viewModel.OpenCurrentNotificationCommand.Execute(null);
         e.Handled = true;
     }
 
@@ -1668,13 +1745,13 @@ public partial class IslandWindow : Window
 
     private void TimerButton_Click(object sender, RoutedEventArgs e)
     {
-        ShowTimerPanel(pinOpen: true);
+        ShowTimerPanel();
         e.Handled = true;
     }
 
     private void TimerOrb_Click(object sender, MouseButtonEventArgs e)
     {
-        ShowTimerPanel(pinOpen: true);
+        ShowTimerPanel();
         e.Handled = true;
     }
 
@@ -1682,7 +1759,7 @@ public partial class IslandWindow : Window
     {
         // The orb is a live activity affordance: hovering it should reveal the full
         // timer surface just like Apple's Dynamic Island, without requiring a click.
-        if (!_timerPanelOpen) ShowTimerPanel(pinOpen: false);
+        if (!_timerPanelOpen) ShowTimerPanel();
     }
 
     private void TimerPanel_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
@@ -1705,26 +1782,13 @@ public partial class IslandWindow : Window
             return;
         }
 
-        // A deliberate click owns the panel until the user closes it. Hover-opened panels
-        // still use the pointer-based auto-close path below.
-        if (_timerPanelPinnedByClick)
+        if (IsPointerOverTimerPanelHost() || CompactTimerOrb.IsMouseOver ||
+            (_timerPanelHostAnimating && IsPointerOverGlassShell()))
         {
-            _timerPanelLeaveTimer.Stop();
-            return;
-        }
-
-        // WPF can keep the transparent overlay under the pointer and never deliver the
-        // subsequent MouseLeave. Read the OS cursor position instead, which also works
-        // after the pointer has left the transparent window entirely.
-        if (IsPointerOverGlassShell() || IsPointerOverTimerPanelHost() || CompactTimerOrb.IsMouseOver)
-        {
-            // Keep checking while the panel is open. Stopping here loses the leave event
-            // in the transparent-overlay case that caused the panel to stick open.
             if (!_timerPanelLeaveTimer.IsEnabled) _timerPanelLeaveTimer.Start();
             return;
         }
 
-        // A captured mouse means a dropdown popup or scrollbar drag is still active.
         if (Mouse.Captured is not null)
         {
             if (!_timerPanelLeaveTimer.IsEnabled) _timerPanelLeaveTimer.Start();
@@ -1759,18 +1823,20 @@ public partial class IslandWindow : Window
             && point.Y <= TimerPanelHost.ActualHeight;
     }
 
-    public void ShowTimerPanel(bool pinOpen = false)
+    public void ShowTimerPanel()
     {
-        if (pinOpen) _timerPanelPinnedByClick = true;
-
         if (_timerPanelClosing)
         {
             _timerPanelLeaveTimer.Stop();
             BeginTimerPanelHostOpen(animate: true);
-            if (!_timerPanelPinnedByClick) _timerPanelLeaveTimer.Start();
+            _timerPanelLeaveTimer.Start();
             return;
         }
-        if (_timerPanelOpen) return;
+        if (_timerPanelOpen)
+        {
+            if (!_timerPanelLeaveTimer.IsEnabled) _timerPanelLeaveTimer.Start();
+            return;
+        }
 
         _collapseTimer.Stop();
         _timerPanelLeaveTimer.Stop();
@@ -1785,7 +1851,7 @@ public partial class IslandWindow : Window
         _timerPanelOpen = true;
         _viewModel.TimerEditorOpen = true;
         _viewModel.InteractionProtected = true;
-        if (!_timerPanelPinnedByClick) _timerPanelLeaveTimer.Start();
+        _timerPanelLeaveTimer.Start();
         ShowTimerTab();
         ForceShow();
         _position.ApplyWindowStyles(this, _viewModel.Settings, compact: false);
@@ -1802,7 +1868,6 @@ public partial class IslandWindow : Window
     public void CloseTimerPanel()
     {
         _timerPanelLeaveTimer.Stop();
-        _timerPanelPinnedByClick = false;
         if (!_timerPanelOpen || _timerPanelClosing) return;
         // Keep TimerEditorOpen true until the host has finished shrinking. This keeps the compact orb
         // hidden underneath the panel and lets the separate host land exactly on its orb geometry.
@@ -1839,7 +1904,7 @@ public partial class IslandWindow : Window
         Dispatcher.BeginInvoke(ShowAlarmTab);
     }
 
-    private void ShowAlarmTab()
+    public void ShowAlarmTab()
     {
         TimerTabContent.Visibility = Visibility.Collapsed;
         AlarmTabContent.Visibility = Visibility.Visible;
@@ -1853,7 +1918,7 @@ public partial class IslandWindow : Window
         TimerFooterText.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(nameof(TimerAlarmViewModel.AlarmStateText)));
     }
 
-    private void ShowTimerTab()
+    public void ShowTimerTab()
     {
         TimerTabContent.Visibility = Visibility.Visible;
         AlarmTabContent.Visibility = Visibility.Collapsed;
@@ -1867,7 +1932,7 @@ public partial class IslandWindow : Window
         TimerFooterText.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(nameof(TimerAlarmViewModel.TimerFooterText)));
     }
 
-    private void ShowStopwatchTab()
+    public void ShowStopwatchTab()
     {
         TimerTabContent.Visibility = Visibility.Collapsed;
         AlarmTabContent.Visibility = Visibility.Collapsed;
@@ -1894,6 +1959,32 @@ public partial class IslandWindow : Window
             : new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x9C, 0xB0, 0xCE));
     }
     private void SettingsButton_Click(object sender, RoutedEventArgs e) => OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
+
+    // ---- Command palette integration ----
+
+    /// <summary>Distance from the window top to the bottom of the glass shell (DIP), used to
+    /// place the palette just below the island.</summary>
+    public double ShellBottomDips => GlassShell.Margin.Top + GlassShell.ActualHeight;
+
+    public void FocusTimerPanel()
+    {
+        if (TimerPanelHost.Visibility != Visibility.Visible) return;
+        TimerTabButton.Focus();
+        Keyboard.Focus(TimerTabButton);
+    }
+
+    /// <summary>Fills the Q prompt without submitting, then hands focus to it.</summary>
+    public void PrefillQPrompt(string? text)
+    {
+        if (!string.IsNullOrEmpty(text)) QPromptBox.Text = text;
+        UpdateQPromptComposer();
+        Dispatcher.BeginInvoke(() =>
+        {
+            QPromptBox.Focus();
+            Keyboard.Focus(QPromptBox);
+        }, DispatcherPriority.Background);
+    }
+
     private void QSettingsButton_Click(object sender, RoutedEventArgs e) => OpenQSettingsRequested?.Invoke(this, EventArgs.Empty);
     private void RecenterButton_Click(object sender, RoutedEventArgs e) => RecenterRequested?.Invoke(this, EventArgs.Empty);
 

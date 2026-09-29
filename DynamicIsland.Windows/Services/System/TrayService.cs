@@ -66,7 +66,7 @@ public sealed class TrayService : IDisposable
 
         _icon = new Forms.NotifyIcon
         {
-            Text = "Dynamic Island",
+            Text = "Sutra Island",
             Icon = CreateIcon(),
             ContextMenuStrip = menu,
             Visible = true

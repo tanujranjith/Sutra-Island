@@ -1,16 +1,16 @@
-# Dynamic Island Codex test build
+# Sutra Island Codex test build
 
 This ZIP is the test distribution that includes a pinned official Codex runtime.
-Extract the entire folder before launching `DynamicIsland.exe`; do not run the app
+Extract the entire folder before launching the included app executable; do not run it
 from inside the ZIP.
 
 In **Settings > Q Assistant**, choose **ChatGPT / Codex** and select **Sign in with
 ChatGPT**. The browser/device-code flow and OAuth token lifecycle are handled by
-the official Codex app-server. Dynamic Island never receives or stores the token.
+the official Codex app-server. Sutra Island never receives or stores the token.
 
 Important behavior:
 
-- Signing out in Dynamic Island also signs out official Codex apps for this Windows user.
+- Signing out in Sutra Island also signs out official Codex apps for this Windows user.
 - Q sends prompts, OCR text, and an enabled screen image to OpenAI through Codex.
 - Q requests read-only/no-approval operation, declines tool approvals, and deletes
   only the Codex threads it created after each request.

@@ -75,7 +75,7 @@ public sealed class CodexAppServerClient : IAsyncDisposable
             {
                 await SendRequestCoreAsync("initialize", new
                 {
-                    clientInfo = new { name = "dynamic_island", title = "Dynamic Island", version = _clientVersion }
+                    clientInfo = new { name = "sutra_island", title = "Sutra Island", version = _clientVersion }
                 }, cancellationToken).ConfigureAwait(false);
                 await SendNotificationAsync("initialized", new { }, cancellationToken).ConfigureAwait(false);
                 _initialized = true;
@@ -331,7 +331,7 @@ public sealed class CodexAppServerClient : IAsyncDisposable
     {
         object response = method.EndsWith("requestApproval", StringComparison.Ordinal)
             ? new { id, result = new { decision = "decline" } }
-            : new { id, error = new { code = -32601, message = "Dynamic Island Q does not enable tools or interactive requests." } };
+            : new { id, error = new { code = -32601, message = "Sutra Island Q does not enable tools or interactive requests." } };
         _log?.Info($"Codex server request declined: method={method}");
         return WriteAsync(JsonSerializer.Serialize(response), CancellationToken.None);
     }

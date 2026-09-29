@@ -91,6 +91,20 @@ public sealed class MediaSessionService(LoggingService log) : IDisposable
         catch (Exception ex) { log.Error("Play/pause command failed", ex); }
     }
 
+    // Explicit play/pause for the command palette — toggles are ambiguous when a command
+    // names the exact action it wants.
+    public async Task PauseAsync()
+    {
+        try { if (_selectedSession is not null) await _selectedSession.TryPauseAsync(); }
+        catch (Exception ex) { log.Error("Pause command failed", ex); }
+    }
+
+    public async Task PlayAsync()
+    {
+        try { if (_selectedSession is not null) await _selectedSession.TryPlayAsync(); }
+        catch (Exception ex) { log.Error("Play command failed", ex); }
+    }
+
     public async Task PreviousAsync()
     {
         try { if (_selectedSession is not null) await _selectedSession.TrySkipPreviousAsync(); }

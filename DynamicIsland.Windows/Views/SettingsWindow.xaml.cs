@@ -11,15 +11,21 @@ namespace DynamicIsland.Windows.Views;
 public partial class SettingsWindow : Window
 {
     private readonly IslandViewModel _islandViewModel;
+    private readonly IslandWindow _islandWindow;
     private bool _previewPinnedExpanded;
     private bool _previewExpanded;
 
     public event EventHandler? OpenTimerRequested;
 
-    public SettingsWindow(SettingsViewModel settingsViewModel, IslandViewModel islandViewModel)
+    public SettingsWindow(SettingsViewModel settingsViewModel, IslandViewModel islandViewModel, IslandWindow islandWindow)
     {
         InitializeComponent();
         _islandViewModel = islandViewModel;
+        _islandWindow = islandWindow;
+        ExpandedPreviewSurface.Fill = new VisualBrush(_islandWindow.ExpandedPreviewVisual)
+        { Stretch = Stretch.Fill };
+        _islandWindow.ExpandedPreviewVisual.SizeChanged += ExpandedPreviewVisual_SizeChanged;
+        Closed += (_, _) => _islandWindow.ExpandedPreviewVisual.SizeChanged -= ExpandedPreviewVisual_SizeChanged;
         DataContext = settingsViewModel;
         settingsViewModel.PropertyChanged += SettingsOnPropertyChanged;
         Closed += (_, _) => settingsViewModel.PropertyChanged -= SettingsOnPropertyChanged;
@@ -92,9 +98,25 @@ public partial class SettingsWindow : Window
         { BeginTime = TimeSpan.FromMilliseconds(80) });
     }
 
-    private (double Width, double Height) PreviewSize(bool expanded) => expanded
-        ? (324d, 218d)
-        : (_islandViewModel.PreviewIslandWidth, _islandViewModel.PreviewIslandHeight);
+    private (double Width, double Height) PreviewSize(bool expanded)
+    {
+        if (!expanded) return (_islandViewModel.PreviewIslandWidth, _islandViewModel.PreviewIslandHeight);
+        var source = _islandWindow.ExpandedPreviewVisual;
+        var width = source.ActualWidth > 0 ? source.ActualWidth : 900d;
+        var height = source.ActualHeight > 0 ? source.ActualHeight : 371d;
+        var scale = Math.Min(400d / width, 300d / height);
+        return (width * scale, height * scale);
+    }
+
+    private void ExpandedPreviewVisual_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (!_previewExpanded) return;
+        var (width, height) = PreviewSize(true);
+        PreviewPill.BeginAnimation(WidthProperty, null);
+        PreviewPill.BeginAnimation(HeightProperty, null);
+        PreviewPill.Width = width;
+        PreviewPill.Height = height;
+    }
 
     private void IslandPreviewOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -108,6 +130,47 @@ public partial class SettingsWindow : Window
     }
 
     private void OpenTimer_Click(object sender, RoutedEventArgs e) => OpenTimerRequested?.Invoke(this, EventArgs.Empty);
+
+    // ---- Command palette shortcut capture ----
+    private bool _capturingPaletteHotkey;
+
+    private void ChangePaletteHotkey_Click(object sender, RoutedEventArgs e)
+    {
+        _capturingPaletteHotkey = true;
+        PaletteHotkeyButton.Content = "Press shortcut… Esc cancels";
+        PaletteHotkeyButton.Foreground = BrushFrom("#69B5FF");
+    }
+
+    private void SettingsWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (!_capturingPaletteHotkey) return;
+        e.Handled = true;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt
+            or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin or Key.None)
+            return; // wait for the actual key
+        if (key == Key.Escape)
+        {
+            EndPaletteHotkeyCapture();
+            return;
+        }
+        var combo = Infrastructure.HotkeyParser.Format(key, Keyboard.Modifiers);
+        if (combo is null)
+        {
+            if (DataContext is SettingsViewModel settings)
+                settings.SetCommandPaletteStatus("Use Ctrl, Alt, or Shift plus a letter, digit, F1–F12, or Space.");
+            return;
+        }
+        if (DataContext is SettingsViewModel vm) vm.CommandPaletteShortcut = combo;
+        EndPaletteHotkeyCapture();
+    }
+
+    private void EndPaletteHotkeyCapture()
+    {
+        _capturingPaletteHotkey = false;
+        PaletteHotkeyButton.Content = "Change";
+        PaletteHotkeyButton.Foreground = System.Windows.Media.Brushes.White;
+    }
 
     private void SettingsOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {

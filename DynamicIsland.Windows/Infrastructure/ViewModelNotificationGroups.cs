@@ -26,7 +26,7 @@ public static class ViewModelNotificationGroups
         "QState", "QCurrentMode", "QStatusText", "QHeaderStatusText", "QResponse", "QResponseDisplay", "QPromptText", "QPromptDisplay", "QHasPrompt", "QShortcuts", "QHasShortcuts",
         "QInlineStatusText", "QShowInlineThinking", "QCanStop", "QCanCopyResponse", "QCanRetry", "QShowResponseActions", "QError", "QSourceText", "QCompactText",
         "IsQActive", "ShowQSurface", "QIsAsk", "QIsSay", "QIsListening", "QNeedsConsent", "QSpeechAvailable", "QSelectedProvider", "ShowCompactMediaContent", "ShowCompactQContent",
-        "PrimaryActivity", "CompactGlyph", "CompactPrimaryText", "CompactSecondaryText"
+        "PrimaryActivity", "CompactGlyph", "CompactPrimaryText", "CompactSecondaryText", "ShowCompactEqualizer"
     };
 
     public static readonly IReadOnlySet<string> MediaProgressOnlyProperties = new HashSet<string>(StringComparer.Ordinal)
@@ -40,7 +40,7 @@ public static class ViewModelNotificationGroups
         "IsMuted", "IsAudioActive", "ShowAudioStatusText", "ShowVolume",
         "PrimaryActivity", "CompactGlyph", "CompactPrimaryText", "CompactSecondaryText",
         "ShowCompactArt", "ShowCompactMediaRing", "ShowCompactRingTrack",
-        "UseRealSpectrum", "ShowAnimatedWave"
+        "UseRealSpectrum", "ShowAnimatedWave", "ShowMusicVisualizer", "ShowCompactEqualizer"
     };
 
     public static readonly IReadOnlySet<string> BatteryProperties = new HashSet<string>(StringComparer.Ordinal)

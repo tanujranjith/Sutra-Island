@@ -114,7 +114,7 @@ public sealed class CoreUpgradeTests
     [Fact]
     public void UnavailablePinFallsBack() => Assert.Equal(IslandActivity.Media, ActivityPolicy.Select(false, false, false, IslandActivity.Timer, false, false, true, false, false));
     [Fact]
-    public void NotificationsBaselineThenDeliverEveryNewIdentityInOrder()
+    public void NotificationsBaselineThenDeliverNewContentInOrder()
     {
         var tracker = new NotificationSnapshotTracker(); var now = DateTimeOffset.UtcNow;
         var existing = new NotificationInfo("A", "old", "", 100, now, "app-a");
@@ -123,7 +123,7 @@ public sealed class CoreUpgradeTests
         var second = existing with { Id = 2, Title = "second", CreatedAt = now.AddSeconds(2) };
         Assert.Equal(new[] { first, second }, tracker.Observe([second, existing, first, second]));
         Assert.Empty(tracker.Observe([first, second, existing]));
-        var reused = first with { CreatedAt = now.AddSeconds(3) };
+        var reused = first with { CreatedAt = now.AddSeconds(3), Body = "updated" };
         Assert.Equal(new[] { reused }, tracker.Observe([reused, second]));
         tracker.Reset(); Assert.Empty(tracker.Observe([reused]));
     }

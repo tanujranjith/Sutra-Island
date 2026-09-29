@@ -169,7 +169,7 @@ public sealed partial class IslandViewModel
                 nameof(QCompareProvider), nameof(QCompareProviderChoice), nameof(QCompareModel), nameof(QCompareEffort));
         }
         RaiseMany(nameof(QCompareEnabled), nameof(QSingleMode), nameof(QShowSingleTranscript), nameof(QShowComparison), nameof(QShowCompactComparison),
-            nameof(QShowCompactSingle), nameof(IslandBaseSurfaceBrush), nameof(QCompactIconSize), nameof(QDisclosureText), nameof(QSendLabel), nameof(QStopLabel), nameof(QComposerPlaceholder), nameof(QLeftAnswer), nameof(QRightAnswer),
+            nameof(QShowCompactSingle), nameof(IslandBaseSurfaceBrush), nameof(QCompactIconSize), nameof(ShowCompactEqualizer), nameof(QDisclosureText), nameof(QSendLabel), nameof(QStopLabel), nameof(QComposerPlaceholder), nameof(QLeftAnswer), nameof(QRightAnswer),
             nameof(QLeftStatus), nameof(QRightStatus), nameof(QLeftCanCopy), nameof(QRightCanCopy), nameof(QCompareCanRetry), nameof(QLeftLabel), nameof(QRightLabel),
             nameof(QLeftCompact), nameof(QRightCompact));
     }

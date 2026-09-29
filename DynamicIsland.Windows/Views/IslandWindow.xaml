@@ -1,7 +1,7 @@
 <Window x:Class="DynamicIsland.Windows.Views.IslandWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:DynamicIsland.Windows.Views"
-        Title="Dynamic Island" Width="1200" Height="220"
+        Title="Sutra Island" Width="1200" Height="220"
         WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True"
         Background="Transparent" ShowInTaskbar="False" Topmost="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -473,6 +473,9 @@
                 MouseEnter="Pill_MouseEnter" MouseLeave="Pill_MouseLeave"
                 MouseLeftButtonDown="Pill_MouseLeftButtonDown"
                 MouseRightButtonUp="Pill_MouseRightButtonUp">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="28" ShadowDepth="8" Opacity="0.5" Color="#000000" Direction="90" />
+                </Border.Effect>
                 <Border.RenderTransform>
                     <TransformGroup>
                         <ScaleTransform x:Name="PillScale" ScaleX="1" ScaleY="1" />
@@ -536,9 +539,19 @@
                                Foreground="{Binding PrimaryTextBrush}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" VerticalAlignment="Center"
                                Margin="8,0" Visibility="{Binding ShowCompactHolePunchQOutput, Converter={StaticResource BoolToVisibility}}" />
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
-                                Visibility="{Binding ShowCompactStatusContent, Converter={StaticResource BoolToVisibility}}">
+                                 Visibility="{Binding ShowCompactStatusContent, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal" Height="28" VerticalAlignment="Center" Margin="0,0,8,0"
+                                     Visibility="{Binding ShowCompactEqualizer, Converter={StaticResource BoolToVisibility}}">
+                            <Rectangle Width="2" Height="{Binding VisualizerBar0Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                            <Rectangle Width="2" Height="{Binding VisualizerBar1Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                            <Rectangle Width="2" Height="{Binding VisualizerBar2Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                            <Rectangle Width="2" Height="{Binding VisualizerBar3Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                            <Rectangle Width="2" Height="{Binding VisualizerBar4Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                            <Rectangle Width="2" Height="{Binding VisualizerBar5Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                            <Rectangle Width="2" Height="{Binding VisualizerBar6Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                        </StackPanel>
                         <Border Width="1" Height="30" Margin="0,0,12,0" Background="{Binding IslandDividerBrush}"
-                                Visibility="{Binding ShowCompactRam, Converter={StaticResource BoolToVisibility}}" />
+                                 Visibility="{Binding ShowCompactRam, Converter={StaticResource BoolToVisibility}}" />
                         <StackPanel Margin="0,0,13,0" Visibility="{Binding ShowCompactRam, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="RAM" FontFamily="{Binding UiFontFamily}" FontSize="8" Foreground="{Binding SecondaryTextBrush}" HorizontalAlignment="Right" />
                             <TextBlock Text="{Binding RamText}" Margin="0,1,0,0" FontFamily="{Binding UiFontFamily}" FontSize="{Binding CompactSecondaryFontSize}" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" HorizontalAlignment="Right" />
@@ -605,13 +618,25 @@
                                    Foreground="{Binding SecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                     <Border Grid.Column="1" Width="1" Height="30" Margin="10,0" Background="{Binding IslandDividerBrush}" />
-                    <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <StackPanel Orientation="Horizontal" Height="28" VerticalAlignment="Center" Margin="0,0,8,0"
+                                     Visibility="{Binding ShowCompactEqualizer, Converter={StaticResource BoolToVisibility}}">
+                            <Rectangle Width="2" Height="{Binding VisualizerBar0Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                            <Rectangle Width="2" Height="{Binding VisualizerBar1Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                            <Rectangle Width="2" Height="{Binding VisualizerBar2Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                            <Rectangle Width="2" Height="{Binding VisualizerBar3Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                            <Rectangle Width="2" Height="{Binding VisualizerBar4Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                            <Rectangle Width="2" Height="{Binding VisualizerBar5Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                            <Rectangle Width="2" Height="{Binding VisualizerBar6Height}" RadiusX="1" RadiusY="1" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0.75,0" />
+                        </StackPanel>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Right">
                         <TextBlock Text="{Binding ClockTimeText}" FontFamily="{Binding UiFontFamily}" FontSize="{Binding CompactClockFontSize}"
                                    FontWeight="SemiBold" Foreground="{Binding PrimaryTextBrush}" HorizontalAlignment="Right" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Visibility="{Binding ShowBattery, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="{Binding BatteryGlyph}" FontFamily="Segoe Fluent Icons" FontSize="10" Foreground="{Binding SecondaryTextBrush}" />
                             <TextBlock Text="{Binding BatteryText}" Margin="4,1,0,0" FontFamily="{Binding UiFontFamily}" FontSize="9.5" Foreground="{Binding SecondaryTextBrush}" />
                         </StackPanel>
+                    </StackPanel>
                     </StackPanel>
                 </Grid>
 
@@ -659,13 +684,13 @@
                         </StackPanel>
                         <StackPanel Grid.Column="1" Grid.RowSpan="2" Orientation="Horizontal" Height="34" VerticalAlignment="Center"
                                     HorizontalAlignment="Right" Margin="4,0,0,0" Visibility="{Binding ShowMusicVisualizer, Converter={StaticResource BoolToVisibility}}">
-                            <Rectangle Width="4" Height="{Binding VisualizerBar0Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Bottom" Margin="1,0" />
-                            <Rectangle Width="4" Height="{Binding VisualizerBar1Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Bottom" Margin="1,0" />
-                            <Rectangle Width="4" Height="{Binding VisualizerBar2Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Bottom" Margin="1,0" />
-                            <Rectangle Width="4" Height="{Binding VisualizerBar3Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Bottom" Margin="1,0" />
-                            <Rectangle Width="4" Height="{Binding VisualizerBar4Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Bottom" Margin="1,0" />
-                            <Rectangle Width="4" Height="{Binding VisualizerBar5Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Bottom" Margin="1,0" />
-                            <Rectangle Width="4" Height="{Binding VisualizerBar6Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Bottom" Margin="1,0" />
+                            <Rectangle Width="4" Height="{Binding VisualizerBar0Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="1,0" />
+                            <Rectangle Width="4" Height="{Binding VisualizerBar1Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="1,0" />
+                            <Rectangle Width="4" Height="{Binding VisualizerBar2Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="1,0" />
+                            <Rectangle Width="4" Height="{Binding VisualizerBar3Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="1,0" />
+                            <Rectangle Width="4" Height="{Binding VisualizerBar4Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="1,0" />
+                            <Rectangle Width="4" Height="{Binding VisualizerBar5Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="1,0" />
+                            <Rectangle Width="4" Height="{Binding VisualizerBar6Height}" RadiusX="2" RadiusY="2" Fill="{Binding AccentBrush}" VerticalAlignment="Center" Margin="1,0" />
                         </StackPanel>
                     </Grid>
 
@@ -1387,7 +1412,7 @@
                                     <Button Click="QNew_Click" Style="{StaticResource QActionButton}" ToolTip="Start a new question" AutomationProperties.Name="New question">
                                         <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8F4;" FontFamily="Segoe Fluent Icons" FontSize="13" VerticalAlignment="Center" /><TextBlock Text="New question" Margin="8,0,0,0" /></StackPanel>
                                     </Button>
-                                    <Button Click="QClose_Click" Style="{StaticResource QResponseActionButton}" Margin="10,0,0,0" ToolTip="Return to the normal Dynamic Island" AutomationProperties.Name="Quit Q">
+                                    <Button Click="QClose_Click" Style="{StaticResource QResponseActionButton}" Margin="10,0,0,0" ToolTip="Return to the normal Sutra Island" AutomationProperties.Name="Quit Q">
                                         <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8BB;" FontFamily="Segoe Fluent Icons" FontSize="13" VerticalAlignment="Center" /><TextBlock Text="Quit Q" Margin="8,0,0,0" /></StackPanel>
                                     </Button>
                                 </StackPanel>
@@ -1661,30 +1686,17 @@
         <TextBlock Text="{Binding TimerCountText}" HorizontalAlignment="Right" VerticalAlignment="Top" Foreground="{Binding AccentBrush}" FontWeight="Bold" FontSize="11" /></Grid>
 
         <!-- Notifications retain their real system behaviour, but use the same quiet black material. -->
-        <Grid x:Name="NotifBanner" Margin="0,292,0,0" VerticalAlignment="Top" HorizontalAlignment="Center" Opacity="0">
-            <Grid.Style>
-                <Style TargetType="Grid">
-                    <Setter Property="Visibility" Value="Collapsed" />
-                    <Style.Triggers>
-                        <MultiDataTrigger>
-                            <MultiDataTrigger.Conditions>
-                                <Condition Binding="{Binding ShowBanner}" Value="True" />
-                                <Condition Binding="{Binding IsAirPodsBannerActive}" Value="False" />
-                            </MultiDataTrigger.Conditions>
-                            <Setter Property="Visibility" Value="Visible" />
-                        </MultiDataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Grid.Style>
+        <Grid x:Name="NotifBanner" Margin="0,70,0,0" VerticalAlignment="Top" HorizontalAlignment="Center" Opacity="0" Visibility="Collapsed">
             <Grid.RenderTransform><ScaleTransform x:Name="NotifScale" ScaleX="1" ScaleY="1" /></Grid.RenderTransform>
-            <Border x:Name="NotifCard" MaxWidth="480" Padding="14,10" CornerRadius="18" Background="#FA111113" BorderBrush="#16FFFFFF" BorderThickness="1" ClipToBounds="True">
+            <Border x:Name="NotifCard" MaxWidth="480" Padding="14,10" CornerRadius="18" Background="#FA111113" BorderBrush="#16FFFFFF" BorderThickness="1" ClipToBounds="True"
+                    Cursor="Hand" PreviewMouseLeftButtonDown="OpenNotification_Click">
                 <Border.Effect><DropShadowEffect x:Name="NotifGlow" BlurRadius="14" ShadowDepth="3" Opacity="0.42" Color="#000000" /></Border.Effect>
                 <Grid>
-                    <StackPanel x:Name="NotifContent">
+                    <StackPanel x:Name="NotifContent" Margin="0,0,30,0">
                         <StackPanel.Effect><BlurEffect x:Name="NotifBlur" Radius="0" /></StackPanel.Effect>
-                        <TextBlock Text="{Binding BannerApp}" FontFamily="Segoe UI Variable Text" FontSize="10.5" Foreground="{StaticResource AppleSecondary}" />
-                        <TextBlock Text="{Binding BannerTitle}" Margin="0,2,0,0" FontFamily="Segoe UI Variable Text" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AppleWhite}" />
-                        <TextBlock Text="{Binding BannerBody}" Margin="0,2,0,0" MaxWidth="430" TextWrapping="Wrap" FontFamily="Segoe UI Variable Text" FontSize="11.5" Foreground="#FFD1D1D6" />
+                        <TextBlock x:Name="NotifAppText" FontFamily="Segoe UI Variable Text" FontSize="10.5" Foreground="{StaticResource AppleSecondary}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="NotifTitleText" Margin="0,2,0,0" FontFamily="Segoe UI Variable Text" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AppleWhite}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="NotifBodyText" Margin="0,2,0,0" MaxWidth="430" TextWrapping="Wrap" FontFamily="Segoe UI Variable Text" FontSize="11.5" Foreground="#FFD1D1D6" />
                     </StackPanel>
                     <Rectangle x:Name="NotifSweepRect" IsHitTestVisible="False" Opacity="0">
                         <Rectangle.Fill>
@@ -1696,6 +1708,10 @@
                             </LinearGradientBrush>
                         </Rectangle.Fill>
                     </Rectangle>
+                    <Button x:Name="NotifDismissButton" Content="&#xE8BB;" Click="DismissNotification_Click" Style="{StaticResource AppleControlOnDark}"
+                            Width="30" Height="30" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,-6,0"
+                            ToolTip="Dismiss notification" AutomationProperties.Name="Dismiss notification"
+                            Visibility="{Binding ShowNotification, Converter={StaticResource BoolToVisibility}}" />
                 </Grid>
             </Border>
         </Grid>

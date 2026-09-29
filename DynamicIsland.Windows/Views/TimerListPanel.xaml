@@ -8,72 +8,27 @@
         </ResourceDictionary>
     </UserControl.Resources>
     <ScrollViewer x:Name="EditorScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False">
-        <Grid Margin="4,0">
+        <Grid x:Name="TimerLayout" Margin="4,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="320" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0" Text="{Binding StorageWarning}" Foreground="#FFFFB86C" TextWrapping="Wrap" Margin="0,0,0,6" />
-            <Expander Grid.Row="1" Visibility="{Binding HasMissedAlerts, Converter={StaticResource BoolToVisibility}}" Header="Missed alerts" Foreground="#CCD0D8" Margin="0,0,0,8">
+
+            <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="{Binding StorageWarning}" Foreground="#FFFFB86C" TextWrapping="Wrap" Margin="0,0,0,6" />
+            <Expander x:Name="MissedAlerts" Grid.Row="1" Grid.ColumnSpan="2" Visibility="{Binding HasMissedAlerts, Converter={StaticResource BoolToVisibility}}" Header="Missed alerts" Foreground="#CCD0D8" Margin="0,0,0,8">
                 <StackPanel>
                     <TextBlock Text="{Binding MissedSummary}" TextWrapping="Wrap" />
                     <Button Content="Clear summary" Command="{Binding ClearMissedCommand}" Style="{StaticResource SettingsButton}" HorizontalAlignment="Left" />
                 </StackPanel>
             </Expander>
-            <ListBox Grid.Row="2" ItemsSource="{Binding Timers}" SelectedValuePath="Id" SelectedValue="{Binding SelectedTimerId}"
-                     Height="54" Margin="0,0,0,10" Background="Transparent" BorderThickness="0"
-                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                     HorizontalContentAlignment="Stretch" AutomationProperties.Name="Timers">
-                <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem">
-                        <Setter Property="Margin" Value="0,0,6,0" />
-                        <Setter Property="Padding" Value="0" />
-                        <Setter Property="Width" Value="210" />
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="ListBoxItem">
-                                    <Border x:Name="ItemChrome" Background="#FF111E32" BorderBrush="#FF2F4C70" BorderThickness="1" CornerRadius="12" Padding="10,6">
-                                        <ContentPresenter />
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsSelected" Value="True">
-                                            <Setter TargetName="ItemChrome" Property="Background"
-                                                    Value="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
-                                            <Setter TargetName="ItemChrome" Property="BorderBrush"
-                                                    Value="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
-                                        </Trigger>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="ItemChrome" Property="BorderBrush"
-                                                    Value="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </ListBox.ItemContainerStyle>
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Text}" Foreground="#FFB7C7DF" FontSize="11" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                            <Button Grid.Column="1" Content="&#xE711;" Command="{Binding DataContext.EndTimerCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                    CommandParameter="{Binding Id}" Style="{StaticResource TimerChipDeleteButton}" Margin="6,0,0,0"
-                                    ToolTip="End timer" AutomationProperties.Name="End timer" />
-                        </Grid>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-            <Grid Grid.Row="3" Width="286" Height="286" HorizontalAlignment="Center" Margin="0,0,0,12">
+
+            <Grid x:Name="TimerRingPanel" Grid.Row="2" Grid.Column="0" Width="286" Height="286" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,0,20,12">
                 <Ellipse Width="286" Height="286" Stroke="{Binding DataContext.AccentSoftBrush, RelativeSource={RelativeSource AncestorType=Window}}" StrokeThickness="1" />
                 <Ellipse Width="270" Height="270" Stroke="#FF263D61" StrokeThickness="8" />
                 <Ellipse Width="270" Height="270"
@@ -106,14 +61,67 @@
                     </Border>
                 </StackPanel>
             </Grid>
-            <WrapPanel Grid.Row="4" HorizontalAlignment="Center" Margin="0,0,0,12">
-                <Button Content="5m" Command="{Binding StartPresetCommand}" CommandParameter="5" Style="{StaticResource TimerSurfaceButton}" Margin="3" MinWidth="68" />
-                <Button Content="10m" Command="{Binding StartPresetCommand}" CommandParameter="10" Style="{StaticResource TimerSurfaceButton}" Margin="3" MinWidth="68" />
-                <Button Content="15m" Command="{Binding StartPresetCommand}" CommandParameter="15" Style="{StaticResource TimerSurfaceButton}" Margin="3" MinWidth="68" />
-                <Button Content="25m" Command="{Binding StartPresetCommand}" CommandParameter="25" Style="{StaticResource TimerSurfaceButton}" Margin="3" MinWidth="68" />
-                <Button Content="30m" Command="{Binding StartPresetCommand}" CommandParameter="30" Style="{StaticResource TimerSurfaceButton}" Margin="3" MinWidth="68" />
-            </WrapPanel>
-            <StackPanel Grid.Row="5" MaxWidth="520" HorizontalAlignment="Center" Margin="0,0,0,12">
+
+            <StackPanel x:Name="OptionsPanel" Grid.Row="2" Grid.Column="1" VerticalAlignment="Top">
+                <TextBlock Text="Active timers" Foreground="#FF8EA7CA" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <ListBox ItemsSource="{Binding Timers}" SelectedValuePath="Id" SelectedValue="{Binding SelectedTimerId}"
+                         Height="54" Margin="0,0,0,14" Background="Transparent" BorderThickness="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                         HorizontalContentAlignment="Stretch" AutomationProperties.Name="Timers">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Margin" Value="0,0,6,0" />
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Width" Value="210" />
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="ItemChrome" Background="#FF111E32" BorderBrush="#FF2F4C70" BorderThickness="1" CornerRadius="12" Padding="10,6">
+                                            <ContentPresenter />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="ItemChrome" Property="Background"
+                                                        Value="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                                <Setter TargetName="ItemChrome" Property="BorderBrush"
+                                                        Value="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ItemChrome" Property="BorderBrush"
+                                                        Value="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding Text}" Foreground="#FFB7C7DF" FontSize="11" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Content="&#xE711;" Command="{Binding DataContext.EndTimerCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                        CommandParameter="{Binding Id}" Style="{StaticResource TimerChipDeleteButton}" Margin="6,0,0,0"
+                                        ToolTip="End timer" AutomationProperties.Name="End timer" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <TextBlock Text="Quick start" Foreground="#FF8EA7CA" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <WrapPanel Margin="-3,0,0,10">
+                    <Button Content="5m" Command="{Binding StartPresetCommand}" CommandParameter="5" Style="{StaticResource TimerSurfaceButton}" Margin="3" MinWidth="68" />
+                    <Button Content="10m" Command="{Binding StartPresetCommand}" CommandParameter="10" Style="{StaticResource TimerSurfaceButton}" Margin="3" MinWidth="68" />
+                    <Button Content="15m" Command="{Binding StartPresetCommand}" CommandParameter="15" Style="{StaticResource TimerSurfaceButton}" Margin="3" MinWidth="68" />
+                    <Button Content="25m" Command="{Binding StartPresetCommand}" CommandParameter="25" Style="{StaticResource TimerSurfaceButton}" Margin="3" MinWidth="68" />
+                    <Button Content="30m" Command="{Binding StartPresetCommand}" CommandParameter="30" Style="{StaticResource TimerSurfaceButton}" Margin="3" MinWidth="68" />
+                </WrapPanel>
+
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -122,15 +130,18 @@
                     <TextBox Text="{Binding CustomMinutes}" Style="{StaticResource TimerTextBox}" FontSize="20" HorizontalContentAlignment="Center" />
                     <TextBlock Grid.Column="1" Text="minutes" Foreground="#FF9DB4D7" FontSize="16" VerticalAlignment="Center" Margin="14,0,0,0" />
                 </Grid>
-                <TextBox Text="{Binding TimerLabel}" Style="{StaticResource TimerTextBox}" ToolTip="Optional timer label" Margin="0,10,0,0" />
+                <Button Content="Start custom timer" Command="{Binding StartCustomCommand}" Style="{StaticResource TimerSurfaceButton}" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="12,6" />
+                <TextBlock Text="Label" Foreground="#FF8EA7CA" FontSize="12" FontWeight="SemiBold" Margin="0,12,0,6" />
+                <TextBox Text="{Binding TimerLabel}" Style="{StaticResource TimerTextBox}" ToolTip="Optional timer label" />
                 <Button Content="Add alarm from this label" Command="{Binding UseTimerLabelForAlarmCommand}" Style="{StaticResource TimerSurfaceButton}"
                         HorizontalAlignment="Left" Margin="0,8,0,0" Padding="12,6" ToolTip="Open Alarm with this label ready to schedule" />
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,18,0,0">
+                    <Button Content="{Binding TimerPrimaryText}" Command="{Binding TimerPrimaryCommand}" Style="{StaticResource TimerPrimaryButton}" MinWidth="150" MinHeight="48" FontSize="15" Margin="0,0,8,0" />
+                    <Button Content="Reset" Command="{Binding ResetTimerCommand}" Style="{StaticResource TimerSurfaceButton}" MinWidth="120" MinHeight="48" FontSize="15" />
+                </StackPanel>
+                <TextBlock Text="{Binding ValidationMessage}" Foreground="#FFFFB86C" TextWrapping="Wrap" HorizontalAlignment="Left" Margin="0,10,0,0" />
             </StackPanel>
-            <WrapPanel Grid.Row="6" HorizontalAlignment="Center" Margin="0,0,0,6">
-                <Button Content="{Binding TimerPrimaryText}" Command="{Binding TimerPrimaryCommand}" Style="{StaticResource TimerPrimaryButton}" MinWidth="170" MinHeight="52" FontSize="15" Margin="5" />
-                <Button Content="Reset" Command="{Binding ResetTimerCommand}" Style="{StaticResource TimerSurfaceButton}" MinWidth="170" MinHeight="52" FontSize="15" Margin="5" />
-            </WrapPanel>
-            <TextBlock Grid.Row="6" Text="{Binding ValidationMessage}" Foreground="#FFFFB86C" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,72,0,0" />
         </Grid>
     </ScrollViewer>
 </UserControl>

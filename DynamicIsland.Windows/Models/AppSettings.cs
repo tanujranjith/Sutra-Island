@@ -12,7 +12,7 @@ public enum QCaptureMode { ActiveWindow, ActiveMonitor }
 
 public sealed class AppSettings
 {
-    public int SchemaVersion { get; set; } = 11;
+    public int SchemaVersion { get; set; } = 12;
     public bool LaunchOnStartup { get; set; }
     public bool AlwaysOnTop { get; set; } = true;
     public bool LockPosition { get; set; }
@@ -99,8 +99,9 @@ public sealed class AppSettings
     public bool WeatherFahrenheit { get; set; }
     public bool ShowSystemMonitor { get; set; }
     public bool ShowRamInCompact { get; set; } // show RAM usage on the collapsed (compact) island
-    public bool RealAudioSpectrum { get; set; }
+    public bool RealAudioSpectrum { get; set; } = true;
     public bool ShowMusicVisualizer { get; set; } = true;
+    public bool ShowEqualizerInCompact { get; set; } // show the live equalizer on the compact island while audio is playing
     public bool ShowConnectivity { get; set; } = true;
 
     // ===== Layout order (csv of: media,volume,status) =====
@@ -135,6 +136,7 @@ public sealed class AppSettings
     // ===== Clipboard / notifications / calendar (Windows APIs; may be limited unpackaged) =====
     public bool ShowClipboard { get; set; }
     public bool ShowNotifications { get; set; }
+    public int NotificationPollSeconds { get; set; } = 4;
     public bool ShowNextMeeting { get; set; }
     // Notification mirroring filter: All shows every toast; Allowlist shows only listed apps; Blocklist hides them.
     public NotificationFilter NotificationFilterMode { get; set; } = NotificationFilter.All;
@@ -165,6 +167,8 @@ public sealed class AppSettings
     public string QSaySystemPrompt { get; set; } = "";
     // Global shortcut used to open Q. Ctrl+Alt+Q remains the compatibility default.
     public string QActivationHotkey { get; set; } = "Ctrl+Alt+Q";
+    // Global shortcut that opens the command palette. Customisable in Settings → Advanced.
+    public string CommandPaletteHotkey { get; set; } = "Ctrl+Alt+K";
     // Null migrates the former single choice; zero intentionally disables every shortcut.
     public QActivationShortcuts? QActivationKeys { get; set; }
     public List<QShortcut> QShortcuts { get; set; } = [];

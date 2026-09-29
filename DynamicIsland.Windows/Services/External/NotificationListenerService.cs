@@ -20,6 +20,16 @@ public sealed class NotificationListenerService : IDisposable
     public IntegrationStatus Status { get; private set; } = IntegrationStatus.Disabled;
     public bool IsActive => Status.State == IntegrationState.Ready;
     public NotificationListenerService(LoggingService log) { _log = log; _timer.Tick += async (_, _) => await PollAsync(); }
+    public TimeSpan PollInterval => _timer.Interval;
+    public void Configure(TimeSpan pollInterval)
+    {
+        var interval = TimeSpan.FromSeconds(Math.Clamp(pollInterval.TotalSeconds, 1, 30));
+        if (interval == _timer.Interval) return;
+        var wasRunning = _timer.IsEnabled;
+        if (wasRunning) _timer.Stop();
+        _timer.Interval = interval;
+        if (wasRunning) _timer.Start();
+    }
     private void SetStatus(IntegrationStatus value) { if (Status == value) return; Status = value; StatusChanged?.Invoke(this, EventArgs.Empty); }
     public async Task StartAsync(bool requestPermission = false)
     {
@@ -64,9 +74,16 @@ public sealed class NotificationListenerService : IDisposable
         {
             var binding = n.Notification.Visual.GetBinding(KnownNotificationBindings.ToastGeneric);
             if (binding is null) return null;
-            var text = binding.GetTextElements();
-            var app = n.AppInfo?.DisplayInfo?.DisplayName ?? "Notification";
-            return new(app, text.Count > 0 ? text[0].Text : app, string.Join("  ", text.Skip(1).Select(t => t.Text)), n.Id, n.CreationTime, n.AppInfo?.AppUserModelId ?? app);
+            var app = n.AppInfo?.DisplayInfo?.DisplayName?.Trim() ?? string.Empty;
+            var text = binding.GetTextElements()
+                .Select(element => element.Text?.Trim() ?? string.Empty)
+                .Where(NotificationContent.HasVisibleText)
+                .ToArray();
+            var appId = n.AppInfo?.AppUserModelId ?? app;
+            var notification = new NotificationInfo(app,
+                text.FirstOrDefault() ?? string.Empty,
+                string.Join("  ", text.Skip(1)), n.Id, n.CreationTime, appId);
+            return NotificationContent.HasVisibleContent(notification) ? notification : null;
         }
         catch { return null; }
     }

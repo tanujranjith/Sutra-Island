@@ -1,6 +1,6 @@
 # Q visual assistant
 
-Q is Dynamic Island’s on-demand visual assistant. Press the configured Q
+Q is Sutra Island’s on-demand visual assistant. Press the configured Q
 activation shortcuts (`Ctrl+Alt+Q` by default) from another
 application to capture the current context and ask a question without opening a
 separate chat window. By default, Q expands the Island automatically. Disable
@@ -27,14 +27,14 @@ wait before closing, from 1 to 300 seconds; it is off by default.
 ### ChatGPT / Codex sign-in
 
 The **ChatGPT / Codex** provider uses the official Codex app-server and does not
-need an OpenAI API key. For the simplest test, download the release asset named
-`DynamicIsland-Codex-Test-v1.0.6-win-x64.zip`, extract the whole folder, and run
-`DynamicIsland.exe`. The normal `DynamicIsland.exe` remains available for users
+need an OpenAI API key. For the simplest test, download the Codex test ZIP from
+the latest release, extract the whole folder, and run the included app executable.
+The standalone executable remains available for users
 who already have a supported official Codex installation.
 
 In Q settings, choose **ChatGPT / Codex**, select **Sign in with ChatGPT**, and
 enter the displayed device code at the official verification URL. The app-server
-owns the OAuth login and token-refresh lifecycle; Dynamic Island receives account
+owns the OAuth login and token-refresh lifecycle; Sutra Island receives account
 status but never reads, copies, logs, or stores the OAuth token.
 
 Runtime lookup is deterministic: a bundled and SHA-256-verified Codex 0.151.0
@@ -50,7 +50,7 @@ API-platform billing or API credits. The API-key OpenAI provider remains availab
 separately.
 
 The signed-in account is shared with official Codex apps on the same Windows user
-profile. Signing out from Dynamic Island therefore signs that shared Codex profile
+profile. Signing out from Sutra Island therefore signs that shared Codex profile
 out everywhere; the UI warns before doing so. Model and effort choices come from
 `model/list`, and Q passes the exact selected model and supported effort into each
 turn. The displayed usage percentage and reset time come from Codex rate-limit

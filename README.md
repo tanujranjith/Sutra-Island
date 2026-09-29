@@ -1,6 +1,6 @@
-# Dynamic Island for Windows
+# Sutra Island for Windows
 
-A native **Windows desktop "Dynamic Island"** — a polished, always-on-top pill that
+**Sutra Island** is a live desktop island for Windows — a polished, always-on-top pill that
 sits at the top-center of your screen and expands on hover into a wide, restrained
 smoked-charcoal panel showing **now-playing media, system volume, an audio
 equalizer, the clock, date, weather, RAM/network, battery, and a timer/alarm**.
@@ -20,12 +20,12 @@ connection state, left/right/case battery, charging state, case-lid state, and
 in-ear state without requiring a driver or a companion service.
 
 <p align="center">
-  <img src="media/current-expanded-island.png" alt="Current Dynamic Island expanded media, audio, and system status surface" width="900">
+  <img src="media/current-expanded-island.png" alt="Current Sutra Island expanded media, audio, and system status surface" width="900">
 </p>
 
 <p align="center">
-  <a href="../../releases/latest/download/DynamicIsland.exe">
-    <img src="https://img.shields.io/badge/Download-DynamicIsland.exe-2ea44f?style=for-the-badge&logo=windows&logoColor=white" alt="Download DynamicIsland.exe">
+  <a href="../../releases/latest">
+    <img src="https://img.shields.io/badge/Download-Sutra%20Island-2ea44f?style=for-the-badge&logo=windows&logoColor=white" alt="Download Sutra Island">
   </a>
   &nbsp;
   <a href="../../releases/latest"><img src="https://img.shields.io/badge/Releases-all%20versions-24292e?style=for-the-badge" alt="All releases"></a>
@@ -74,7 +74,7 @@ can't seek.
 
 | Expanded Island | Compact Island | Settings surface | Timer surface |
 | --- | --- | --- | --- |
-| <img src="media/current-expanded-island.png" alt="Expanded Dynamic Island" width="220"> | <img src="media/current-island-preview.png" alt="Compact Dynamic Island" width="220"> | <img src="media/current-settings-preview.png" alt="Dynamic Island settings window" width="220"> | <img src="media/current-timer-panel.png" alt="Timer panel" width="220"> |
+| <img src="media/current-expanded-island.png" alt="Expanded Sutra Island" width="220"> | <img src="media/current-island-preview.png" alt="Compact Sutra Island" width="220"> | <img src="media/current-settings-preview.png" alt="Sutra Island settings window" width="220"> | <img src="media/current-timer-panel.png" alt="Timer panel" width="220"> |
 
 These captures document the current native WPF implementation. The clean crops
 are used here intentionally; raw desktop captures in `test-artifacts/` may include
@@ -154,8 +154,8 @@ throughout; type is **Segoe UI Variable**.
 
 ### Option 1 — Download the app (easiest)
 
-1. Go to the **[latest release](../../releases/latest)** and download
-   **`DynamicIsland.exe`** (or use the green button above).
+1. Go to the **[latest release](../../releases/latest)** and download the app executable
+   (or use the green button above).
 2. Double-click it. The build is **self-contained** — no .NET, no installer,
    nothing else to set up.
 
@@ -166,10 +166,10 @@ screen context is sent to a provider. Local Ollama setups can use the configurab
 base URL without an API key.
 
 For ChatGPT/Codex testing, the release also includes
-**`DynamicIsland-Codex-Test-v1.0.6-win-x64.zip`**. Extract the complete folder and
-launch its `DynamicIsland.exe`; the ZIP includes a pinned, SHA-256-verified official
-Codex runtime. The normal **`DynamicIsland.exe`** remains the standalone option and
-uses an existing supported official Codex installation. Signing out of Codex in Dynamic Island also
+the Codex test ZIP. Extract the complete folder and
+launch its app executable; the ZIP includes a pinned, SHA-256-verified official
+Codex runtime. The standalone executable remains available separately and
+uses an existing supported official Codex installation. Signing out of Codex in Sutra Island also
 signs out official Codex apps for that Windows user. See [`Q.md`](Q.md) for the
 subscription limits, privacy model, and security boundaries.
 
@@ -227,17 +227,13 @@ dotnet publish .\DynamicIsland.Windows -c Release -r win-x64
 
 ### Publishing a release (maintainers)
 
-So the **Download** button resolves, attach the published exe to a GitHub Release
-named exactly `DynamicIsland.exe`:
+The release workflow publishes the standalone app and Codex test bundle:
 
 ```powershell
 dotnet publish .\DynamicIsland.Windows -c Release -r win-x64
-# rename/copy the output to DynamicIsland.exe, then:
-gh release create v1.0.6 ".\DynamicIsland.Windows\bin\Release\net10.0-windows10.0.19041.0\win-x64\publish\DynamicIsland.Windows.exe#DynamicIsland.exe" --title "v1.0.6" --notes-file .\RELEASE_NOTES.md
 ```
 
-The `#DynamicIsland.exe` suffix uploads the asset under that name, which is what the
-`releases/latest/download/DynamicIsland.exe` link points to.
+The download button links to the release page so earlier releases remain accessible.
 
 ---
 

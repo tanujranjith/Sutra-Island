@@ -58,10 +58,13 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private QuoteItem[] _quotes = [];
     private int _quoteIndex;
     private readonly System.Windows.Threading.DispatcherTimer _quoteTimer = new();
-    private readonly System.Windows.Threading.DispatcherTimer _visualizerTimer = new() { Interval = TimeSpan.FromMilliseconds(90) };
+    private readonly System.Windows.Threading.DispatcherTimer _visualizerTimer = new() { Interval = TimeSpan.FromMilliseconds(33) };
     private readonly System.Windows.Threading.DispatcherTimer _connectivityTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly System.Windows.Threading.DispatcherTimer _qAutoCloseTimer = new();
+    private readonly System.Windows.Threading.DispatcherTimer _timerUiTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private double _visualizerPhase;
+    private readonly VisualizerMotion _visualizerMotion = new();
+    private readonly System.Diagnostics.Stopwatch _visualizerClock = System.Diagnostics.Stopwatch.StartNew();
     private (string Label, TimeZoneInfo Zone)[] _worldClockZones = [];
     private string _worldClockConfig = string.Empty;
     private string[] _expandedOrder = ["media", "volume", "status"];
@@ -172,7 +175,16 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         _volumeWarningTimer.Tick += (_, _) => { _volumeWarningTimer.Stop(); _volumeWarningActive = false; RaiseMany(nameof(ShowBanner), nameof(IsAirPodsBannerActive), nameof(BannerApp), nameof(BannerTitle), nameof(BannerBody)); };
         _airPodsBannerTimer.Tick += (_, _) => { _airPodsBannerTimer.Stop(); _airPodsBannerActive = false; RaiseMany(nameof(ShowBanner), nameof(IsAirPodsBannerActive), nameof(BannerApp), nameof(BannerTitle), nameof(BannerBody)); };
         _quoteTimer.Tick += (_, _) => OnUi(AdvanceQuote);
-        _visualizerTimer.Tick += (_, _) => OnUi(() => { if (IsAudioActive) { _visualizerPhase += 0.32; RaiseVisualizerProperties(); } });
+        _visualizerTimer.Tick += (_, _) => OnUi(() =>
+        {
+            if (!IsAudioActive)
+                return;
+
+            var elapsed = _visualizerClock.Elapsed;
+            _visualizerClock.Restart();
+            UpdateVisualizerMotion(elapsed.TotalSeconds, !IsReducedMotion);
+            RaiseVisualizerProperties();
+        });
         _visualizerTimer.Start();
         _connectivityTimer.Tick += (_, _) => OnUi(() => RaiseMany(nameof(WifiConnected), nameof(WifiStatusText), nameof(WifiStatusBrush)));
         _connectivityTimer.Start();
@@ -213,6 +225,8 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         _batteryService.Changed += OnBatteryChanged;
         _clockService.Tick += OnClockTick;
         _timerAlarmService.Changed += OnTimerAlarmChanged;
+        _timerUiTimer.Tick += (_, _) => RaiseMany(nameof(TimerText), nameof(TimerProgress), nameof(TimerRemainingProgress));
+        SyncTimerUiTicker();
         _themeService.SystemThemeChanged += OnSystemThemeChanged;
         _qSession.Changed += OnQChanged;
         ApplySettings();
@@ -820,7 +834,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public CornerRadius IslandInnerCornerRadius => new(Math.Max(0, ClampedCornerRadius - 1));
 
     // ===== Notification banner (transient) =====
-    public bool ShowNotification => _notification is not null && Settings.ShowNotifications && !FocusModeEnabled && !DeferOrdinaryBanners;
+    public bool ShowNotification => _notification is not null && NotificationContent.HasVisibleContent(_notification) && Settings.ShowNotifications && !FocusModeEnabled && !DeferOrdinaryBanners;
     public string NotificationApp => _notification?.App ?? string.Empty;
     public string NotificationTitle => _notification?.Title ?? string.Empty;
     public string NotificationBody => _notification?.Body ?? string.Empty;
@@ -839,7 +853,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     {
         get
         {
-            if (ShowNotification) return NotificationApp;
+            if (ShowNotification) return NotificationContent.Truncate(NotificationApp, 48);
             if (_volumeWarningActive && Settings.VolumeWarningEnabled) return "Volume";
             if (IsAirPodsBannerActive) return _airPods.DisplayName;
             return string.Empty;
@@ -849,7 +863,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     {
         get
         {
-            if (ShowNotification) return NotificationTitle;
+            if (ShowNotification) return NotificationContent.Truncate(NotificationTitle, 120);
             if (_volumeWarningActive && Settings.VolumeWarningEnabled) return "High volume";
             if (IsAirPodsBannerActive) return BuildAirPodsBannerTitle();
             return string.Empty;
@@ -859,7 +873,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     {
         get
         {
-            if (ShowNotification) return NotificationBody;
+            if (ShowNotification) return NotificationContent.Truncate(NotificationBody, 260);
             if (_volumeWarningActive && Settings.VolumeWarningEnabled) return $"Volume is at {_lastWarnedVolumePercent}% — consider lowering it to protect your hearing.";
             if (IsAirPodsBannerActive) return BuildAirPodsBannerBody();
             return string.Empty;
@@ -904,6 +918,10 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public bool UseRealSpectrum => Settings.RealAudioSpectrum && _spectrumService.IsActive && IsAudioActive;
     public bool ShowAnimatedWave => IsAudioActive && !UseRealSpectrum;
     public bool ShowMusicVisualizer => Settings.ShowMusicVisualizer && IsAudioActive;
+    // Compact-island equalizer: same live bars as the expanded visualizer, but gated behind
+    // its own option so the collapsed pill stays calm unless the user opts in. Q and the
+    // Q-compare surface own the compact lane while active, so hide there to avoid overlap.
+    public bool ShowCompactEqualizer => Settings.ShowEqualizerInCompact && IsAudioActive && !IsQActive && !QShowCompactComparison && !IsHolePunchMode;
     public double VisualizerBar0Height => VisualizerHeight(0);
     public double VisualizerBar1Height => VisualizerHeight(1);
     public double VisualizerBar2Height => VisualizerHeight(2);
@@ -913,8 +931,25 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public double VisualizerBar6Height => VisualizerHeight(6);
     private double VisualizerHeight(int index)
     {
-        var value = UseRealSpectrum ? Band(index) : 0.15 + 0.42 * ((Math.Sin(_visualizerPhase + index * 0.78) + 1) / 2);
-        return 7 + Math.Clamp(value, 0.08, 1.0) * 25;
+        // Motion is advanced on the visualizer timer so bars interpolate smoothly instead of
+        // jumping between raw analyzer frames.
+        return 6 + (Math.Clamp(_visualizerMotion.Level(index), 0, 1) * 20);
+    }
+    private void UpdateVisualizerMotion(double elapsedSeconds, bool lively)
+    {
+        if (UseRealSpectrum)
+        {
+            _visualizerMotion.Advance(_spectrum, elapsedSeconds, lively);
+            return;
+        }
+
+        if (lively)
+            _visualizerPhase += elapsedSeconds * 7.5;
+
+        Span<double> targets = stackalloc double[VisualizerMotion.BandCount];
+        for (var band = 0; band < VisualizerMotion.BandCount; band++)
+            targets[band] = 0.05 + (0.85 * ((Math.Sin((_visualizerPhase * (0.85 + (band * 0.08))) + (band * 0.9)) + 1) / 2));
+        _visualizerMotion.Advance(targets, elapsedSeconds, lively);
     }
     private void RaiseVisualizerProperties() => RaiseMany(
         nameof(VisualizerBar0Height), nameof(VisualizerBar1Height), nameof(VisualizerBar2Height),
@@ -927,7 +962,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public double SpectrumBand4 => Band(4);
     public double SpectrumBand5 => Band(5);
     public double SpectrumBand6 => Band(6);
-    private double Band(int i) => i < _spectrum.Length ? Math.Clamp(_spectrum[i], 0.08, 1.0) : 0.1;
+    private double Band(int i) => i < _spectrum.Length ? Math.Clamp(_spectrum[i], 0, 1.0) : 0;
 
     // ===== Expanded module order (album is fixed at column 0; these occupy 1..3) =====
     private string[] Order => _expandedOrder;
@@ -1342,7 +1377,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         nameof(QSourceText), nameof(QCompactText), nameof(IsQActive), nameof(ShowQSurface), nameof(QIsAsk), nameof(QIsSay), nameof(QIsListening),
         nameof(QNeedsConsent), nameof(QSpeechAvailable), nameof(QSelectedProvider), nameof(ShowCompactMediaContent), nameof(ShowCompactQContent), nameof(ShowCompactHolePunchQOutput), nameof(ShowCompactArtSurface), nameof(ShowCompactStatusContent),
         nameof(PrimaryActivity), nameof(CompactGlyph), nameof(CompactPrimaryText), nameof(CompactSecondaryText), nameof(ShowCompactArt),
-        nameof(ShowCompactMediaRing), nameof(ShowCompactTimerRing), nameof(ShowCompactRingTrack));
+        nameof(ShowCompactMediaRing), nameof(ShowCompactTimerRing), nameof(ShowCompactRingTrack), nameof(ShowCompactEqualizer));
     }
 
     private void UpdateQAutoCloseTimer()
@@ -1426,11 +1461,8 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         if (_currentNotificationHistoryItem is not null)
             _notificationHistoryService.Dismiss(_currentNotificationHistoryItem.Id);
         if (_currentGroup is { } group) foreach (var item in group.Items) _notificationHistoryService.Dismiss(item.Id);
-        _currentGroup = null;
-        _currentNotificationHistoryItem = null;
-        _notification = null;
+        ClearCurrentNotificationBanner();
         RefreshNotificationHistory();
-        RaiseMany(nameof(ShowNotification), nameof(ShowBanner), nameof(IsAirPodsBannerActive), nameof(BannerApp), nameof(BannerTitle), nameof(BannerBody));
     }
 
     private static void OpenNotification(NotificationHistoryItem? item)
@@ -1491,13 +1523,13 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private void OnSpectrumChanged(object? sender, double[] bands) => OnUi(() =>
     {
         _spectrum = bands;
+        // Bar heights are intentionally not raised here. The visualizer timer consumes the new
+        // targets at display cadence through VisualizerMotion.
         foreach (var name in new[]
         {
             nameof(SpectrumBand0), nameof(SpectrumBand1), nameof(SpectrumBand2), nameof(SpectrumBand3),
             nameof(SpectrumBand4), nameof(SpectrumBand5), nameof(SpectrumBand6),
-            nameof(UseRealSpectrum), nameof(ShowAnimatedWave), nameof(ShowMusicVisualizer),
-            nameof(VisualizerBar0Height), nameof(VisualizerBar1Height), nameof(VisualizerBar2Height),
-            nameof(VisualizerBar3Height), nameof(VisualizerBar4Height), nameof(VisualizerBar5Height), nameof(VisualizerBar6Height)
+            nameof(UseRealSpectrum), nameof(ShowAnimatedWave), nameof(ShowMusicVisualizer), nameof(ShowCompactEqualizer)
         }) RaisePropertyChanged(name);
     });
 
@@ -1520,11 +1552,24 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             nameof(CountdownText), nameof(WorldClocks), nameof(MeetingWhen));
     });
     private void RaiseMany(params string[] names) { foreach (var n in names) RaisePropertyChanged(n); }
-    private void OnTimerAlarmChanged(object? sender, EventArgs e) => OnUi(() => { RefreshActivities(); RaiseMany(
-        nameof(TimerText), nameof(TimerProgress), nameof(TimerRemainingProgress), nameof(ShowTimerOrb), nameof(AlarmText), nameof(PrimaryActivity),
-        nameof(CompactGlyph), nameof(CompactPrimaryText), nameof(CompactSecondaryText),
-        nameof(ShowCompactArt), nameof(ShowCompactMediaRing), nameof(ShowCompactTimerRing),
-        nameof(ShowCompactRingTrack)); });
+    private void OnTimerAlarmChanged(object? sender, EventArgs e) => OnUi(() =>
+    {
+        RefreshActivities();
+        RaiseMany(
+            nameof(TimerText), nameof(TimerProgress), nameof(TimerRemainingProgress), nameof(ShowTimerOrb), nameof(AlarmText), nameof(PrimaryActivity),
+            nameof(CompactGlyph), nameof(CompactPrimaryText), nameof(CompactSecondaryText),
+            nameof(ShowCompactArt), nameof(ShowCompactMediaRing), nameof(ShowCompactTimerRing),
+            nameof(ShowCompactRingTrack));
+        SyncTimerUiTicker();
+    });
+    private void SyncTimerUiTicker()
+    {
+        if (_timerAlarmService.State.Timers.Any(t => t.Phase == TimerPhase.Running))
+        {
+            if (!_timerUiTimer.IsEnabled) _timerUiTimer.Start();
+        }
+        else _timerUiTimer.Stop();
+    }
     private void OnSystemThemeChanged(object? sender, EventArgs e) => OnUi(() =>
     {
         IsDarkTheme = IsCustomTheme ? ThemePalette.Custom(Settings.CustomThemeColorHex).IsDark : _themeService.IsDark(Settings.Theme);
@@ -1564,9 +1609,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             nameof(IsMuted), nameof(IsAudioActive), nameof(ShowAudioStatusText), nameof(ShowVolume),
             nameof(ShowMedia), nameof(PrimaryActivity), nameof(CompactGlyph), nameof(CompactPrimaryText), nameof(CompactSecondaryText),
             nameof(ShowCompactArt), nameof(ShowCompactMediaRing), nameof(ShowCompactRingTrack),
-            nameof(UseRealSpectrum), nameof(ShowAnimatedWave), nameof(ShowMusicVisualizer),
-            nameof(VisualizerBar0Height), nameof(VisualizerBar1Height), nameof(VisualizerBar2Height),
-            nameof(VisualizerBar3Height), nameof(VisualizerBar4Height), nameof(VisualizerBar5Height), nameof(VisualizerBar6Height));
+            nameof(UseRealSpectrum), nameof(ShowAnimatedWave), nameof(ShowMusicVisualizer), nameof(ShowCompactEqualizer));
         (ToggleMuteCommand as RelayCommand)?.RaiseCanExecuteChanged();
     }
 
@@ -1590,6 +1633,14 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private void RaiseExpansionProperties()
     {
         RaiseMany(nameof(IsCompact), nameof(ShowTimerOrb), nameof(ShowQuoteInCompact), nameof(ShowQuoteInExpanded));
+    }
+
+    public void SetFocusMode(bool enabled)
+    {
+        if (Settings.FocusModeEnabled == enabled) return;
+        Settings.FocusModeEnabled = enabled;
+        _ = PersistSettingsAsync();
+        RaiseFocusModeProperties();
     }
 
     private void RaiseFocusModeProperties()
@@ -1706,7 +1757,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             nameof(ShowNotification), nameof(ShowBanner), nameof(IsAirPodsBannerActive),
             nameof(BannerApp), nameof(BannerTitle), nameof(BannerBody),
             nameof(ShowClipboard), nameof(ShowWidgetsPanel), nameof(LiveWidgetRailWidth), nameof(ShowStatusExtras),
-            nameof(UseRealSpectrum), nameof(ShowAnimatedWave), nameof(ShowMusicVisualizer), nameof(ShowConnectivity), nameof(PinExpanded), nameof(ScrollTitles));
+            nameof(UseRealSpectrum), nameof(ShowAnimatedWave), nameof(ShowMusicVisualizer), nameof(ShowCompactEqualizer), nameof(ShowConnectivity), nameof(PinExpanded), nameof(ScrollTitles));
         RaiseLiveWidgetLayoutProperties();
         RaiseMediaCommandsCanExecute();
         (ToggleMuteCommand as RelayCommand)?.RaiseCanExecuteChanged();
@@ -1904,6 +1955,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         _visualizerTimer.Stop();
         _connectivityTimer.Stop();
         _qAutoCloseTimer.Stop();
+        _timerUiTimer.Stop();
         _batteryService.Changed -= OnBatteryChanged;
         _clockService.Tick -= OnClockTick;
         _timerAlarmService.Changed -= OnTimerAlarmChanged;

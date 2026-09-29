@@ -82,8 +82,16 @@ public sealed partial class TimerAlarmViewModel : ObservableObject, IDisposable
             RaisePropertyChanged(nameof(StopwatchPrimaryText));
         });
         _service.Changed += OnChanged;
+        _timerUiTimer.Tick += (_, _) =>
+        {
+            RaisePropertyChanged(nameof(TimerRemaining));
+            RaisePropertyChanged(nameof(TimerProgress));
+            RaisePropertyChanged(nameof(TimerRemainingProgress));
+        };
+        SyncTimerUiTicker();
     }
 
+    private readonly System.Windows.Threading.DispatcherTimer _timerUiTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private readonly System.Windows.Threading.DispatcherTimer _swTimer = new() { Interval = TimeSpan.FromMilliseconds(53) };
     private readonly System.Diagnostics.Stopwatch _sw = new();
     public ObservableCollection<string> Laps { get; } = [];
@@ -211,7 +219,22 @@ public sealed partial class TimerAlarmViewModel : ObservableObject, IDisposable
         RaisePropertyChanged(nameof(TimerPrimaryText));
         RaisePropertyChanged(nameof(AlarmStateText));
         RaisePropertyChanged(nameof(IsAlarmRinging));
+        SyncTimerUiTicker();
     }
 
-    public void Dispose() => _service.Changed -= OnChanged;
+    private void SyncTimerUiTicker()
+    {
+        if (_service.State.Timer.Phase == TimerPhase.Running)
+        {
+            if (!_timerUiTimer.IsEnabled) _timerUiTimer.Start();
+        }
+        else _timerUiTimer.Stop();
+    }
+
+    public void Dispose()
+    {
+        _service.Changed -= OnChanged;
+        _timerUiTimer.Stop();
+        _swTimer.Stop();
+    }
 }

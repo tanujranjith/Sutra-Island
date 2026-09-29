@@ -236,10 +236,11 @@ public sealed class SettingsViewModel : ObservableObject
     public string SelectedMediaApp { get => _settings.SelectedMediaApp; set => Set(v => _settings.SelectedMediaApp = v, value); }
 
     // ===== Per-element sizes (live) =====
-    private void SetSize(Action<int> setter, int value, int min, int max)
+    private void SetSize(Action<int> setter, int value, int min, int max,
+        [System.Runtime.CompilerServices.CallerMemberName] string? property = null)
     {
         setter(Math.Clamp(value, min, max));
-        RaisePropertyChanged();
+        RaisePropertyChanged(property);
         _apply();
     }
     public int InterfaceScale { get => _settings.InterfaceScale; set => SetSize(v => _settings.InterfaceScale = v, value, 70, 150); }
@@ -292,6 +293,7 @@ public sealed class SettingsViewModel : ObservableObject
     public bool ShowRamInCompact { get => _settings.ShowRamInCompact; set { Set(v => _settings.ShowRamInCompact = v, value); _apply(); } }
     public bool RealAudioSpectrum { get => _settings.RealAudioSpectrum; set { Set(v => _settings.RealAudioSpectrum = v, value); _apply(); } }
     public bool ShowMusicVisualizer { get => _settings.ShowMusicVisualizer; set { Set(v => _settings.ShowMusicVisualizer = v, value); _apply(); } }
+    public bool ShowEqualizerInCompact { get => _settings.ShowEqualizerInCompact; set { Set(v => _settings.ShowEqualizerInCompact = v, value); _apply(); } }
     public bool ShowConnectivity { get => _settings.ShowConnectivity; set { Set(v => _settings.ShowConnectivity = v, value); _apply(); } }
 
     // ===== Widgets / live activities (new) =====
@@ -379,6 +381,7 @@ public sealed class SettingsViewModel : ObservableObject
     public string WorldClockZones { get => _settings.WorldClockZones; set { Set(v => _settings.WorldClockZones = v ?? "", value); _apply(); } }
     public bool ShowNextMeeting { get => _settings.ShowNextMeeting; set { Set(v => _settings.ShowNextMeeting = v, value); _apply(); } }
     public bool ShowNotifications { get => _settings.ShowNotifications; set { Set(v => _settings.ShowNotifications = v, value); _apply(); } }
+    public int NotificationPollSeconds { get => _settings.NotificationPollSeconds; set => SetSize(v => _settings.NotificationPollSeconds = v, value, 1, 30); }
     public Array NotificationFilterOptions => Enum.GetValues<NotificationFilter>();
     public NotificationFilter NotificationFilterMode { get => _settings.NotificationFilterMode; set { Set(v => _settings.NotificationFilterMode = v, value); _apply(); } }
     public string NotificationAppFilter { get => _settings.NotificationAppFilter; set { Set(v => _settings.NotificationAppFilter = v ?? "", value); _apply(); } }
@@ -505,6 +508,19 @@ public sealed class SettingsViewModel : ObservableObject
         set { Set(v => _settings.QHotkeyShortcut = string.Equals(v, "None", StringComparison.Ordinal) ? "" : v ?? "", value); _apply(); }
     }
     public IReadOnlyList<string> QHotkeyShortcutOptions => ["None", .. QShortcutList.Select(item => item.Name).Where(name => !string.IsNullOrWhiteSpace(name))];
+    private string _commandPaletteStatus = "";
+    public string CommandPaletteStatus => _commandPaletteStatus;
+    public void SetCommandPaletteStatus(string status)
+    {
+        if (_commandPaletteStatus == status) return;
+        _commandPaletteStatus = status;
+        RaisePropertyChanged(nameof(CommandPaletteStatus));
+    }
+    public string CommandPaletteShortcut
+    {
+        get => _settings.CommandPaletteHotkey;
+        set { Set(v => _settings.CommandPaletteHotkey = v ?? "", value); _apply(); }
+    }
     public string QConnectionStatus { get => _qConnectionStatus; private set => SetProperty(ref _qConnectionStatus, value); }
     public ICommand TestQCommand { get; }
     public ICommand SignInCodexCommand { get; }
@@ -841,13 +857,13 @@ public sealed class SettingsViewModel : ObservableObject
     private void Export()
     {
         var dialog = new Microsoft.Win32.SaveFileDialog
-        { Filter = "Dynamic Island settings (*.json)|*.json", FileName = "dynamic-island-settings.json" };
+        { Filter = "Sutra Island settings (*.json)|*.json", FileName = "sutra-island-settings.json" };
         if (dialog.ShowDialog() == true) _ = _settingsService.ExportAsync(_settings, dialog.FileName);
     }
 
     private async void Import()
     {
-        var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Dynamic Island settings (*.json)|*.json" };
+        var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Sutra Island settings (*.json)|*.json" };
         if (dialog.ShowDialog() != true) return;
         var loaded = await _settingsService.ImportAsync(dialog.FileName);
         if (loaded is null) return;
@@ -878,7 +894,7 @@ public sealed class SettingsViewModel : ObservableObject
     private void ResetToDefaults()
     {
         var choice = System.Windows.MessageBox.Show(
-            "Reset all Dynamic Island settings back to their defaults?\n\nThis affects appearance, sizes, " +
+            "Reset all Sutra Island settings back to their defaults?\n\nThis affects appearance, sizes, " +
             "position, activities, and integrations.",
             "Reset to defaults", System.Windows.MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning);
         if (choice != System.Windows.MessageBoxResult.OK) return;

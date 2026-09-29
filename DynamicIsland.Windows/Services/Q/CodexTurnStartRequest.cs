@@ -8,7 +8,7 @@ internal static class CodexTurnStartRequest
         ["cwd"] = workspace,
         ["approvalPolicy"] = "never",
         ["sandbox"] = "read-only",
-        ["serviceName"] = "dynamic_island_q"
+        ["serviceName"] = "sutra_island_q"
     };
 
     public static Dictionary<string, object?> Create(string threadId, IReadOnlyList<object> input,

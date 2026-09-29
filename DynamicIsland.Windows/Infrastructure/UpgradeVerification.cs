@@ -152,7 +152,7 @@ internal static class UpgradeVerification
         var timerPanel = (TimerListPanel)timerHost.Children[0];
         var scroller = (ScrollViewer)timerPanel.FindName("EditorScroller");
         report.Add($"Timer scrolling: viewport={scroller.ViewportHeight}, extent={scroller.ExtentHeight}, height={scroller.ActualHeight}");
-        Check(scroller.ScrollableHeight > 0, "Timer editor scrolls overflow instead of clipping controls");
+        Check(scroller.ExtentHeight <= scroller.ViewportHeight + 1 || scroller.ScrollableHeight > 0, "Timer editor either fits or scrolls overflow instead of clipping controls");
         scroller.ScrollToEnd(); await Capture("timers-scrolled");
         typeof(IslandWindow).GetMethod("AlarmTab_Click", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(window, [null, new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent)]);
         await Capture("alarms");
@@ -220,7 +220,7 @@ internal static class UpgradeVerification
         using var codex = new AsyncDisposeAdapter(new CodexAppServerClient(log: log));
         var account = new CodexAccountCoordinator(codex.Client, log);
         var settingsVm = new SettingsViewModel(settings, settingsService, new StartupService(log), () => { }, () => { }, () => { }, new FakeSecrets(), new QProviderRegistry([]), account);
-        var settingsWindow = new SettingsWindow(settingsVm, vm) { Opacity = 0, ShowActivated = false }; settingsWindow.Show(); settingsWindow.UpdateLayout(); settingsWindow.Close();
+        var settingsWindow = new SettingsWindow(settingsVm, vm, window) { Opacity = 0, ShowActivated = false }; settingsWindow.Show(); settingsWindow.UpdateLayout(); settingsWindow.Close();
         var timerWindow = new TimerAlarmWindow(window) { DataContext = timerVm, Opacity = 0, ShowActivated = false }; timerWindow.Show(); timerWindow.UpdateLayout(); timerWindow.Close();
         bindingLog.Flush(); File.WriteAllLines(Path.Combine(output, "checks.txt"), report);
         window.Close(); PresentationTraceSources.DataBindingSource.Listeners.Remove(bindingLog);
@@ -240,7 +240,7 @@ internal static class UpgradeVerification
         var editor = new SettingsViewModel(settings, persistence, new StartupService(log), vm.ApplySettings,
             () => { }, () => { }, secrets, registry, account);
         vm.QProviderSelectionChanged += (_, _) => editor.RefreshQProviderControls();
-        var settingsWindow = new SettingsWindow(editor, vm) { Opacity = 0, ShowActivated = false };
+        var settingsWindow = new SettingsWindow(editor, vm, window) { Opacity = 0, ShowActivated = false };
         settingsWindow.Show(); settingsWindow.OpenQSettings(); settingsWindow.UpdateLayout();
         var previousTheme = settings.Theme;
         editor.Theme = ThemeMode.Custom; editor.CustomThemeColorHex = "#123D38";

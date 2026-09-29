@@ -76,7 +76,9 @@ public sealed class SettingsService(LoggingService log)
             settings.ShowIslandInScreenshots = false;
         if (previousSchema < 10)
             settings.QAutoExpandIsland = true;
-        settings.SchemaVersion = Math.Max(11, settings.SchemaVersion);
+        if (previousSchema < 12)
+            settings.RealAudioSpectrum = true;
+        settings.SchemaVersion = Math.Max(12, settings.SchemaVersion);
         if (settings.PinnedActivity is not (IslandActivity.None or IslandActivity.Media or IslandActivity.Timer)) settings.PinnedActivity = IslandActivity.None;
         settings.SelectedMediaApp = string.IsNullOrWhiteSpace(settings.SelectedMediaApp)
             ? "Automatic" : settings.SelectedMediaApp;
@@ -108,6 +110,7 @@ public sealed class SettingsService(LoggingService log)
         if (string.IsNullOrWhiteSpace(settings.ExpandedOrder)) settings.ExpandedOrder = "media,volume,status";
         settings.LowBatteryThreshold = Math.Clamp(settings.LowBatteryThreshold, 5, 50);
         settings.VolumeWarningThreshold = Math.Clamp(settings.VolumeWarningThreshold, 10, 100);
+        settings.NotificationPollSeconds = Math.Clamp(settings.NotificationPollSeconds, 1, 30);
         if (!Enum.IsDefined(settings.QCaptureMode)) settings.QCaptureMode = Models.QCaptureMode.ActiveWindow;
         settings.QSelectedProvider = string.IsNullOrWhiteSpace(settings.QSelectedProvider) ? "openai" : settings.QSelectedProvider.Trim();
         settings.QSelectedModel = string.IsNullOrWhiteSpace(settings.QSelectedModel) ? "gpt-4o-mini" : settings.QSelectedModel.Trim();

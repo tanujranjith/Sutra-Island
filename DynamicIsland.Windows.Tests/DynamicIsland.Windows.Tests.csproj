@@ -15,6 +15,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\DynamicIsland.Windows\Infrastructure\SeekMath.cs" Link="SeekMath.cs" />
+    <Compile Include="..\DynamicIsland.Windows\Infrastructure\SpectrumAnalyzer.cs" Link="SpectrumAnalyzer.cs" />
+    <Compile Include="..\DynamicIsland.Windows\Infrastructure\VisualizerDynamics.cs" Link="VisualizerDynamics.cs" />
+    <Compile Include="..\DynamicIsland.Windows\Infrastructure\VisualizerMotion.cs" Link="VisualizerMotion.cs" />
     <Compile Include="..\DynamicIsland.Windows\Infrastructure\ThemePalette.cs" Link="ThemePalette.cs" />
     <Compile Include="..\DynamicIsland.Windows\Infrastructure\IslandPlacement.cs" Link="IslandPlacement.cs" />
     <Compile Include="..\DynamicIsland.Windows\Infrastructure\QSequenceMatcher.cs" Link="QSequenceMatcher.cs" />
@@ -38,5 +41,7 @@
     <Compile Include="..\DynamicIsland.Windows\Services\Q\CodexErrors.cs" Link="CodexErrors.cs" />
     <Compile Include="..\DynamicIsland.Windows\Services\Q\CodexRuntimeResolver.cs" Link="CodexRuntimeResolver.cs" />
     <Compile Include="..\DynamicIsland.Windows\Services\Q\CodexThreadLedger.cs" Link="CodexThreadLedger.cs" />
+    <Compile Include="..\DynamicIsland.Windows\Infrastructure\CommandPalette\CalculatorParser.cs" Link="CalculatorParser.cs" />
   </ItemGroup>
-<ItemGroup><Compile Include="..\DynamicIsland.Windows\Infrastructure\TimerEngine.cs" Link="TimerEngine.cs" /></ItemGroup><ItemGroup><Compile Include="..\DynamicIsland.Windows\Infrastructure\AppDataPaths.cs" Link="AppDataPaths.cs" /><Compile Include="..\DynamicIsland.Windows\Infrastructure\ActivityPolicy.cs" Link="ActivityPolicy.cs" /><Compile Include="..\DynamicIsland.Windows\Models\IslandState.cs" Link="IslandState.cs" /></ItemGroup><ItemGroup><Compile Include="../DynamicIsland.Windows/Infrastructure/NotificationPolicy.cs" Link="NotificationPolicy.cs" /></ItemGroup><ItemGroup><Compile Include="../DynamicIsland.Windows/Models/NotificationInfo.cs" Link="NotificationInfo.cs" /></ItemGroup><ItemGroup><Compile Include="../DynamicIsland.Windows/Models/NotificationHistoryItem.cs" Link="NotificationHistoryItem.cs" /></ItemGroup><ItemGroup><Compile Include="../DynamicIsland.Windows/Models/IntegrationStatus.cs" Link="IntegrationStatus.cs" /></ItemGroup></Project>
+<ItemGroup><Compile Include="..\DynamicIsland.Windows\Infrastructure\TimerEngine.cs" Link="TimerEngine.cs" /></ItemGroup><ItemGroup><Compile Include="..\DynamicIsland.Windows\Infrastructure\AppDataPaths.cs" Link="AppDataPaths.cs" /><Compile Include="..\DynamicIsland.Windows\Infrastructure\ActivityPolicy.cs" Link="ActivityPolicy.cs" /><Compile Include="..\DynamicIsland.Windows\Models\IslandState.cs" Link="IslandState.cs" /></ItemGroup><ItemGroup>    <Compile Include="../DynamicIsland.Windows/Infrastructure/NotificationPolicy.cs" Link="NotificationPolicy.cs" />
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/NotificationContent.cs" Link="NotificationContent.cs" /></ItemGroup><ItemGroup><Compile Include="../DynamicIsland.Windows/Models/NotificationInfo.cs" Link="NotificationInfo.cs" /></ItemGroup><ItemGroup><Compile Include="../DynamicIsland.Windows/Models/NotificationHistoryItem.cs" Link="NotificationHistoryItem.cs" /></ItemGroup><ItemGroup><Compile Include="../DynamicIsland.Windows/Models/IntegrationStatus.cs" Link="IntegrationStatus.cs" /></ItemGroup></Project>
