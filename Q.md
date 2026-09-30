@@ -26,13 +26,15 @@ wait before closing, from 1 to 300 seconds; it is off by default.
 
 ### ChatGPT / Codex sign-in
 
-The **ChatGPT / Codex** provider uses the official Codex app-server and does not
-need an OpenAI API key. For the simplest test, download the Codex test ZIP from
+The **Codex** provider uses the official Codex app-server. With ChatGPT sign-in,
+it uses eligible subscription access without an OpenAI Platform API key. Its label
+shows **Codex · Subscription**, **Codex · API key**, or **Codex · Sign in**, based
+on the shared account's authentication mode. For the simplest test, download the Codex test ZIP from
 the latest release, extract the whole folder, and run the included app executable.
 The standalone executable remains available for users
 who already have a supported official Codex installation.
 
-In Q settings, choose **ChatGPT / Codex**, select **Sign in with ChatGPT**, and
+In Q settings, choose **Codex · Sign in**, select **Sign in with ChatGPT**, and
 enter the displayed device code at the official verification URL. The app-server
 owns the OAuth login and token-refresh lifecycle; Sutra Island receives account
 status but never reads, copies, logs, or stores the OAuth token.
@@ -45,9 +47,10 @@ the Codex version can be pinned while the app-server protocol evolves.
 
 This provider uses Codex service access associated with the signed-in ChatGPT account,
 including the account's Codex-specific model availability and rate limits. It does
-not turn a ChatGPT subscription into a general OpenAI API key, and it does not use
-API-platform billing or API credits. The API-key OpenAI provider remains available
-separately.
+not turn a ChatGPT subscription into a general OpenAI API key. Subscription
+authentication does not use API-platform billing or credits; API-key
+authentication uses the configured account's API access. **OpenAI · API key**
+remains a separate provider for Platform API billing.
 
 The signed-in account is shared with official Codex apps on the same Windows user
 profile. Signing out from Sutra Island therefore signs that shared Codex profile
@@ -68,8 +71,11 @@ API key.
 - **Say** suggests concise first-person wording for what to say next; it does not
   claim that an action was taken.
 - Type a prompt, use Windows dictation when available, or send follow-ups from
-  the composer.
-- Use **Stop**, **Copy**, **Retry**, **New question**, and **Quit Q** as the session
+  the composer. Enter sends; Shift+Enter inserts a new line. The composer no longer
+  has an Ask/Say toggle; `say` remains available in the command palette.
+- Enter `ask <question>` in the command palette to capture context and submit
+  automatically. Bare `ask` opens Q for typing.
+- Use **Stop**, **Copy**, **Retry**, **New question**, and **Close Q** as the session
   state allows.
 - Under **Q activation shortcuts**, enable any combination of `Ctrl+Alt+Q`,
   `Shift+A`, `Shift+comma`, `Shift+period`, and typing lowercase `var`.
@@ -112,16 +118,21 @@ Use the **Inference provider** dropdown in the Q panel to switch providers for y
 
 ### Compare two providers
 
-Turn on **Compare** in the Q header, choose a different provider/model in each answer column, and use **Send to both**. Q captures the screen once per prompt and sends the same prompt and enabled screen context to both providers, using their separately saved credentials. Each provider uses its own API billing/account limits. Each answer streams independently; one provider failing does not discard the other answer. Follow-ups keep separate histories, never mixing the other provider's responses. Changing a provider/model resets comparison answers; **New question** clears both histories.
+Open the Q header's **… → Compare two providers**, choose a different provider/model in each answer column, and use **Send to both**. Q captures the screen once per prompt and sends the same prompt and enabled screen context to both providers, using their separately saved credentials. Each provider uses its own API billing/account limits. Each answer streams independently; one provider failing does not discard the other answer. Follow-ups keep separate histories, never mixing the other provider's responses. Changing a provider/model resets comparison answers; **New question** clears both histories.
 
 Expanded mode shows two independently scrollable answers with separate **Copy** and **Retry** actions. Small screens stack the answer panels in a scrollable area above the shared composer. **Stop both** cancels both requests. Retry affects only its answer and reuses that question's captured context while honoring the current image-sharing setting.
 
 Collapsed comparison shows `Gemini: answer` and `OAI: answer` (labels follow the selected providers). Long answers are ellipsized; hovering a line shows its full text, and opening the island shows both full answers. Comparison temporarily reserves a wider 480-DIP compact island with two readable rows; turning Compare off restores the ordinary configured size. Compare mode and the second provider/model persist across restarts.
 
-Choose **API keys** in Q (or open Settings → Q Assistant), select a provider, paste its key, and click **Save key**. Repeat for other providers: each keeps its own independently encrypted key. The saved-key summary lists configured providers without revealing credentials. **Remove key** only removes the selected provider's key. An empty input is not a missing-key indicator: saved credentials are never filled back into the editor. Codex uses ChatGPT sign-in and Ollama does not require an API key.
+Choose **… → Q settings and API keys** in Q (or open Settings → Q Assistant), select a provider, paste its key, and click **Save key**. Repeat for other providers: each keeps its own independently encrypted key. The saved-key summary lists configured providers without revealing credentials. **Remove key** only removes the selected provider's key. An empty input is not a missing-key indicator: saved credentials are never filled back into the editor. Codex uses the shared Codex account and Ollama does not require an API key.
 
-Model lists are refreshed by **Test connection** when a provider exposes discovery.
-The model menu retains a current suggested default as an offline fallback. **Auto**
+Model lists load automatically when Q opens or its provider changes, using the
+saved credential or Codex account. Use the refresh icon beside the model selector
+to reload them; its tooltip reports the result. Settings also discovers models
+through **Test connection**. Enter an exact model ID in the editable model field
+when needed. Suggested models remain available as a fallback and do not guarantee
+account access. The provider registry is fixed in the app. Codex effort choices
+come from live model metadata; API-provider choices use model-specific app rules. **Auto**
 omits an explicit effort whenever possible so the provider/model default wins;
 selecting another effort sends that exact supported value.
 
@@ -129,7 +140,7 @@ Provider APIs and model catalogs evolve independently. Preview models can be ren
 or retired, an account may not have every suggested model, and some models ignore or
 reject effort/image fields they do not support. Use **Test connection** after changing
 a provider or model. API-key providers use that vendor's API billing and rate limits;
-they do not consume a ChatGPT subscription. Only **ChatGPT / Codex** uses eligible
+they do not consume a ChatGPT subscription. Only **Codex · Subscription** uses eligible
 Codex subscription limits.
 
 ## Privacy and data flow

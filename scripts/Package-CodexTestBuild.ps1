@@ -45,6 +45,13 @@ Assert-Sha256 $codexExePath $ExpectedCodexSha256
 Assert-Sha256 $codeModeHostPath $ExpectedCodeModeHostSha256
 
 New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
+# Validate the resolved staging targets before replacing an earlier package.
+$outputPrefix = $outputPath.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+foreach ($target in @($stagePath, $zipPath)) {
+    if (-not [System.IO.Path]::GetFullPath($target).StartsWith($outputPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Package staging target must remain inside the output directory.'
+    }
+}
 if (Test-Path -LiteralPath $stagePath) { Remove-Item -LiteralPath $stagePath -Recurse -Force }
 if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
 $codexStage = New-Item -ItemType Directory -Force -Path (Join-Path $stagePath 'codex')
@@ -55,6 +62,8 @@ Copy-Item -LiteralPath $codeModeHostPath -Destination (Join-Path $codexStage.Ful
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\CODEX_TEST_BUILD.md') -Destination $stagePath
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\THIRD_PARTY_NOTICES.md') -Destination $stagePath
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\Q.md') -Destination $stagePath
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\README.md') -Destination $stagePath
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\RELEASE_NOTES.md') -Destination $stagePath
 
 $runtimeFiles = @('codex.exe', 'codex-code-mode-host.exe') | ForEach-Object {
     $file = Join-Path $codexStage.FullName $_

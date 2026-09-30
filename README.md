@@ -14,6 +14,25 @@ active window, uses OCR and optional vision input, and streams answers directly
 inside the Island. See [`Q.md`](Q.md) for setup, provider configuration, and the
 privacy model.
 
+## What's new in v1.0.12
+
+- **Settings redesign:** sidebar navigation, searchable sections, an Overview
+  page, Shortcuts & behavior, and a collapsible live preview with accurate proportions.
+- **Q conversation UI:** message bubbles, a smaller header, one composer, polished
+  dropdowns, and a subtle three-dot thinking animation.
+- **Provider, model, and effort controls:** integrated in the composer. Labels
+  distinguish OpenAI API-key billing from Codex subscription/account access.
+- **Current models:** automatic discovery, manual refresh, and exact model-ID
+  entry. Suggestions include GPT-6 and Claude Sonnet/Opus 5.5; access depends on
+  your account. Codex effort options come from its live catalog, while API
+  providers use model-specific effort rules.
+- **Command palette:** run media, volume, timer, and Q commands. Enter
+  `ask why is the sky blue` to capture context and send the question automatically.
+- **Rapid media controls:** repeated volume and seek clicks accumulate, and
+  playback commands queue.
+
+See [release notes](RELEASE_NOTES.md) for the complete update.
+
 The native build also detects a paired, connected **AirPods** or compatible Beats
 device through Windows Bluetooth LE advertisements. The Island can show the model,
 connection state, left/right/case battery, charging state, case-lid state, and
@@ -57,16 +76,13 @@ The current native WPF build keeps the Apple-style shell while adding a dedicate
 timer/alarm surface, settings customization, live activities, and Q. The timer
 panel above is a clean implementation capture rather than a design mockup.
 
-The expanded Island is organized into three precise sections on one wide overlay:
+The expanded island combines album art, track details, a progress timeline, media
+transport controls, volume, and clock/system cards. Enabled widgets can add weather,
+AirPods, connectivity, and other live activities. Settings control what appears.
 
-| Left — Now Playing | Center — Audio | Right — Status |
-| --- | --- | --- |
-| Album art, a **`NOW PLAYING`** squircle chip, title + explicit badge + favorite, artist/source, a gold progress timeline, and a **5-button transport** | Speaker, volume %, −/+, a live blue **equalizer**, and a clickable **Output** device row | Clock + AM/PM, date, weather card, **RAM** & **network** cards, and a row of circular quick actions |
-
-The transport is, in order: **⟲10 · prev · play/pause · next · 10⟳**. The rewind
-and fast-forward buttons jump exactly **10 seconds** and clamp to the start/end of
-the track; they gray out with an explanatory tooltip when the active media app
-can't seek.
+Rewind and fast-forward use the configured seek amounts and clamp to the start/end
+of the track. Controls disable when the active media app cannot seek. Repeated taps
+build on the latest accepted seek target instead of a stale timeline position.
 
 ---
 
@@ -76,7 +92,8 @@ can't seek.
 | --- | --- | --- | --- |
 | <img src="media/current-expanded-island.png" alt="Expanded Sutra Island" width="220"> | <img src="media/current-island-preview.png" alt="Compact Sutra Island" width="220"> | <img src="media/current-settings-preview.png" alt="Sutra Island settings window" width="220"> | <img src="media/current-timer-panel.png" alt="Timer panel" width="220"> |
 
-These captures document the current native WPF implementation. The clean crops
+These captures show earlier native WPF layouts; v1.0.12 redesigns Settings and Q
+as described above. The clean crops
 are used here intentionally; raw desktop captures in `test-artifacts/` may include
 the contents of the active test window and should not be treated as public promo
 assets. The timer comparison capture is retained in `media/current-timer-comparison.png`
@@ -122,19 +139,27 @@ This branch adds activity pinning, queued notifications, adaptive overflow, inte
   monitor, extract OCR text, optionally send the captured PNG to a vision-capable
   provider, and stream an answer in the Island. Q supports Ask and Say modes,
   typed follow-ups, Windows dictation, retry/copy/recapture/new-question actions,
-  provider model discovery, and configurable one-click shortcuts.
+  automatic provider model discovery, model refresh, reasoning-effort selection,
+  and configurable one-click shortcuts. Provider, model, and effort controls live
+  together in the composer; Ask/Say is no longer a composer toggle.
 - **ChatGPT / Codex for Q** - sign in through the official Codex device-code flow
   and use eligible Codex subscription limits without an OpenAI API key. The
-  existing API-key providers remain available and unchanged.
+  API-key providers remain available separately. Provider labels show whether
+  Codex is using subscription access or API-key authentication.
+- **Command palette** — run island commands, search actions, and submit Q prompts
+  with `ask <question>`. Configure its shortcut in Settings → Shortcuts & behavior.
+- **Settings** — sidebar navigation, section search, Overview, and a collapsible
+  live preview with explicit Compact/Expanded selection.
 - **Quick actions** — timer, settings, collapse, and a menu, as
   one row of equal circular buttons.
 - **System integration** — per-monitor-V2 DPI aware, multi-monitor aware,
   single-instance, hidden from Alt-Tab, optional launch-on-startup, optional
   click-through when compact, reduced-motion support, full light/dark theming, and
   a tray menu.
-- **Privacy-first** — no analytics or accounts. The app makes network requests
-  only for optional weather and Q provider
-  requests when Q is explicitly invoked. Q credentials use Windows user-scoped
+- **Privacy** — no analytics or Sutra Island account required. Enabled online
+  widgets and Q providers can make network requests. Q can query model catalogs
+  when opened, when its provider changes, or when refreshed; Codex sign-in also
+  queries account status. Q credentials use Windows user-scoped
   DPAPI storage and captured context stays in memory for the current session.
 
 ---
@@ -195,7 +220,7 @@ from this driver-free integration. Availability also depends on a Bluetooth adap
 that supports LE advertisements and on Windows exposing the paired device as
 connected.
 
-> The `.exe` is ~287 MB (it bundles the .NET runtime), which is over GitHub's
+> The `.exe` bundles the .NET runtime and exceeds GitHub's
 > 100 MB per-file limit, so it's distributed as a **release asset** rather than
 > committed to the repo.
 
@@ -227,13 +252,18 @@ dotnet publish .\DynamicIsland.Windows -c Release -r win-x64
 
 ### Publishing a release (maintainers)
 
-The release workflow publishes the standalone app and Codex test bundle:
+The release workflow runs tests and publishes the standalone app, Codex test
+bundle, and `SHA256SUMS.txt`. To prepare a release, update the project version,
+README, Q setup notes, and `RELEASE_NOTES.md`, then validate the build:
 
 ```powershell
 dotnet publish .\DynamicIsland.Windows -c Release -r win-x64
 ```
 
-The download button links to the release page so earlier releases remain accessible.
+Push a matching `vMAJOR.MINOR.PATCH` tag to trigger `.github/workflows/release.yml`.
+The workflow rejects a tag that differs from the project version. Bundled runtime
+files must match their pinned SHA-256 hashes. The download button points to the
+latest release page; earlier releases remain accessible from the release history.
 
 ---
 

@@ -88,12 +88,27 @@ jobs:
             -OutputDirectory dist `
             -AppVersion $env:APP_VERSION
 
+      - name: Write download checksums
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ steps.version.outputs.app_version }}
+        run: |
+          @('DynamicIsland.exe', "DynamicIsland-Codex-Test-v$env:APP_VERSION-win-x64.zip") |
+            ForEach-Object {
+              $hash = (Get-FileHash -LiteralPath (Join-Path 'dist' $_) -Algorithm SHA256).Hash.ToLowerInvariant()
+              "$hash  $_"
+            } | Set-Content -LiteralPath dist\SHA256SUMS.txt -Encoding ascii
+          $notes = [regex]::Split((Get-Content -LiteralPath RELEASE_NOTES.md -Raw), '(?m)^---\s*$')[0].Trim()
+          Set-Content -LiteralPath dist\RELEASE_NOTES.md -Value $notes -Encoding utf8
+
       - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
+          body_path: dist/RELEASE_NOTES.md
           generate_release_notes: true
           files: |
             dist/DynamicIsland.exe
             dist/DynamicIsland-Codex-Test-v${{ steps.version.outputs.app_version }}-win-x64.zip
+            dist/SHA256SUMS.txt

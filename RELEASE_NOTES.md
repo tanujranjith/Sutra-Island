@@ -1,3 +1,46 @@
+# Sutra Island v1.0.12
+
+## Settings
+
+- New sidebar navigation, Overview page, and dedicated Shortcuts & behavior page.
+- Search settings sections and collapse the live preview to make more room.
+- Compact and expanded previews preserve the island's proportions.
+
+## Q assistant
+
+- Smaller header, message bubbles, and a unified composer with provider, model,
+  reasoning effort, dictation, and send controls.
+- Rounded dropdown menus with selection checkmarks and keyboard focus states.
+- Provider labels distinguish OpenAI Platform API-key billing from Codex account
+  access, including subscription and API-key authentication.
+- Model discovery runs when Q opens or its provider changes; refresh the catalog
+  manually or enter an exact model ID. Suggested models include GPT-6 Luna,
+  GPT-6.1 Sol, GPT-6 Astra, Claude Sonnet 5.5, and Claude Opus 5.5.
+- Codex effort choices come from the account's model catalog; API-provider effort
+  choices use model-specific rules. Auto keeps the provider's default.
+- Three softly pulsing dots replace the thinking shimmer and glow.
+- The island stays open while its Q menus are being used.
+
+## Commands and media
+
+- Command palette for media, volume, timers, Q, and other island actions.
+- `ask <question>` captures context and submits the question automatically.
+- Repeated volume, mute, playback, and seek clicks accumulate correctly.
+
+## Downloads
+
+- `DynamicIsland.exe`: self-contained Windows x64 app.
+- `DynamicIsland-Codex-Test-v1.0.12-win-x64.zip`: app, setup documentation, and
+  pinned SHA-256-verified Codex 0.151.0 runtime. Extract the complete folder.
+- `SHA256SUMS.txt`: checksums of both downloads.
+
+Model availability depends on your provider account. The Codex test runtime
+remains pinned; the standalone app can use a supported official Codex installation.
+
+Validation: 215 automated tests passed and the Windows x64 release build succeeded.
+
+---
+
 # Dynamic Island v1.0.11
 
 ## Q and responsive pill controls

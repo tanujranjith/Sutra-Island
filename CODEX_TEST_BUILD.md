@@ -4,7 +4,7 @@ This ZIP is the test distribution that includes a pinned official Codex runtime.
 Extract the entire folder before launching the included app executable; do not run it
 from inside the ZIP.
 
-In **Settings > Q Assistant**, choose **ChatGPT / Codex** and select **Sign in with
+In **Settings > Q Assistant**, choose **Codex · Sign in** and select **Sign in with
 ChatGPT**. The browser/device-code flow and OAuth token lifecycle are handled by
 the official Codex app-server. Sutra Island never receives or stores the token.
 
@@ -17,6 +17,9 @@ Important behavior:
 - ChatGPT subscription access applies only to the Codex service and its limits. It
   is not an OpenAI API key and does not provide general API credits.
 - This test bundle pins Codex 0.151.0 and validates its files before launching.
+- After sign-in, the provider label reflects subscription or API-key authentication.
+- Use the composer to choose the provider, model, and reasoning effort. Refresh
+  queries the account's available models; model access depends on the account.
 
 For the complete setup, privacy, and troubleshooting notes, see the repository's
 `Q.md` file.
