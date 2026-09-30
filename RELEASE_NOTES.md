@@ -1,3 +1,18 @@
+# Sutra Island v1.0.15
+
+## Notifications
+
+- Refresh the Windows notification snapshot immediately after notification-added events, with overlapping polls serialized so an event during a poll triggers a follow-up refresh.
+- Deliver notification content changes even when Windows reuses an existing notification ID; identical repeated messages remain deduplicated.
+
+## Downloads
+
+- `DynamicIsland.exe`: updated self-contained Windows x64 app.
+- `DynamicIsland-Codex-Test-v1.0.15-win-x64.zip`: app, setup documentation, and pinned SHA-256-verified Codex 0.151.0 runtime. Extract the complete folder.
+- `SHA256SUMS.txt`: checksums of both downloads.
+
+---
+
 # Sutra Island v1.0.14
 
 ## Notifications

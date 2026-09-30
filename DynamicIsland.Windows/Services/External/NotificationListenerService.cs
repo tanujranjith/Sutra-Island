@@ -18,6 +18,7 @@ public sealed class NotificationListenerService : IDisposable
     private int _generation;
     private bool _enabled;
     private bool _polling;
+    private bool _pollAgain;
     public event EventHandler<IReadOnlyList<NotificationInfo>>? BatchReceived;
     public event EventHandler? StatusChanged;
     public IntegrationStatus Status { get; private set; } = IntegrationStatus.Disabled;
@@ -78,6 +79,7 @@ public sealed class NotificationListenerService : IDisposable
         _enabled = false;
         _generation++;
         _timer.Stop();
+        _pollAgain = false;
         UnsubscribeFromNotificationChanges();
         _listener = null;
         _tracker.Reset();
@@ -92,16 +94,13 @@ public sealed class NotificationListenerService : IDisposable
             if (args.ChangeKind != UserNotificationChangedKind.Added) return;
             try
             {
-                var notification = sender.GetNotification(args.UserNotificationId);
-                var extracted = notification is null ? null : Extract(notification);
-                if (extracted is null) return;
-
+                // Re-read the listener snapshot on the same dispatcher used by polling,
+                // instead of accessing WinRT notification objects from the callback thread.
                 _dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
                 {
                     if (!_enabled || generation != _generation) return;
-                    // Periodic snapshot polling remains as a recovery path. The view model
-                    // deduplicates this event against the poll if both observe the same toast.
-                    BatchReceived?.Invoke(this, new[] { extracted });
+                    _log.Debug("Notification-added event received; refreshing the Windows snapshot.");
+                    _ = PollAsync();
                 }));
             }
             catch (Exception ex)
@@ -125,7 +124,8 @@ public sealed class NotificationListenerService : IDisposable
 
     private async Task PollAsync()
     {
-        if (!_enabled || _listener is null || _polling) return;
+        if (!_enabled || _listener is null) return;
+        if (_polling) { _pollAgain = true; return; }
         _polling = true; var generation = _generation;
         try
         {
@@ -143,7 +143,15 @@ public sealed class NotificationListenerService : IDisposable
             if (fresh.Count > 0) BatchReceived?.Invoke(this, fresh);
         }
         catch (Exception ex) { if (generation == _generation) { SetStatus(new(IntegrationState.Error, "Notifications could not refresh. Retry.")); _log.Debug(ex.Message); } }
-        finally { _polling = false; }
+        finally
+        {
+            _polling = false;
+            if (_pollAgain)
+            {
+                _pollAgain = false;
+                if (_enabled && generation == _generation) _ = PollAsync();
+            }
+        }
     }
     private static NotificationInfo? Extract(UserNotification n)
     {

@@ -14,7 +14,11 @@ active window, uses OCR and optional vision input, and streams answers directly
 inside the Island. See [`Q.md`](Q.md) for setup, provider configuration, and the
 privacy model.
 
-## What's new in v1.0.14
+## What's new in v1.0.15
+
+- **Capture updated notifications:** refresh the Windows snapshot on notification events, serialize overlapping polls, and detect changed message content even when Windows reuses a notification ID.
+
+### v1.0.14
 
 - **More reliable notification delivery:** capture Windows notification-added events immediately, with snapshot polling as a recovery path.
 - **Clear delayed banners:** a single notification keeps its app, title, and body after a delay; a summary is shown only when multiple notifications are waiting.

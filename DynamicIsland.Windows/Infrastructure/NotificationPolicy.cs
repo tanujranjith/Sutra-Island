@@ -7,7 +7,7 @@ public sealed class NotificationSnapshotTracker(TimeProvider? clock = null)
     private static readonly TimeSpan DuplicateContentWindow = TimeSpan.FromMinutes(2);
     private const int MaxRemembered = 512;
     private readonly TimeProvider _clock = clock ?? TimeProvider.System;
-    private readonly Dictionary<string, DateTimeOffset> _recent = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, SeenNotification> _recent = new(StringComparer.Ordinal);
     private readonly Dictionary<(string App, string Title, string Body), DateTimeOffset> _recentContent = new();
     private bool _initialized;
 
@@ -23,25 +23,27 @@ public sealed class NotificationSnapshotTracker(TimeProvider? clock = null)
         {
             var content = (string.IsNullOrWhiteSpace(item.AppId) ? item.App.Trim() : item.AppId.Trim(),
                 item.Title.Trim(), item.Body.Trim());
-            var knownIdentity = _recent.ContainsKey(item.Identity);
+            var knownIdentity = _recent.TryGetValue(item.Identity, out var previous);
+            var identityContentChanged = knownIdentity && !NotificationContent.SameMessage(
+                previous!.AppId, previous.App, previous.Title, previous.Body,
+                item.AppId, item.App, item.Title, item.Body);
             var recentlyVisible = _recentContent.TryGetValue(content, out var seenAt) &&
                                   now - seenAt <= DuplicateContentWindow;
-            // Windows can replace a still-visible toast with a new ID long after it was
-            // first shown. Refresh its content's last-seen time on every poll, even when
-            // the ID is already known, so replacement never queues a second banner.
-            if (_initialized && !knownIdentity && !recentlyVisible)
+            // Windows may reuse a toast ID when its message changes. Treat changed content
+            // under a known ID as new, while suppressing identical messages across IDs.
+            if (_initialized && (!knownIdentity || identityContentChanged) && !recentlyVisible)
                 fresh.Add(item);
-            _recent[item.Identity] = now;
+            _recent[item.Identity] = new(item.App, item.AppId, item.Title, item.Body, now);
             _recentContent[content] = now;
         }
-        foreach (var expired in _recent.Where(pair => now - pair.Value > Retention).Select(pair => pair.Key).ToArray())
+        foreach (var expired in _recent.Where(pair => now - pair.Value.SeenAt > Retention).Select(pair => pair.Key).ToArray())
             _recent.Remove(expired);
         if (_recent.Count > MaxRemembered)
         {
             var active = items.Select(item => item.Identity).ToHashSet(StringComparer.Ordinal);
             var overflow = _recent.Count - MaxRemembered;
             foreach (var oldest in _recent.Where(pair => !active.Contains(pair.Key))
-                         .OrderBy(pair => pair.Value).Take(overflow).Select(pair => pair.Key).ToArray())
+                         .OrderBy(pair => pair.Value.SeenAt).Take(overflow).Select(pair => pair.Key).ToArray())
                 _recent.Remove(oldest);
         }
         foreach (var expired in _recentContent.Where(pair => now - pair.Value > DuplicateContentWindow)
@@ -64,6 +66,8 @@ public sealed class NotificationSnapshotTracker(TimeProvider? clock = null)
         _recentContent.Clear();
         _initialized = false;
     }
+
+    private sealed record SeenNotification(string App, string AppId, string Title, string Body, DateTimeOffset SeenAt);
 }
 
 public sealed class NotificationQueue(TimeProvider? clock = null)

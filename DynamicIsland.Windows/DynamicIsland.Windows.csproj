@@ -18,10 +18,10 @@
     <Product>Sutra Island</Product>
     <Company>Sutra Island</Company>
     <Description>A live desktop island for Windows</Description>
-    <Version>1.0.14</Version>
-    <AssemblyVersion>1.0.14.0</AssemblyVersion>
-    <FileVersion>1.0.14.0</FileVersion>
-    <InformationalVersion>1.0.14</InformationalVersion>
+    <Version>1.0.15</Version>
+    <AssemblyVersion>1.0.15.0</AssemblyVersion>
+    <FileVersion>1.0.15.0</FileVersion>
+    <InformationalVersion>1.0.15</InformationalVersion>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
