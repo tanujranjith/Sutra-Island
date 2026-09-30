@@ -14,7 +14,11 @@ active window, uses OCR and optional vision input, and streams answers directly
 inside the Island. See [`Q.md`](Q.md) for setup, provider configuration, and the
 privacy model.
 
-## What's new in v1.0.12
+## What's new in v1.0.13
+
+- **Music visualizer reliability:** animated fallback bars keep moving when loopback audio is too quiet for the spectrum analyzer, and real-spectrum response returns when a usable signal is available.
+
+### v1.0.12
 
 - **Settings redesign:** sidebar navigation, searchable sections, an Overview
   page, Shortcuts & behavior, and a collapsible live preview with accurate proportions.

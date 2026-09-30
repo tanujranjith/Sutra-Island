@@ -20,6 +20,7 @@ namespace DynamicIsland.Windows.ViewModels;
 
 public sealed partial class IslandViewModel : ObservableObject, IDisposable
 {
+    private const double MinimumVisibleSpectrumLevel = 0.06;
     private static readonly ConcurrentDictionary<string, MediaBrush> BrushCache =
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<(double Size, double Radius), Geometry> RingGeometryCache = new();
@@ -948,12 +949,14 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     }
     private void UpdateVisualizerMotion(double elapsedSeconds, bool lively)
     {
-        if (UseRealSpectrum)
+        if (UseRealSpectrum && HasUsableSpectrum())
         {
             _visualizerMotion.Advance(_spectrum, elapsedSeconds, lively);
             return;
         }
 
+        // Keep the bars moving when loopback reports active but the sampled audio is below
+        // the analyzer floor (or the capture stream temporarily contains silence).
         if (lively)
             _visualizerPhase += elapsedSeconds * 7.5;
 
@@ -961,6 +964,13 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         for (var band = 0; band < VisualizerMotion.BandCount; band++)
             targets[band] = 0.05 + (0.85 * ((Math.Sin((_visualizerPhase * (0.85 + (band * 0.08))) + (band * 0.9)) + 1) / 2));
         _visualizerMotion.Advance(targets, elapsedSeconds, lively);
+    }
+    private bool HasUsableSpectrum()
+    {
+        foreach (var band in _spectrum)
+            if (band >= MinimumVisibleSpectrumLevel)
+                return true;
+        return false;
     }
     private void RaiseVisualizerProperties() => RaiseMany(
         nameof(VisualizerBar0Height), nameof(VisualizerBar1Height), nameof(VisualizerBar2Height),

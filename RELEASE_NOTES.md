@@ -1,3 +1,17 @@
+# Sutra Island v1.0.13
+
+## Music visualizer
+
+- Keep the bars moving when loopback capture is active but its signal is below the spectrum analyzer's useful range. The real spectrum takes over again as soon as a usable signal returns.
+
+## Downloads
+
+- `DynamicIsland.exe`: updated self-contained Windows x64 app.
+- `DynamicIsland-Codex-Test-v1.0.13-win-x64.zip`: app, setup documentation, and pinned SHA-256-verified Codex 0.151.0 runtime. Extract the complete folder.
+- `SHA256SUMS.txt`: checksums of both downloads.
+
+---
+
 # Sutra Island v1.0.12
 
 ## Settings
