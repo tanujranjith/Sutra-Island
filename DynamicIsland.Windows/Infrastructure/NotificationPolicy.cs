@@ -85,7 +85,8 @@ public sealed class NotificationQueue(TimeProvider? clock = null)
         if (stale.Length > 0)
         {
             _pending.RemoveAll(g => g.EnqueuedAt < cutoff);
-            return new(stale.SelectMany(g => g.Items).OrderBy(i => i.CreatedAt).ToArray(), _clock.GetUtcNow(), true);
+            var items = stale.SelectMany(g => g.Items).OrderBy(i => i.CreatedAt).ToArray();
+            return new(items, _clock.GetUtcNow(), Summary: items.Length > 1);
         }
         var next = _pending[0]; _pending.RemoveAt(0); return next;
     }

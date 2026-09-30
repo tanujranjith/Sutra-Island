@@ -8,5 +8,7 @@ public sealed record NotificationInfo(string App, string Title, string Body, uin
 public sealed record NotificationGroup(IReadOnlyList<NotificationHistoryItem> Items, DateTimeOffset EnqueuedAt, bool Summary = false)
 {
     public NotificationHistoryItem Latest => Items[^1];
-    public string Title => Summary ? $"{Items.Count} notifications received" : Items.Count > 1 ? $"{Latest.Title} (+{Items.Count - 1})" : Latest.Title;
+    public string Title => Summary
+        ? $"{Items.Count} notification{(Items.Count == 1 ? string.Empty : "s")} received"
+        : Items.Count > 1 ? $"{Latest.Title} (+{Items.Count - 1})" : Latest.Title;
 }

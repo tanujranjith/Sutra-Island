@@ -1,3 +1,18 @@
+# Sutra Island v1.0.14
+
+## Notifications
+
+- Capture Windows notification-added events as they happen, while retaining snapshot polling as a recovery path for missed events.
+- Preserve the source app, title, and body when one notification has waited behind another island activity. Generic summaries are reserved for multiple waiting notifications.
+
+## Downloads
+
+- `DynamicIsland.exe`: updated self-contained Windows x64 app.
+- `DynamicIsland-Codex-Test-v1.0.14-win-x64.zip`: app, setup documentation, and pinned SHA-256-verified Codex 0.151.0 runtime. Extract the complete folder.
+- `SHA256SUMS.txt`: checksums of both downloads.
+
+---
+
 # Sutra Island v1.0.13
 
 ## Music visualizer

@@ -14,7 +14,12 @@ active window, uses OCR and optional vision input, and streams answers directly
 inside the Island. See [`Q.md`](Q.md) for setup, provider configuration, and the
 privacy model.
 
-## What's new in v1.0.13
+## What's new in v1.0.14
+
+- **More reliable notification delivery:** capture Windows notification-added events immediately, with snapshot polling as a recovery path.
+- **Clear delayed banners:** a single notification keeps its app, title, and body after a delay; a summary is shown only when multiple notifications are waiting.
+
+### v1.0.13
 
 - **Music visualizer reliability:** animated fallback bars keep moving when loopback audio is too quiet for the spectrum analyzer, and real-spectrum response returns when a usable signal is available.
 
