@@ -36,8 +36,8 @@ public static class QProviderPolicy
     {
         var suggestions = providerId?.ToLowerInvariant() switch
         {
-            "openai" => new[] { "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol" },
-            "anthropic" => new[] { "claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5" },
+            "openai" => new[] { "gpt-6-luna", "gpt-6.1-sol", "gpt-6-astra" },
+            "anthropic" => new[] { "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-sonnet-5" },
             "gemini" => new[] { "gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-3.1-pro-preview" },
             "groq" => new[] { "qwen/qwen3.8-27b", "qwen/qwen3.6-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b" },
             "xai" => new[] { "grok-4.6" },
@@ -52,9 +52,16 @@ public static class QProviderPolicy
 
     public static IReadOnlyList<string> EffortOptions(string? providerId, string? model = null) => providerId?.ToLowerInvariant() switch
     {
+        "openai" when model?.StartsWith("gpt-6-luna", StringComparison.OrdinalIgnoreCase) == true =>
+            ["auto", "none", "low", "medium", "high", "xhigh", "max"],
+        "openai" when model?.StartsWith("gpt-6", StringComparison.OrdinalIgnoreCase) == true =>
+            ["auto", "low", "medium", "high", "xhigh", "max"],
         "openai" when model?.StartsWith("gpt-5.6", StringComparison.OrdinalIgnoreCase) == true =>
             ["auto", "none", "low", "medium", "high", "xhigh", "max"],
         "openai" => ["auto", "none", "minimal", "low", "medium", "high", "xhigh", "max"],
+        "anthropic" when model?.Contains("haiku", StringComparison.OrdinalIgnoreCase) == true => ["auto"],
+        "anthropic" when model?.Contains("sonnet-4-6", StringComparison.OrdinalIgnoreCase) == true ||
+            model?.Contains("opus-4-6", StringComparison.OrdinalIgnoreCase) == true => ["auto", "low", "medium", "high", "max"],
         "anthropic" => ["auto", "low", "medium", "high", "xhigh", "max"],
         "gemini" when model?.Contains("3.7", StringComparison.OrdinalIgnoreCase) == true => ["auto", "low", "medium", "high"],
         "gemini" => ["auto", "minimal", "low", "medium", "high"],

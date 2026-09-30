@@ -206,8 +206,8 @@ public sealed class QProviderTests
     [Fact]
     public void ProviderDefaultsAndEffortChoicesMatchCurrentContracts()
     {
-        Assert.Equal("gpt-5.6-luna", new OpenAiQProvider().Info.DefaultModel);
-        Assert.Equal("claude-sonnet-5", new AnthropicQProvider().Info.DefaultModel);
+        Assert.Equal("gpt-6-luna", new OpenAiQProvider().Info.DefaultModel);
+        Assert.Equal("claude-sonnet-5-5", new AnthropicQProvider().Info.DefaultModel);
         Assert.Equal("gemini-3.7-flash", new GeminiQProvider().Info.DefaultModel);
         Assert.Equal("qwen/qwen3.8-27b", new GroqQProvider().Info.DefaultModel);
         Assert.Equal("grok-4.6", new XaiQProvider().Info.DefaultModel);
@@ -216,6 +216,39 @@ public sealed class QProviderTests
         Assert.DoesNotContain("minimal", QProviderPolicy.EffortOptions("openai", "gpt-5.6-luna"));
         Assert.DoesNotContain("minimal", QProviderPolicy.EffortOptions("gemini", "gemini-3.7-flash"));
         Assert.DoesNotContain("none", QProviderPolicy.EffortOptions("groq", "qwen/qwen3.8-27b"));
+    }
+
+    [Theory]
+    [InlineData("gpt-6-luna", "none", "none")]
+    [InlineData("gpt-6-luna", "minimal", "auto")]
+    [InlineData("gpt-6.1-sol", "none", "auto")]
+    [InlineData("gpt-6.1-sol", "xhigh", "xhigh")]
+    [InlineData("gpt-6-astra", "max", "max")]
+    public void NewOpenAiModelsNormalizeUnsupportedEfforts(string model, string requested, string expected)
+    {
+        Assert.Equal(expected, QProviderPolicy.NormalizeEffort("openai", model, requested));
+    }
+
+    [Theory]
+    [InlineData("claude-sonnet-5-5", "xhigh", "xhigh")]
+    [InlineData("claude-opus-5-5", "max", "max")]
+    [InlineData("claude-haiku-4-5", "high", "auto")]
+    [InlineData("claude-sonnet-4-6", "xhigh", "auto")]
+    public void ClaudeEffortChoicesRespectModelSupport(string model, string requested, string expected)
+    {
+        Assert.Equal(expected, QProviderPolicy.NormalizeEffort("anthropic", model, requested));
+    }
+
+    [Fact]
+    public void CurrentSuggestionsIncludeNewModelsAndPreserveManualSelection()
+    {
+        var openAi = QProviderPolicy.ModelSuggestions("openai", "custom-model-id");
+        Assert.Contains("custom-model-id", openAi);
+        Assert.Contains("gpt-6-luna", openAi);
+        Assert.Contains("gpt-6.1-sol", openAi);
+        Assert.Contains("gpt-6-astra", openAi);
+        Assert.Contains("claude-sonnet-5-5", QProviderPolicy.ModelSuggestions("anthropic"));
+        Assert.Contains("claude-opus-5-5", QProviderPolicy.ModelSuggestions("anthropic"));
     }
 
     private static QRequest Request(string model, string effort, bool image = false) =>

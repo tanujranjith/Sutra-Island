@@ -9,6 +9,7 @@ public sealed class AudioSessionService(LoggingService log) : IDisposable
     private const float AudibleThreshold = 0.008f;
     private readonly CancellationTokenSource _shutdown = new();
     private Thread? _thread;
+    private readonly object _controlGate = new();
 
     public event EventHandler<AudioState>? Changed;
     public AudioState Current { get; private set; } = AudioState.Unknown;
@@ -22,29 +23,54 @@ public sealed class AudioSessionService(LoggingService log) : IDisposable
     }
 
     public void SetMasterVolume(int percent)
+        => ChangeVolume(percent, relative: false);
+
+    public void AdjustMasterVolume(int delta)
+        => ChangeVolume(delta, relative: true);
+
+    private void ChangeVolume(int amount, bool relative)
     {
-        IAudioEndpointVolume? endpoint = null;
-        IMMDevice? device = null;
-        try
+        lock (_controlGate)
         {
-            (device, endpoint) = CoreAudioFactory.ActivateDefault<IAudioEndpointVolume>();
-            Marshal.ThrowExceptionForHR(endpoint.SetMasterVolumeLevelScalar(Math.Clamp(percent, 0, 100) / 100f, nint.Zero));
+            IAudioEndpointVolume? endpoint = null;
+            IMMDevice? device = null;
+            try
+            {
+                (device, endpoint) = CoreAudioFactory.ActivateDefault<IAudioEndpointVolume>();
+                Marshal.ThrowExceptionForHR(endpoint.GetMasterVolumeLevelScalar(out var current));
+                var percent = Math.Clamp((relative ? (int)Math.Round(current * 100) : 0) + amount, 0, 100);
+                Marshal.ThrowExceptionForHR(endpoint.SetMasterVolumeLevelScalar(percent / 100f, nint.Zero));
+                Current = Current with { MasterVolumePercent = percent };
+                Changed?.Invoke(this, Current);
+            }
+            catch (Exception ex) { log.Error("Unable to set master volume", ex); }
+            finally { CoreAudioFactory.Release(endpoint); CoreAudioFactory.Release(device); }
         }
-        catch (Exception ex) { log.Error("Unable to set master volume", ex); }
-        finally { CoreAudioFactory.Release(endpoint); CoreAudioFactory.Release(device); }
     }
 
     public void SetMuted(bool muted)
+        => ChangeMute(muted);
+
+    public void ToggleMuted() => ChangeMute(null);
+
+    private void ChangeMute(bool? requested)
     {
-        IAudioEndpointVolume? endpoint = null;
-        IMMDevice? device = null;
-        try
+        lock (_controlGate)
         {
-            (device, endpoint) = CoreAudioFactory.ActivateDefault<IAudioEndpointVolume>();
-            Marshal.ThrowExceptionForHR(endpoint.SetMute(muted, nint.Zero));
+            IAudioEndpointVolume? endpoint = null;
+            IMMDevice? device = null;
+            try
+            {
+                (device, endpoint) = CoreAudioFactory.ActivateDefault<IAudioEndpointVolume>();
+                Marshal.ThrowExceptionForHR(endpoint.GetMute(out var current));
+                var muted = requested ?? !current;
+                Marshal.ThrowExceptionForHR(endpoint.SetMute(muted, nint.Zero));
+                Current = Current with { SystemMuted = muted };
+                Changed?.Invoke(this, Current);
+            }
+            catch (Exception ex) { log.Error("Unable to update master mute", ex); }
+            finally { CoreAudioFactory.Release(endpoint); CoreAudioFactory.Release(device); }
         }
-        catch (Exception ex) { log.Error("Unable to update master mute", ex); }
-        finally { CoreAudioFactory.Release(endpoint); CoreAudioFactory.Release(device); }
     }
 
     /// <summary>Active output endpoints as (id, name) pairs, for the in-island device picker.</summary>
@@ -65,11 +91,15 @@ public sealed class AudioSessionService(LoggingService log) : IDisposable
     {
         while (!_shutdown.IsCancellationRequested)
         {
-            var next = ReadState();
-            if (next != Current)
+            AudioState next;
+            lock (_controlGate)
             {
-                Current = next;
-                Changed?.Invoke(this, next);
+                next = ReadState();
+                if (next != Current)
+                {
+                    Current = next;
+                    Changed?.Invoke(this, next);
+                }
             }
 
             // Core Audio enumeration is relatively expensive. Keep controls responsive while

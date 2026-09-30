@@ -6,13 +6,9 @@ namespace DynamicIsland.Q.Core;
 
 public sealed class OpenAiQProvider(HttpClient? httpClient = null) : HttpQProvider(httpClient)
 {
-    public override QProviderInfo Info { get; } = new("openai", "OpenAI",
+    public override QProviderInfo Info { get; } = new("openai", "OpenAI · API key",
         QProviderCapabilities.Text | QProviderCapabilities.Images | QProviderCapabilities.Streaming | QProviderCapabilities.ModelDiscovery,
-        "gpt-5.6-luna", "https://api.openai.com/v1");
-
-    protected override bool IsUsableModel(string id) =>
-        (id.StartsWith("gpt-", StringComparison.OrdinalIgnoreCase) || id.StartsWith("o", StringComparison.OrdinalIgnoreCase)) &&
-        base.IsUsableModel(id);
+        "gpt-6-luna", "https://api.openai.com/v1");
 
     public override async IAsyncEnumerable<QStreamEvent> StreamAsync(QRequest request, string? credential, string? baseUrl,
         [EnumeratorCancellation] CancellationToken cancellationToken)

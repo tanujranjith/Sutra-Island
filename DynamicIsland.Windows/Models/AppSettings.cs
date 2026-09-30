@@ -151,7 +151,7 @@ public sealed class AppSettings
     public bool QAutoCloseAfterResponse { get; set; }
     public int QAutoCloseDelaySeconds { get; set; } = 10;
     public string QSelectedProvider { get; set; } = "openai";
-    public string QSelectedModel { get; set; } = "gpt-4o-mini";
+    public string QSelectedModel { get; set; } = "gpt-6-luna";
     public Dictionary<string, QProviderPreference> QProviderPreferences { get; set; } = new();
     public bool QCompareEnabled { get; set; }
     public string QCompareProvider { get; set; } = "gemini";

@@ -1,7 +1,7 @@
 <Window x:Class="DynamicIsland.Windows.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Sutra Island Settings" Width="1240" Height="820" MinWidth="1080" MinHeight="700"
+        Title="Sutra Island Settings" Width="1350" Height="820" MinWidth="1060" MinHeight="700"
         WindowStartupLocation="CenterScreen" Background="#0E1116" Foreground="#F5F5F7"
         FontFamily="Segoe UI Variable Text" UseLayoutRounding="True"
         PreviewKeyDown="SettingsWindow_PreviewKeyDown">
@@ -200,6 +200,44 @@
             </Setter>
         </Style>
 
+        <Style x:Key="SideNavButton" TargetType="ToggleButton">
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Margin" Value="0,2" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Foreground" Value="#C1CAD5" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="9" Padding="{TemplateBinding Padding}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="26" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="{TemplateBinding Tag}" FontFamily="Segoe Fluent Icons" FontSize="15"
+                                           Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" />
+                                <ContentPresenter Grid.Column="1" VerticalAlignment="Center" />
+                                <Border x:Name="SelectionMark" Width="3" HorizontalAlignment="Left" Margin="-12,0,0,0"
+                                        CornerRadius="0,2,2,0" Background="{StaticResource Blue}" Visibility="Collapsed" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#202833" /><Setter Property="Foreground" Value="#F5F5F7" /></Trigger>
+                            <Trigger Property="IsChecked" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#1B2A3B" /><Setter Property="Foreground" Value="#F5F5F7" /><Setter TargetName="SelectionMark" Property="Visibility" Value="Visible" /></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SideNavSubButton" TargetType="ToggleButton" BasedOn="{StaticResource SideNavButton}">
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Margin" Value="18,1,0,1" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Foreground" Value="#AEB8C5" />
+        </Style>
+
         <Style x:Key="ActionButton" TargetType="Button">
             <Setter Property="Background" Value="#242A33" />
             <Setter Property="Foreground" Value="#F5F5F7" />
@@ -231,16 +269,71 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="470" />
+            <ColumnDefinition Width="250" />
             <ColumnDefinition Width="*" />
+            <ColumnDefinition x:Name="PreviewColumn" Width="306" />
         </Grid.ColumnDefinitions>
 
+        <!-- Primary settings navigation -->
+        <Border Grid.Column="0" Background="#10151B" BorderBrush="#303741" BorderThickness="0,0,1,0">
+            <Grid Margin="18,22,16,16">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="34" Height="30" CornerRadius="9" Background="{StaticResource Blue}" VerticalAlignment="Center" Margin="0,0,10,0">
+                            <TextBlock Text="&#xE7C1;" FontFamily="Segoe Fluent Icons" FontSize="15" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Sutra Island" FontFamily="Segoe UI Variable Display" FontSize="21" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Text="A live desktop island for Windows" FontSize="11.5" Foreground="#ADB6C2" Margin="0,8,0,0" />
+                </StackPanel>
+
+                <Border Grid.Row="1" Height="40" Margin="0,20,0,13" CornerRadius="9" Background="#171E27" BorderBrush="#36414D" BorderThickness="1">
+                    <Grid>
+                        <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="14" Foreground="#9BA8B7" VerticalAlignment="Center" Margin="12,0,0,0" />
+                        <TextBox x:Name="SettingsSearchBox" Margin="32,0,6,0" Padding="4,0" Background="Transparent" BorderThickness="0"
+                                 Foreground="#F5F5F7" CaretBrush="White" FontSize="12.5" VerticalContentAlignment="Center"
+                                 ToolTip="Search settings" TextChanged="SettingsSearch_TextChanged" />
+                    </Grid>
+                </Border>
+
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="NavigationItems">
+                        <ToggleButton x:Name="OverviewTab" Content="Overview" Tag="&#xE80F;" Style="{StaticResource SideNavButton}" CommandParameter="overview" Click="Section_Click" />
+                        <TextBlock x:Name="IslandNavLabel" Text="ISLAND" Style="{StaticResource GroupLabel}" Margin="12,18,0,5" />
+                        <ToggleButton x:Name="ContentTab" Content="Content" Tag="&#xE713;" Style="{StaticResource SideNavSubButton}" CommandParameter="content" Click="Section_Click" />
+                        <ToggleButton x:Name="AppearanceTab" Content="Appearance" Tag="&#xE790;" Style="{StaticResource SideNavSubButton}" CommandParameter="appearance" Click="Section_Click" />
+                        <ToggleButton x:Name="PositionTab" Content="Position" Tag="&#xE809;" Style="{StaticResource SideNavSubButton}" CommandParameter="position" Click="Section_Click" />
+                        <ToggleButton x:Name="ActivitiesTab" Content="Widgets &amp; connections" Tag="&#xE753;" Style="{StaticResource SideNavButton}" CommandParameter="activities" Click="Section_Click" Margin="0,14,0,2" />
+                        <ToggleButton x:Name="QTab" Content="Q Assistant" Tag="&#xE720;" Style="{StaticResource SideNavButton}" CommandParameter="q" Click="Section_Click" />
+                        <ToggleButton x:Name="ShortcutsTab" Content="Shortcuts &amp; behavior" Tag="&#xE765;" Style="{StaticResource SideNavButton}" CommandParameter="shortcuts" Click="Section_Click" />
+                        <ToggleButton x:Name="AdvancedTab" Content="Advanced" Tag="&#xE9F5;" Style="{StaticResource SideNavButton}" CommandParameter="advanced" Click="Section_Click" />
+                        <TextBlock x:Name="SettingsSearchEmpty" Text="No settings found." Foreground="{StaticResource Muted}" FontSize="12" Margin="12,18,0,0" Visibility="Collapsed" />
+                    </StackPanel>
+                </ScrollViewer>
+
+                <StackPanel Grid.Row="3" Margin="0,14,0,0">
+                    <Border Height="1" Background="#303741" Margin="0,0,0,12" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button Command="{Binding RecenterCommand}" Style="{StaticResource ActionButton}" Padding="9,7" Margin="0,0,8,0" ToolTip="Recenter island">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE81D;" FontFamily="Segoe Fluent Icons" Margin="0,0,6,0" /><TextBlock Text="Recenter" /></StackPanel>
+                        </Button>
+                        <Button Click="OpenTimer_Click" Style="{StaticResource ActionButton}" Padding="9,7" ToolTip="Open timer">
+                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE916;" FontFamily="Segoe Fluent Icons" Margin="0,0,6,0" /><TextBlock Text="Timer" /></StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <Button Content="Done" Click="Done_Click" Background="{StaticResource Blue}" BorderBrush="{StaticResource Blue}"
+                            Style="{StaticResource ActionButton}" Padding="18,8" HorizontalAlignment="Stretch" Margin="0,10,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- Live preview workspace -->
-        <Border Grid.Column="0" BorderBrush="#303741" BorderThickness="0,0,1,0" ClipToBounds="True">
+        <Border x:Name="PreviewPane" Grid.Column="2" BorderBrush="#303741" BorderThickness="1,0,0,0" ClipToBounds="True">
             <Grid>
                 <Image Source="/DynamicIsland.Windows;component/Assets/settings-preview-backdrop.png" Stretch="UniformToFill" Opacity="0.82" />
-                <Border Background="#48080B10" />
-                <Grid Margin="34,30,30,26">
+                <Border Background="#7A080B10" />
+                <Grid Margin="18,22,18,18">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -248,11 +341,11 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <StackPanel>
-                        <TextBlock Text="Sutra Island" FontFamily="Segoe UI Variable Display" FontSize="25" FontWeight="SemiBold" />
-                        <TextBlock Text="A live desktop island for Windows" FontSize="13.5" Foreground="#ADB6C2" Margin="0,6,0,0" />
+                        <TextBlock Text="Live preview" FontFamily="Segoe UI Variable Display" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="See how your island looks with these settings." FontSize="12" Foreground="#ADB6C2" Margin="0,6,0,0" TextWrapping="Wrap" />
                     </StackPanel>
 
-                    <Border Grid.Row="1" Width="310" Height="42" Margin="0,28,0,0" CornerRadius="21" Background="#90171C23" BorderBrush="#3B4653" BorderThickness="1" HorizontalAlignment="Center">
+                    <Border Grid.Row="1" Width="258" Height="40" Margin="0,18,0,0" CornerRadius="21" Background="#90171C23" BorderBrush="#3B4653" BorderThickness="1" HorizontalAlignment="Center">
                         <Grid Margin="3">
                             <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
                             <Button x:Name="CompactPreviewButton" Content="Compact" Click="CompactPreview_Click" Background="#39414D" Foreground="White" BorderThickness="0" Cursor="Hand">
@@ -264,8 +357,9 @@
                         </Grid>
                     </Border>
 
-                    <Grid x:Name="PreviewIslandData" Grid.Row="2" MouseEnter="Preview_MouseEnter" MouseLeave="Preview_MouseLeave">
-                        <Border x:Name="PreviewPill" Width="230" Height="62" CornerRadius="{Binding IslandCornerRadius}" Background="{Binding IslandSurfaceBrush}" BorderBrush="{Binding PanelBorderBrush}" BorderThickness="1" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,62,0,0">
+                    <Grid x:Name="PreviewIslandData" Grid.Row="2">
+                        <Viewbox Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Border x:Name="PreviewPill" Width="230" Height="62" CornerRadius="{Binding IslandCornerRadius}" Background="{Binding IslandSurfaceBrush}" BorderBrush="{Binding PanelBorderBrush}" BorderThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Border.Resources>
                                 <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{Binding PrimaryTextBrush}" /><Setter Property="FontFamily" Value="{Binding UiFontFamily}" /></Style>
                             </Border.Resources>
@@ -333,41 +427,75 @@
                                 </Grid>
                             </Grid>
                         </Border>
+                        </Viewbox>
                     </Grid>
 
-                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,14,0,0">
-                        <Button Command="{Binding RecenterCommand}" Style="{StaticResource ActionButton}" Foreground="#69B5FF" Margin="0,0,10,0">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE81D;" FontFamily="Segoe Fluent Icons" Margin="0,0,8,0" /><TextBlock Text="Recenter island" /></StackPanel>
-                        </Button>
-                        <Button Click="OpenTimer_Click" Style="{StaticResource ActionButton}" Foreground="#69B5FF">
-                            <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE916;" FontFamily="Segoe Fluent Icons" Margin="0,0,8,0" /><TextBlock Text="Open timer" /></StackPanel>
-                        </Button>
-                    </StackPanel>
+                    <Button x:Name="CollapsePreviewButton" Grid.Row="3" Content="Collapse preview" Click="TogglePreviewPane_Click"
+                            Style="{StaticResource ActionButton}" HorizontalAlignment="Center" Padding="14,8" Margin="0,12,0,0">
+                        <Button.ContentTemplate><DataTemplate><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE70E;" FontFamily="Segoe Fluent Icons" Margin="0,0,8,0" /><TextBlock Text="Collapse preview" /></StackPanel></DataTemplate></Button.ContentTemplate>
+                    </Button>
                 </Grid>
             </Grid>
         </Border>
 
         <!-- Preferences -->
         <Grid Grid.Column="1">
-            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-            <Border BorderBrush="#303741" BorderThickness="0,0,0,1" Background="#11151B">
-                <UniformGrid Rows="1" Columns="6" Margin="24,0">
-                    <ToggleButton x:Name="ContentTab" Content="Island Content" Tag="&#xE713;" Style="{StaticResource TopTab}" CommandParameter="content" Click="Section_Click" />
-                    <ToggleButton x:Name="AppearanceTab" Content="Appearance" Tag="&#xE790;" Style="{StaticResource TopTab}" CommandParameter="appearance" Click="Section_Click" />
-                    <ToggleButton x:Name="PositionTab" Content="Position" Tag="&#xE809;" Style="{StaticResource TopTab}" CommandParameter="position" Click="Section_Click" />
-                    <ToggleButton x:Name="ActivitiesTab" Content="Live Activities" Tag="&#xE753;" Style="{StaticResource TopTab}" CommandParameter="activities" Click="Section_Click" />
-                    <ToggleButton x:Name="QTab" Content="Q Assistant" Tag="Q" Style="{StaticResource TopTab}" CommandParameter="q" Click="Section_Click" />
-                    <ToggleButton x:Name="AdvancedTab" Content="Advanced" Tag="&#xE9F5;" Style="{StaticResource TopTab}" CommandParameter="advanced" Click="Section_Click" />
-                </UniformGrid>
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+            <Border BorderBrush="#303741" BorderThickness="0,0,0,1" Background="#11151B" Padding="24,0">
+                <Grid Height="48">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE73E;" FontFamily="Segoe Fluent Icons" Foreground="#30D158" VerticalAlignment="Center" />
+                        <TextBlock Text="  Changes apply instantly. Done saves your settings." FontSize="11.5" Foreground="{StaticResource Muted}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <Button x:Name="ShowPreviewButton" Grid.Column="1" Content="Show preview" Click="TogglePreviewPane_Click" Visibility="Collapsed"
+                            Style="{StaticResource ActionButton}" Foreground="#69B5FF" Padding="11,6" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button.ContentTemplate><DataTemplate><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A7;" FontFamily="Segoe Fluent Icons" Margin="0,0,7,0" /><TextBlock Text="Show preview" /></StackPanel></DataTemplate></Button.ContentTemplate>
+                    </Button>
+                </Grid>
             </Border>
 
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="32,28,32,34">
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="34,26,34,30">
                 <Grid>
+                    <StackPanel x:Name="OverviewPage" Visibility="Collapsed">
+                        <TextBlock Text="Overview" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="Personalize Sutra Island and keep your favorite tools close." Style="{StaticResource PageDescription}" />
+                        <TextBlock Text="MAKE IT YOURS" Style="{StaticResource GroupLabel}" Margin="0,0,0,9" />
+                        <Border Style="{StaticResource InsetGroup}"><StackPanel>
+                            <Border Style="{StaticResource PreferenceRow}">
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="#69B5FF" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1"><TextBlock Text="Island content" Style="{StaticResource RowTitle}" /><TextBlock Text="Choose what appears in the island." Style="{StaticResource RowDescription}" /></StackPanel>
+                                    <Button Grid.Column="2" Content="Open" Tag="content" Click="NavigateFromOverview_Click" Style="{StaticResource ActionButton}" />
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource PreferenceRow}">
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE790;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="#69B5FF" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1"><TextBlock Text="Appearance" Style="{StaticResource RowTitle}" /><TextBlock Text="Set the island's theme, size, colors, and motion." Style="{StaticResource RowDescription}" /></StackPanel>
+                                    <Button Grid.Column="2" Content="Open" Tag="appearance" Click="NavigateFromOverview_Click" Style="{StaticResource ActionButton}" />
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource LastPreferenceRow}">
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE753;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="#69B5FF" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1"><TextBlock Text="Widgets &amp; connections" Style="{StaticResource RowTitle}" /><TextBlock Text="Manage live activities and Windows integrations." Style="{StaticResource RowDescription}" /></StackPanel>
+                                    <Button Grid.Column="2" Content="Open" Tag="activities" Click="NavigateFromOverview_Click" Style="{StaticResource ActionButton}" />
+                                </Grid>
+                            </Border>
+                        </StackPanel></Border>
+                        <TextBlock Text="QUICK ACCESS" Style="{StaticResource GroupLabel}" />
+                        <Border Style="{StaticResource InsetGroup}"><StackPanel>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Shortcuts &amp; behavior" Style="{StaticResource RowTitle}" /><Button Grid.Column="1" Content="Open" Tag="shortcuts" Click="NavigateFromOverview_Click" Style="{StaticResource ActionButton}" /></Grid></Border>
+                            <Border Style="{StaticResource LastPreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Q Assistant" Style="{StaticResource RowTitle}" /><Button Grid.Column="1" Content="Open" Tag="q" Click="NavigateFromOverview_Click" Style="{StaticResource ActionButton}" /></Grid></Border>
+                        </StackPanel></Border>
+                    </StackPanel>
+
                     <!-- Island Content -->
                     <StackPanel x:Name="ContentPage">
-                        <TextBlock Text="Island Content" Style="{StaticResource PageTitle}" />
-                        <TextBlock Text="Choose what remains available in the compact and expanded island." Style="{StaticResource PageDescription}" />
-                        <TextBlock Text="ALWAYS AVAILABLE" Style="{StaticResource GroupLabel}" Margin="0,0,0,9" />
+                        <TextBlock Text="Island content" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="Choose what appears in the island." Style="{StaticResource PageDescription}" />
+                        <TextBlock Text="Always visible" Style="{StaticResource GroupLabel}" Margin="0,0,0,9" />
                         <Border Style="{StaticResource InsetGroup}"><StackPanel>
                             <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE8D6;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><TextBlock Grid.Column="1" Text="Media" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowMedia}" /></Grid></Border>
                             <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xEB9F;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><StackPanel Grid.Column="1"><TextBlock Text="Album art in compact" Style="{StaticResource RowTitle}" /><TextBlock Text="Show the track cover instead of the activity icon." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowAlbumArtInCompact}" /></Grid></Border>
@@ -378,7 +506,7 @@
                             <Border Style="{StaticResource LastPreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE916;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><TextBlock Grid.Column="1" Text="Timer &amp; alarm" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowTimerAlarm}" /></Grid></Border>
                         </StackPanel></Border>
 
-                        <TextBlock Text="LIVE ACTIVITIES" Style="{StaticResource GroupLabel}" />
+                        <TextBlock Text="Live activities" Style="{StaticResource GroupLabel}" />
                         <Border Style="{StaticResource InsetGroup}"><StackPanel>
                             <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE9D9;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><StackPanel Grid.Column="1"><TextBlock Text="System monitor" Style="{StaticResource RowTitle}" /><TextBlock Text="RAM and network activity in the expanded island." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowSystemMonitor}" /></Grid></Border>
                             <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE950;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><StackPanel Grid.Column="1"><TextBlock Text="RAM in compact view" Style="{StaticResource RowTitle}" /><TextBlock Text="Keep memory usage visible while the island is collapsed." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowRamInCompact}" /></Grid></Border>
@@ -434,18 +562,8 @@
 
                     <!-- Position -->
                     <StackPanel x:Name="PositionPage" Visibility="Collapsed">
-                        <TextBlock Text="Position &amp; Behaviour" Style="{StaticResource PageTitle}" />
-                        <TextBlock Text="Control where the island lives and how it responds." Style="{StaticResource PageDescription}" />
-                        <TextBlock Text="WINDOW" Style="{StaticResource GroupLabel}" Margin="0,0,0,9" />
-                        <Border Style="{StaticResource InsetGroup}"><StackPanel>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Launch on startup" Style="{StaticResource RowTitle}" /><TextBlock Text="Start Sutra Island when Windows starts." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding LaunchOnStartup}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Always on top" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding AlwaysOnTop}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Expand on hover" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ExpandOnHover}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Click-through when compact" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ClickThroughWhenCompact}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Always expanded" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding AlwaysExpanded}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Auto-grow to fit content" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding AutoGrowPill}" /></Grid></Border>
-                            <Border Style="{StaticResource LastPreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Hide in fullscreen" Style="{StaticResource RowTitle}" /><TextBlock Text="Temporarily hide over fullscreen apps and games." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding AutoHideFullscreen}" /></Grid></Border>
-                        </StackPanel></Border>
+                        <TextBlock Text="Position" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="Choose where the island appears and how it fits your display." Style="{StaticResource PageDescription}" />
                         <TextBlock Text="PLACEMENT" Style="{StaticResource GroupLabel}" />
                         <Border Style="{StaticResource InsetGroup}"><StackPanel>
                             <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Position preset" Style="{StaticResource RowTitle}" /><ComboBox Grid.Column="1" Style="{StaticResource FieldCombo}" ItemsSource="{Binding PositionOptions}" SelectedValuePath="Value" SelectedValue="{Binding DefaultPosition, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" /></Grid></Border>
@@ -461,7 +579,7 @@
 
                     <!-- Live Activities -->
                     <StackPanel x:Name="ActivitiesPage" Visibility="Collapsed">
-                        <TextBlock Text="Live Activities" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="Widgets &amp; connections" Style="{StaticResource PageTitle}" />
                         <TextBlock Text="Configure the real services that can surface information in the island." Style="{StaticResource PageDescription}" />
                         <TextBlock Text="WEATHER &amp; SYSTEM" Style="{StaticResource GroupLabel}" Margin="0,0,0,9" />
                         <Border Style="{StaticResource InsetGroup}"><StackPanel>
@@ -522,13 +640,12 @@
                             <Border Style='{StaticResource PreferenceRow}'><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width='Auto' /></Grid.ColumnDefinitions><StackPanel><TextBlock Text='Auto-close Q after response' Style='{StaticResource RowTitle}' /><TextBlock Text='Close the Q session automatically after a response finishes.' Style='{StaticResource RowDescription}' TextWrapping='Wrap' /></StackPanel><CheckBox Grid.Column='1' Style='{StaticResource ToggleSwitch}' IsChecked='{Binding QAutoCloseAfterResponse}' /></Grid></Border>
                             <Border Style='{StaticResource PreferenceRow}'><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width='Auto' /></Grid.ColumnDefinitions><StackPanel><TextBlock Text='Q auto-close delay' Style='{StaticResource RowTitle}' /><TextBlock Text='How long to keep the completed response visible before closing Q.' Style='{StaticResource RowDescription}' TextWrapping='Wrap' /></StackPanel><StackPanel Grid.Column='1' Orientation='Horizontal'><TextBlock Width='48' Margin='0,0,10,0' Text='{Binding QAutoCloseDelaySeconds, StringFormat={}{0}s}' Foreground='#FF9DA8B8' VerticalAlignment='Center' TextAlignment='Right' /><Slider Style='{StaticResource FieldSlider}' Minimum='1' Maximum='300' TickFrequency='1' IsSnapToTickEnabled='True' Value='{Binding QAutoCloseDelaySeconds}' /></StackPanel></Grid></Border>
                             <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Hotkey quick action" Style="{StaticResource RowTitle}" /><TextBlock Text="Optionally run a Q quick shortcut immediately after the selected Q shortcut opens and captures the screen." Style="{StaticResource RowDescription}" /></StackPanel><ComboBox Grid.Column="1" Width="190" Style="{StaticResource FieldCombo}" ItemsSource="{Binding QHotkeyShortcutOptions}" SelectedItem="{Binding QHotkeyShortcut, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Command palette" Style="{StaticResource RowTitle}" /><TextBlock Text="Global shortcut that opens the command palette." Style="{StaticResource RowDescription}" /><TextBlock Text="{Binding CommandPaletteShortcut}" Style="{StaticResource RowDescription}" Margin="0,2,0,0" /><TextBlock Text="{Binding CommandPaletteStatus}" Foreground="#FFFF9F0A" TextWrapping="Wrap" /></StackPanel><Button x:Name="PaletteHotkeyButton" Grid.Column="1" Content="Change" Click="ChangePaletteHotkey_Click" Style="{StaticResource ActionButton}" VerticalAlignment="Top" Margin="16,0,0,0" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Inference provider" Style="{StaticResource RowTitle}" /><TextBlock Text="Switch here or directly in the Q panel." Style="{StaticResource RowDescription}" /></StackPanel><ComboBox Grid.Column="1" Style="{StaticResource FieldCombo}" ItemsSource="{Binding QProviderOptions}" SelectedValuePath="Id" SelectedValue="{Binding QSelectedProvider, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Inference provider" Style="{StaticResource RowTitle}" /><TextBlock Text="OpenAI uses Platform API billing. Codex shows whether your signed-in account uses a ChatGPT subscription or an API key." Style="{StaticResource RowDescription}" /></StackPanel><ComboBox Grid.Column="1" Style="{StaticResource FieldCombo}" ItemsSource="{Binding QProviderOptions}" SelectedValuePath="Id" SelectedValue="{Binding QSelectedProvider, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" /></Grid></Border>
                             <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Model" Style="{StaticResource RowTitle}" /><ComboBox Grid.Column="1" Width="220" IsEditable="True" Style="{StaticResource FieldCombo}" ItemsSource="{Binding QModelOptions}" Text="{Binding QSelectedModel, UpdateSourceTrigger=LostFocus}" SelectedItem="{Binding QSelectedModel, Mode=TwoWay}" /></Grid></Border>
                             <Border Style="{StaticResource PreferenceRow}" Visibility="{Binding QIsCodexSelected, Converter={StaticResource BoolToVisibility}}">
                                 <Grid>
                                     <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                    <StackPanel><TextBlock Text="ChatGPT/Codex account" Style="{StaticResource RowTitle}" /><TextBlock Text="{Binding QCodexAccountStatus}" Style="{StaticResource RowDescription}" TextWrapping="Wrap" MaxWidth="420" /><TextBlock Text="{Binding QCodexUsageStatus}" Style="{StaticResource RowDescription}" TextWrapping="Wrap" MaxWidth="420" /></StackPanel>
+                                    <StackPanel><TextBlock Text="Codex account" Style="{StaticResource RowTitle}" /><TextBlock Text="{Binding QCodexAccountStatus}" Style="{StaticResource RowDescription}" TextWrapping="Wrap" MaxWidth="420" /><TextBlock Text="{Binding QCodexUsageStatus}" Style="{StaticResource RowDescription}" TextWrapping="Wrap" MaxWidth="420" /></StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                                         <Button Content="{Binding QCodexActionLabel}" Command="{Binding SignInCodexCommand}" Style="{StaticResource ActionButton}" />
                                         <Button Content="Cancel" Command="{Binding CancelCodexLoginCommand}" Style="{StaticResource ActionButton}" Margin="8,0,0,0" Visibility="{Binding QCodexLoginPending, Converter={StaticResource BoolToVisibility}}" />
@@ -599,6 +716,28 @@
                         </StackPanel></Border>
                     </StackPanel>
 
+                    <!-- Shortcuts and window behavior -->
+                    <StackPanel x:Name="ShortcutsPage" Visibility="Collapsed">
+                        <TextBlock Text="Shortcuts &amp; behavior" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="Set how Sutra Island starts and responds, and manage keyboard shortcuts." Style="{StaticResource PageDescription}" />
+                        <TextBlock Text="WINDOW BEHAVIOR" Style="{StaticResource GroupLabel}" Margin="0,0,0,9" />
+                        <Border Style="{StaticResource InsetGroup}"><StackPanel>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Launch on startup" Style="{StaticResource RowTitle}" /><TextBlock Text="Start Sutra Island when Windows starts." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding LaunchOnStartup}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Always on top" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding AlwaysOnTop}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Expand on hover" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ExpandOnHover}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Click-through when compact" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ClickThroughWhenCompact}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Always expanded" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding AlwaysExpanded}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Auto-grow to fit content" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding AutoGrowPill}" /></Grid></Border>
+                            <Border Style="{StaticResource LastPreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Hide in fullscreen" Style="{StaticResource RowTitle}" /><TextBlock Text="Temporarily hide over fullscreen apps and games." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding AutoHideFullscreen}" /></Grid></Border>
+                        </StackPanel></Border>
+                        <TextBlock Text="KEYBOARD SHORTCUTS" Style="{StaticResource GroupLabel}" />
+                        <Border Style="{StaticResource InsetGroup}"><StackPanel>
+                            <Border Style="{StaticResource LastPreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Command palette" Style="{StaticResource RowTitle}" /><TextBlock Text="Global shortcut that opens the command palette." Style="{StaticResource RowDescription}" /><TextBlock Text="{Binding CommandPaletteShortcut}" Style="{StaticResource RowDescription}" Margin="0,2,0,0" /><TextBlock Text="{Binding CommandPaletteStatus}" Foreground="#FFFF9F0A" TextWrapping="Wrap" /></StackPanel><Button x:Name="PaletteHotkeyButton" Grid.Column="1" Content="Change" Click="ChangePaletteHotkey_Click" Style="{StaticResource ActionButton}" VerticalAlignment="Top" Margin="16,0,0,0" /></Grid></Border>
+                        </StackPanel></Border>
+                        <TextBlock Text="Q ASSISTANT SHORTCUTS" Style="{StaticResource GroupLabel}" />
+                        <Border Style="{StaticResource InsetGroup}"><Grid Margin="16,13"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Manage Q activation keys and quick actions." Style="{StaticResource RowDescription}" VerticalAlignment="Center" /><Button Grid.Column="1" Content="Open Q Assistant" Tag="q" Click="NavigateFromOverview_Click" Style="{StaticResource ActionButton}" /></Grid></Border>
+                    </StackPanel>
+
                     <!-- Advanced -->
                     <StackPanel x:Name="AdvancedPage" Visibility="Collapsed">
                         <TextBlock Text="Advanced" Style="{StaticResource PageTitle}" />
@@ -641,12 +780,6 @@
                 </Grid>
             </ScrollViewer>
 
-            <Border Grid.Row="2" Background="#11151B" BorderBrush="#303741" BorderThickness="0,1,0,0" Padding="24,11">
-                <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE73E;" FontFamily="Segoe Fluent Icons" Foreground="#30D158" VerticalAlignment="Center" /><TextBlock Text="  Changes apply instantly and save when this window closes." FontSize="11.5" Foreground="{StaticResource Muted}" VerticalAlignment="Center" /></StackPanel>
-                    <Button Grid.Column="1" Content="Done" Click="Done_Click" Background="{StaticResource Blue}" BorderBrush="{StaticResource Blue}" Style="{StaticResource ActionButton}" Padding="18,7" />
-                </Grid>
-            </Border>
         </Grid>
     </Grid>
 </Window>

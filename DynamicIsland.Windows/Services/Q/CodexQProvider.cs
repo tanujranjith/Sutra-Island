@@ -5,9 +5,9 @@ namespace DynamicIsland.Windows.Services.Q;
 public sealed class CodexQProvider(CodexAppServerClient client) : IQProvider
 {
     public QProviderInfo Info { get; } = new(
-        "codex", "ChatGPT / Codex",
+        "codex", "Codex · Subscription",
         QProviderCapabilities.Text | QProviderCapabilities.Images | QProviderCapabilities.Streaming | QProviderCapabilities.ModelDiscovery,
-        "gpt-5.6-sol", null);
+        "gpt-6.1-sol", null);
 
     public async Task<IReadOnlyList<QModelInfo>> GetModelsAsync(string? credential, CancellationToken cancellationToken, string? baseUrl = null)
     {

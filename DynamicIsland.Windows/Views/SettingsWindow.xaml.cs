@@ -12,8 +12,8 @@ public partial class SettingsWindow : Window
 {
     private readonly IslandViewModel _islandViewModel;
     private readonly IslandWindow _islandWindow;
-    private bool _previewPinnedExpanded;
     private bool _previewExpanded;
+    private bool _previewPaneCollapsed;
 
     public event EventHandler? OpenTimerRequested;
 
@@ -31,29 +31,31 @@ public partial class SettingsWindow : Window
         Closed += (_, _) => settingsViewModel.PropertyChanged -= SettingsOnPropertyChanged;
         IsVisibleChanged += (_, _) => { if (!IsVisible) QApiKeyBox.Clear(); };
         PreviewIslandData.DataContext = islandViewModel;
+        PreviewIslandData.SizeChanged += PreviewIslandData_SizeChanged;
+        Closed += (_, _) => PreviewIslandData.SizeChanged -= PreviewIslandData_SizeChanged;
         _islandViewModel.PropertyChanged += IslandPreviewOnPropertyChanged;
         Closed += (_, _) => _islandViewModel.PropertyChanged -= IslandPreviewOnPropertyChanged;
         SetPreviewExpanded(false, animate: false);
         ShowSection("content");
+        UpdateNavigationFilter(string.Empty);
+    }
+
+    private void TogglePreviewPane_Click(object sender, RoutedEventArgs e)
+    {
+        _previewPaneCollapsed = !_previewPaneCollapsed;
+        PreviewPane.Visibility = _previewPaneCollapsed ? Visibility.Collapsed : Visibility.Visible;
+        PreviewColumn.Width = _previewPaneCollapsed ? new GridLength(0) : new GridLength(306);
+        ShowPreviewButton.Visibility = _previewPaneCollapsed ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void CompactPreview_Click(object sender, RoutedEventArgs e)
     {
-        _previewPinnedExpanded = false;
         SetPreviewExpanded(false, animate: true);
     }
 
     private void ExpandedPreview_Click(object sender, RoutedEventArgs e)
     {
-        _previewPinnedExpanded = true;
         SetPreviewExpanded(true, animate: true);
-    }
-
-    private void Preview_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e) => SetPreviewExpanded(true, animate: true);
-
-    private void Preview_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
-    {
-        if (!_previewPinnedExpanded) SetPreviewExpanded(false, animate: true);
     }
 
     private void SetPreviewExpanded(bool expanded, bool animate)
@@ -100,12 +102,22 @@ public partial class SettingsWindow : Window
 
     private (double Width, double Height) PreviewSize(bool expanded)
     {
-        if (!expanded) return (_islandViewModel.PreviewIslandWidth, _islandViewModel.PreviewIslandHeight);
+        if (!expanded)
+            return (_islandViewModel.PreviewIslandWidth, _islandViewModel.PreviewIslandHeight);
+
         var source = _islandWindow.ExpandedPreviewVisual;
         var width = source.ActualWidth > 0 ? source.ActualWidth : 900d;
         var height = source.ActualHeight > 0 ? source.ActualHeight : 371d;
-        var scale = Math.Min(400d / width, 300d / height);
-        return (width * scale, height * scale);
+        return (width, height);
+    }
+
+    private void PreviewIslandData_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var (width, height) = PreviewSize(_previewExpanded);
+        PreviewPill.BeginAnimation(WidthProperty, null);
+        PreviewPill.BeginAnimation(HeightProperty, null);
+        PreviewPill.Width = width;
+        PreviewPill.Height = height;
     }
 
     private void ExpandedPreviewVisual_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -223,20 +235,59 @@ public partial class SettingsWindow : Window
         ShowSection(key);
     }
 
+    private void NavigateFromOverview_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string key }) return;
+        if (DataContext is SettingsViewModel settings) settings.SelectedSectionKey = key;
+        ShowSection(key);
+    }
+
+    private void SettingsSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (DataContext is SettingsViewModel settings) settings.SearchText = SettingsSearchBox.Text;
+        UpdateNavigationFilter(SettingsSearchBox.Text);
+    }
+
+    private void UpdateNavigationFilter(string? search)
+    {
+        var query = search?.Trim() ?? string.Empty;
+        bool Matches(System.Windows.Controls.Primitives.ToggleButton item, params string[] keywords) => query.Length == 0
+            || keywords.Any(keyword => keyword.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || query.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+
+        OverviewTab.Visibility = Matches(OverviewTab, "overview") ? Visibility.Visible : Visibility.Collapsed;
+        ContentTab.Visibility = Matches(ContentTab, "island", "content", "media", "album", "volume", "audio", "battery", "clock", "date", "timer", "equalizer", "ram") ? Visibility.Visible : Visibility.Collapsed;
+        AppearanceTab.Visibility = Matches(AppearanceTab, "island", "appearance", "theme", "color", "colour", "accent", "animation", "font", "scale", "art") ? Visibility.Visible : Visibility.Collapsed;
+        PositionTab.Visibility = Matches(PositionTab, "island", "position", "monitor", "offset", "display", "placement", "screen") ? Visibility.Visible : Visibility.Collapsed;
+        ActivitiesTab.Visibility = Matches(ActivitiesTab, "widgets", "connections", "activities", "weather", "notifications", "notification", "integrations", "network", "wifi", "bluetooth", "stocks", "calendar", "meeting", "clipboard", "privacy", "countdown") ? Visibility.Visible : Visibility.Collapsed;
+        QTab.Visibility = Matches(QTab, "q", "assistant", "provider", "model", "api", "prompt", "response", "tokens", "screen") ? Visibility.Visible : Visibility.Collapsed;
+        ShortcutsTab.Visibility = Matches(ShortcutsTab, "shortcuts", "behavior", "command palette", "startup", "hotkey", "hover", "click-through", "always on top", "expand") ? Visibility.Visible : Visibility.Collapsed;
+        AdvancedTab.Visibility = Matches(AdvancedTab, "advanced", "developer", "backup", "profiles", "warnings", "debug", "import", "export", "reset", "volume warning", "battery warning") ? Visibility.Visible : Visibility.Collapsed;
+
+        var showIslandGroup = query.Length == 0 || "island content appearance position".Contains(query, StringComparison.OrdinalIgnoreCase);
+        IslandNavLabel.Visibility = showIslandGroup ? Visibility.Visible : Visibility.Collapsed;
+        SettingsSearchEmpty.Visibility = new System.Windows.Controls.Primitives.ToggleButton[] { OverviewTab, ContentTab, AppearanceTab, PositionTab, ActivitiesTab, QTab, ShortcutsTab, AdvancedTab }
+            .Any(item => item.Visibility == Visibility.Visible) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     private void ShowSection(string key)
     {
+        OverviewPage.Visibility = key == "overview" ? Visibility.Visible : Visibility.Collapsed;
         ContentPage.Visibility = key == "content" ? Visibility.Visible : Visibility.Collapsed;
         AppearancePage.Visibility = key == "appearance" ? Visibility.Visible : Visibility.Collapsed;
         PositionPage.Visibility = key == "position" ? Visibility.Visible : Visibility.Collapsed;
         ActivitiesPage.Visibility = key == "activities" ? Visibility.Visible : Visibility.Collapsed;
         QPage.Visibility = key == "q" ? Visibility.Visible : Visibility.Collapsed;
+        ShortcutsPage.Visibility = key == "shortcuts" ? Visibility.Visible : Visibility.Collapsed;
         AdvancedPage.Visibility = key == "advanced" ? Visibility.Visible : Visibility.Collapsed;
 
+        OverviewTab.IsChecked = key == "overview";
         ContentTab.IsChecked = key == "content";
         AppearanceTab.IsChecked = key == "appearance";
         PositionTab.IsChecked = key == "position";
         ActivitiesTab.IsChecked = key == "activities";
         QTab.IsChecked = key == "q";
+        ShortcutsTab.IsChecked = key == "shortcuts";
         AdvancedTab.IsChecked = key == "advanced";
     }
 

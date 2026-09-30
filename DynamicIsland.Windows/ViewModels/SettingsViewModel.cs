@@ -458,7 +458,8 @@ public sealed class SettingsViewModel : ObservableObject
         }
     }
     public IReadOnlyList<QProviderChoice> QProviderOptions => _qProviders.Providers
-        .Select(provider => new QProviderChoice(provider.Info.Id, provider.Info.DisplayName)).ToArray();
+        .Select(provider => new QProviderChoice(provider.Info.Id, provider.Info.Id == "codex"
+            ? CodexProviderLabel.For(_codexAccount.Snapshot.Account) : provider.Info.DisplayName)).ToArray();
     public string QApiKeyStatus => string.IsNullOrWhiteSpace(QApiKey)
         ? "No key saved for this provider." : "Key saved for this provider. Paste a new key below to replace it.";
     public string QSavedKeyProviders
@@ -637,6 +638,14 @@ public sealed class SettingsViewModel : ObservableObject
             _providerModels[providerId] = models;
             if (_settings.QSelectedProvider != providerId) return;
             RaisePropertyChanged(nameof(QModelOptions));
+            var effortBeforeDiscovery = _settings.QReasoningEffort;
+            NormalizeProviderEffort();
+            RaisePropertyChanged(nameof(QReasoningEffortOptions));
+            if (!string.Equals(effortBeforeDiscovery, _settings.QReasoningEffort, StringComparison.OrdinalIgnoreCase))
+            {
+                _apply();
+                _ = _settingsService.SaveAsync(_settings);
+            }
             QConnectionStatus = $"Connected · {models.Count} model{(models.Count == 1 ? "" : "s")} available";
         }
         catch (Exception ex) { if (_settings.QSelectedProvider == providerId) QConnectionStatus = ex.Message.Length > 120 ? ex.Message[..120] : ex.Message; }
@@ -682,6 +691,7 @@ public sealed class SettingsViewModel : ObservableObject
         {
             _codexModels = snapshot.Models ?? _codexModels;
             NormalizeProviderEffort();
+            RaisePropertyChanged(nameof(QProviderOptions));
             RaisePropertyChanged(nameof(QCodexIsConnected));
             RaisePropertyChanged(nameof(QCodexLoginPending));
             RaisePropertyChanged(nameof(QCodexActionLabel));
@@ -782,11 +792,13 @@ public sealed class SettingsViewModel : ObservableObject
     {
         var all = new[]
         {
-            new SettingsSection("content", "Island Content", Glyph(0xE713)),
+            new SettingsSection("overview", "Overview", Glyph(0xE80F)),
+            new SettingsSection("content", "Content", Glyph(0xE713)),
             new SettingsSection("appearance", "Appearance", Glyph(0xE790)),
             new SettingsSection("position", "Position", Glyph(0xE809)),
-            new SettingsSection("activities", "Live Activities", Glyph(0xE753)),
+            new SettingsSection("activities", "Widgets & connections", Glyph(0xE753)),
             new SettingsSection("q", "Q Assistant", Glyph(0xE720)),
+            new SettingsSection("shortcuts", "Shortcuts & behavior", Glyph(0xE765)),
             new SettingsSection("advanced", "Advanced", Glyph(0xE9F5)),
         };
         var q = _searchText?.Trim() ?? "";

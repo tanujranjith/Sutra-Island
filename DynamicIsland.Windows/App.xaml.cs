@@ -383,9 +383,11 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         else _islandViewModel.QCompareEnabled = false;
         // StartQAsync runs its synchronous prefix (which resets the snapshot to Ask) before
         // the first await, so switching to Say and prefilling after the call is safe.
-        _ = _islandViewModel.StartQAsync(_qScreen.LastForegroundTarget);
+        var submitQuestion = mode == QMode.Ask && !compare && !string.IsNullOrWhiteSpace(question);
+        _ = _islandViewModel.StartQAsync(_qScreen.LastForegroundTarget,
+            initialPrompt: submitQuestion ? question : null);
         if (mode == QMode.Say) _islandViewModel.SetQMode(QMode.Say);
-        if (question is not null) _islandWindow.PrefillQPrompt(question);
+        if (question is not null) _islandWindow.PrefillQPrompt(submitQuestion ? string.Empty : question);
     });
 
     private void RegisterQHotkey()

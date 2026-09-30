@@ -1,6 +1,17 @@
 namespace DynamicIsland.Windows.Services.Q;
 
 public sealed record CodexAccount(string? Email, string? PlanType, string AuthMode);
+
+public static class CodexProviderLabel
+{
+    public static string For(CodexAccount? account) => account?.AuthMode switch
+    {
+        string mode when string.Equals(mode, "apiKey", StringComparison.OrdinalIgnoreCase) => "Codex · API key",
+        string mode when string.Equals(mode, "chatgpt", StringComparison.OrdinalIgnoreCase) => "Codex · Subscription",
+        null => "Codex · Sign in",
+        _ => "Codex · Account"
+    };
+}
 public sealed record CodexDeviceLogin(string LoginId, string VerificationUrl, string UserCode);
 public sealed record CodexModel(
     string Id,

@@ -33,7 +33,7 @@ public static class CommandCatalog
         new(PaletteCommand.Seek, "seek", [], "Seek forward or back", "seek forward 10 seconds"),
         new(PaletteCommand.Mute, "mute", [], "Mute system audio", "mute"),
         new(PaletteCommand.Unmute, "unmute", [], "Unmute system audio", "unmute"),
-        new(PaletteCommand.Ask, "ask", [], "Open Q with an optional question", "ask why is the sky blue"),
+        new(PaletteCommand.Ask, "ask", [], "Ask Q a question, or open Q", "ask why is the sky blue"),
         new(PaletteCommand.Say, "say", [], "Open Q in voice mode", "say"),
         new(PaletteCommand.Compare, "compare", [], "Compare two options in Q", "compare train or drive"),
         new(PaletteCommand.Timer, "timer", [], "Start a timer or open timer controls", "timer 10 minutes for laundry"),

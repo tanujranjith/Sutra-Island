@@ -17,6 +17,8 @@ public sealed class MediaSessionService(LoggingService log) : IDisposable
     private byte[]? _artwork;
     private DateTimeOffset _artworkRetryUntil = DateTimeOffset.MinValue;
     private DateTimeOffset _nextArtworkRetry = DateTimeOffset.MinValue;
+    private readonly SemaphoreSlim _commandGate = new(1, 1);
+    private (string Identity, TimeSpan Position, DateTimeOffset At)? _pendingSeek;
 
     // Browser media sessions can publish new metadata before their thumbnail changes.
     // Retry briefly after a track transition so the previous/video thumbnail is not cached.
@@ -85,66 +87,88 @@ public sealed class MediaSessionService(LoggingService log) : IDisposable
     public void SetPreferredApp(string? appId) =>
         _preferredApp = string.IsNullOrWhiteSpace(appId) ? "Automatic" : appId;
 
-    public async Task TogglePlayPauseAsync()
-    {
-        try { if (_selectedSession is not null) await _selectedSession.TryTogglePlayPauseAsync(); }
-        catch (Exception ex) { log.Error("Play/pause command failed", ex); }
-    }
+    public Task TogglePlayPauseAsync() => RunCommandAsync("Play/pause", async session =>
+        { await session.TryTogglePlayPauseAsync(); });
 
     // Explicit play/pause for the command palette — toggles are ambiguous when a command
     // names the exact action it wants.
-    public async Task PauseAsync()
-    {
-        try { if (_selectedSession is not null) await _selectedSession.TryPauseAsync(); }
-        catch (Exception ex) { log.Error("Pause command failed", ex); }
-    }
+    public Task PauseAsync() => RunCommandAsync("Pause", async session =>
+        { await session.TryPauseAsync(); });
 
-    public async Task PlayAsync()
-    {
-        try { if (_selectedSession is not null) await _selectedSession.TryPlayAsync(); }
-        catch (Exception ex) { log.Error("Play command failed", ex); }
-    }
+    public Task PlayAsync() => RunCommandAsync("Play", async session =>
+        { await session.TryPlayAsync(); });
 
-    public async Task PreviousAsync()
-    {
-        try { if (_selectedSession is not null) await _selectedSession.TrySkipPreviousAsync(); }
-        catch (Exception ex) { log.Error("Previous command failed", ex); }
-    }
+    public Task PreviousAsync() => RunCommandAsync("Previous", async session =>
+        { await session.TrySkipPreviousAsync(); });
 
-    public async Task NextAsync()
-    {
-        try { if (_selectedSession is not null) await _selectedSession.TrySkipNextAsync(); }
-        catch (Exception ex) { log.Error("Next command failed", ex); }
-    }
+    public Task NextAsync() => RunCommandAsync("Next", async session =>
+        { await session.TrySkipNextAsync(); });
 
-    public async Task SeekFractionAsync(double fraction)
+    private async Task RunCommandAsync(string name, Func<GlobalSystemMediaTransportControlsSession, Task> action)
     {
+        var session = _selectedSession;
+        if (session is null || _shutdown.IsCancellationRequested) return;
+        var entered = false;
         try
         {
-            if (_selectedSession is null) return;
+            await _commandGate.WaitAsync(_shutdown.Token);
+            entered = true;
+            // A queued click belongs to the source that was selected when it was made.
+            if (!ReferenceEquals(session, _selectedSession) || _shutdown.IsCancellationRequested) return;
+            await action(session);
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { }
+        catch (Exception ex) { log.Error($"{name} command failed", ex); }
+        finally { if (entered) _commandGate.Release(); }
+    }
+
+    public Task SeekFractionAsync(double fraction) => RunCommandAsync("Seek", async session =>
+        {
             var duration = Current.Duration;
             if (duration.Ticks <= 0) return;
-            await _selectedSession.TryChangePlaybackPositionAsync((long)(Math.Clamp(fraction, 0, 1) * duration.Ticks));
-        }
-        catch (Exception ex) { log.Error("Seek failed", ex); }
-    }
+            await ChangePositionAsync(session, TimeSpan.FromTicks((long)(Math.Clamp(fraction, 0, 1) * duration.Ticks)));
+        });
 
     // Seek a fixed amount relative to the current position (used by the 10s rewind/forward controls).
     // The target is clamped to [0, duration] so a near-start rewind lands exactly on 0 and a near-end
     // forward lands exactly on the track length — never overshooting either end. Seeking is relative to
-    // the last published position, which is what the user sees on the progress bar, so a +10s tap lands
-    // 10s ahead of the displayed elapsed time.
-    public async Task SeekByAsync(TimeSpan offset)
-    {
-        try
+    // the latest accepted seek target while the source's timeline is catching up, so rapid taps stack.
+    public Task SeekByAsync(TimeSpan offset) => RunCommandAsync("Relative seek", async session =>
         {
-            if (_selectedSession is null || !Current.CanSeek) return;
+            if (!Current.CanSeek) return;
             var duration = Current.Duration;
             if (duration.Ticks <= 0) return;
-            var target = Infrastructure.SeekMath.ClampSeek(Current.Position, offset, duration);
-            await _selectedSession.TryChangePlaybackPositionAsync(target.Ticks);
+            var position = ResolvePendingSeek(Current.Position, _lastIdentity, Current.PlaybackState);
+            var target = Infrastructure.SeekMath.ClampSeek(position, offset, duration);
+            await ChangePositionAsync(session, target);
+        });
+
+    private async Task ChangePositionAsync(GlobalSystemMediaTransportControlsSession session, TimeSpan target)
+    {
+        var identity = _lastIdentity;
+        if (!await session.TryChangePlaybackPositionAsync(target.Ticks)) return;
+        if (!ReferenceEquals(session, _selectedSession) || identity != _lastIdentity) return;
+        var now = DateTimeOffset.Now;
+        _pendingSeek = (identity, target, now);
+        Publish(Current with { Position = target, UpdatedAt = now });
+    }
+
+    private TimeSpan ResolvePendingSeek(TimeSpan reported, string identity, MediaPlaybackState state, bool fromSource = false)
+    {
+        if (_pendingSeek is not { } pending) return reported;
+        var elapsed = DateTimeOffset.Now - pending.At;
+        if (pending.Identity != identity || elapsed > TimeSpan.FromSeconds(3))
+        {
+            _pendingSeek = null;
+            return reported;
         }
-        catch (Exception ex) { log.Error("Relative seek failed", ex); }
+        var expected = pending.Position + (state == MediaPlaybackState.Playing ? elapsed : TimeSpan.Zero);
+        if (fromSource && Math.Abs((reported - expected).TotalSeconds) < 1)
+        {
+            _pendingSeek = null;
+            return reported;
+        }
+        return Infrastructure.SeekMath.ClampSeek(expected, TimeSpan.Zero, Current.Duration);
     }
 
     public void LaunchSource()
@@ -251,6 +275,7 @@ public sealed class MediaSessionService(LoggingService log) : IDisposable
 
         var controls = best.Playback.Controls;
         var (position, duration) = ResolvePosition(best.Timeline, best.State);
+        position = ResolvePendingSeek(position, newIdentity, best.State, fromSource: true);
         Publish(new MediaInfo
         {
             Title = best.Properties.Title ?? string.Empty,

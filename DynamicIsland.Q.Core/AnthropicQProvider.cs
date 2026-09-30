@@ -10,7 +10,7 @@ public sealed class AnthropicQProvider(HttpClient? httpClient = null) : HttpQPro
 
     public override QProviderInfo Info { get; } = new("anthropic", "Anthropic",
         QProviderCapabilities.Text | QProviderCapabilities.Images | QProviderCapabilities.Streaming | QProviderCapabilities.ModelDiscovery,
-        "claude-sonnet-5", "https://api.anthropic.com");
+        "claude-sonnet-5-5", "https://api.anthropic.com");
 
     public override async Task<IReadOnlyList<QModelInfo>> GetModelsAsync(string? credential,
         CancellationToken cancellationToken, string? baseUrl = null)

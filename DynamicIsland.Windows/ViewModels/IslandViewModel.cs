@@ -92,6 +92,9 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private readonly IQProviderRegistry _qProviders;
     private readonly CodexAccountCoordinator? _codexAccount;
     private IReadOnlyList<CodexModel> _codexModels = [];
+    private readonly Dictionary<string, IReadOnlyList<QModelInfo>> _qProviderModels = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _qModelRefreshes = new(StringComparer.OrdinalIgnoreCase);
+    private string _qModelRefreshStatus = "Refresh available models";
     private QSessionSnapshot _qSnapshot = new(QRunState.Idle, QMode.Ask, string.Empty, string.Empty, "Ready", null, null, "", "");
     private nint _qTargetWindow;
 
@@ -148,15 +151,16 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         NextCommand = new RelayCommand(() => _ = _mediaService.NextAsync(), () => Media.CanNext);
         SeekBackCommand = new RelayCommand(() => _ = _mediaService.SeekByAsync(TimeSpan.FromSeconds(-SeekBackSeconds)), () => CanSeek);
         SeekForwardCommand = new RelayCommand(() => _ = _mediaService.SeekByAsync(TimeSpan.FromSeconds(SeekForwardSeconds)), () => CanSeek);
-        ToggleMuteCommand = new RelayCommand(() => _audioService.SetMuted(!Audio.SystemMuted),
+        ToggleMuteCommand = new RelayCommand(() => _audioService.ToggleMuted(),
             () => Audio.Availability == AudioAvailability.Available);
         AdjustVolumeCommand = new RelayCommand<string>(delta =>
         {
             if (int.TryParse(delta, out var amount))
-                _audioService.SetMasterVolume(Audio.MasterVolumePercent + amount);
+                _audioService.AdjustMasterVolume(amount);
         });
         ToggleExpandedCommand = new RelayCommand(() => IsExpanded = !IsExpanded);
         RefreshCodexAccountCommand = new RelayCommand(() => _ = _codexAccount?.RefreshAsync());
+        RefreshQModelsCommand = new RelayCommand(() => _ = RefreshQModelsAsync(force: true));
         CodexPrimaryActionCommand = new RelayCommand(() => _ = CodexPrimaryActionAsync());
         SignOutCodexCommand = new RelayCommand(() => _ = SignOutCodexAsync());
 
@@ -296,7 +300,8 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public IReadOnlyList<QShortcut> QShortcuts => Settings.QShortcuts ?? [];
     public bool QHasShortcuts => QShortcuts.Count > 0;
     public IReadOnlyList<QProviderChoice> QProviderOptions => _qProviders.Providers
-        .Select(provider => new QProviderChoice(provider.Info.Id, provider.Info.DisplayName)).ToArray();
+        .Select(provider => new QProviderChoice(provider.Info.Id, provider.Info.Id == "codex"
+            ? CodexProviderLabel.For(_codexAccount?.Snapshot.Account) : provider.Info.DisplayName)).ToArray();
     public bool QCanChangeProvider => !QCanStop;
     public event EventHandler? QProviderSelectionChanged;
     public string QSelectedProvider
@@ -314,6 +319,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             Settings.QSelectedModel = selected.Model;
             Settings.QReasoningEffort = selected.ReasoningEffort;
             NormalizeProviderReasoningEffort();
+            _ = RefreshQModelsAsync();
             EnsureCompareProvider();
             ResetComparisonAnswers();
             RaiseQProperties();
@@ -337,7 +343,12 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     }
     public IReadOnlyList<string> QModelOptions => IsCodexSelected && _codexModels.Count > 0
         ? _codexModels.Select(model => model.Id).ToArray()
-        : QProviderPolicy.ModelSuggestions(Settings.QSelectedProvider, Settings.QSelectedModel);
+        : (_qProviderModels.TryGetValue(Settings.QSelectedProvider, out var discovered) ? discovered.Select(model => model.Id) : Enumerable.Empty<string>())
+            .Concat(QProviderPolicy.ModelSuggestions(Settings.QSelectedProvider, Settings.QSelectedModel))
+            .Append(Settings.QSelectedModel)
+            .Where(model => !string.IsNullOrWhiteSpace(model))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    public string QModelRefreshStatus => _qModelRefreshStatus;
     public string QReasoningEffort
     {
         get => Settings.QReasoningEffort;
@@ -1125,6 +1136,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public ICommand AdjustVolumeCommand { get; }
     public ICommand ToggleExpandedCommand { get; }
     public ICommand RefreshCodexAccountCommand { get; }
+    public ICommand RefreshQModelsCommand { get; }
     public ICommand CodexPrimaryActionCommand { get; }
     public ICommand SignOutCodexCommand { get; }
     public ICommand SeekCommand { get; private set; } = null!;
@@ -1170,14 +1182,14 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         pending?.Cancel();
     }
 
-    public async Task StartQAsync(nint targetWindow = default, string? hotkeyShortcutName = null)
+    public async Task StartQAsync(nint targetWindow = default, string? hotkeyShortcutName = null, string? initialPrompt = null)
     {
         // Publish Ready and submit the shortcut on the same dispatcher. Worker continuations
         // could otherwise submit while the UI still said Capturing and silently skip the prompt.
         var ui = System.Windows.Application.Current?.Dispatcher;
         if (ui is not null && !ui.CheckAccess())
         {
-            await ui.InvokeAsync(() => StartQAsync(targetWindow, hotkeyShortcutName)).Task.Unwrap();
+            await ui.InvokeAsync(() => StartQAsync(targetWindow, hotkeyShortcutName, initialPrompt)).Task.Unwrap();
             return;
         }
         if (!Settings.QEnabled) return;
@@ -1193,6 +1205,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         _qSnapshot = new QSessionSnapshot(QRunState.Capturing, QMode.Ask, string.Empty, string.Empty,
             "Reading active window…", null, null, Settings.QSelectedProvider, Settings.QSelectedModel);
         RaiseQProperties();
+        if (!IsCodexSelected) _ = RefreshQModelsAsync();
         try
         {
             await RefreshCodexModelsAsync();
@@ -1208,7 +1221,8 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             var shortcutName = string.IsNullOrWhiteSpace(hotkeyShortcutName) ? null : hotkeyShortcutName.Trim();
             var shortcutPrompt = shortcutName is null ? null : Settings.QShortcuts?.FirstOrDefault(shortcut =>
                 string.Equals(shortcut.Name, shortcutName, StringComparison.OrdinalIgnoreCase))?.Prompt;
-            if (!string.IsNullOrWhiteSpace(shortcutPrompt)) await SubmitQAsync(shortcutPrompt);
+            var prompt = string.IsNullOrWhiteSpace(initialPrompt) ? shortcutPrompt : initialPrompt.Trim();
+            if (!string.IsNullOrWhiteSpace(prompt)) await SubmitQAsync(prompt);
         }
         catch (OperationCanceledException)
         {
@@ -1291,9 +1305,9 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public void ClearQ() { CancelQActivation(); _qAutoCloseTimer.Stop(); _qComparison.Clear(); _qSession.Clear(); IsExpanded = false; }
     public void CopyQResponse() { if (!string.IsNullOrWhiteSpace(QResponse)) System.Windows.Clipboard.SetText(QResponse); }
 
-    private async Task RefreshCodexModelsAsync()
+    private async Task RefreshCodexModelsAsync(bool force = false)
     {
-        if ((!IsCodexSelected && !(QCompareEnabled && QCompareProvider == "codex")) || _codexAccount is null || _codexModels.Count > 0) return;
+        if ((!IsCodexSelected && !(QCompareEnabled && QCompareProvider == "codex")) || _codexAccount is null || (!force && _codexModels.Count > 0)) return;
         try
         {
             await _codexAccount.RefreshAsync(CancellationToken.None).ConfigureAwait(false);
@@ -1317,6 +1331,87 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         {
             // Submission surfaces the concrete app-server/account error. Keep fallback
             // selectors available if discovery is temporarily unavailable.
+        }
+    }
+
+    private async Task RefreshQModelsAsync(bool force = false)
+    {
+        var providerId = Settings.QSelectedProvider;
+        if (string.IsNullOrWhiteSpace(providerId)) return;
+        if (IsCodexSelected)
+        {
+            await OnUiAsync(() =>
+            {
+                _qModelRefreshStatus = "Loading Codex models…";
+                RaisePropertyChanged(nameof(QModelRefreshStatus));
+            });
+            await RefreshCodexModelsAsync(force).ConfigureAwait(false);
+            await OnUiAsync(() =>
+            {
+                if (!IsCodexSelected) return;
+                _qModelRefreshStatus = _codexModels.Count > 0
+                    ? $"{_codexModels.Count} Codex models available"
+                    : "Sign in to Codex in Settings to load models.";
+                RaisePropertyChanged(nameof(QModelRefreshStatus));
+            });
+            return;
+        }
+        var provider = _qProviders.Find(providerId);
+        if (provider is null || !provider.Info.Capabilities.HasFlag(QProviderCapabilities.ModelDiscovery)) return;
+        if (!force && _qProviderModels.ContainsKey(providerId)) return;
+        lock (_qModelRefreshes)
+        {
+            if (!_qModelRefreshes.Add(providerId)) return;
+        }
+
+        try
+        {
+            await OnUiAsync(() =>
+            {
+                if (!string.Equals(Settings.QSelectedProvider, providerId, StringComparison.OrdinalIgnoreCase)) return;
+                _qModelRefreshStatus = "Loading models…";
+                RaisePropertyChanged(nameof(QModelRefreshStatus));
+            }).ConfigureAwait(false);
+
+            var isOllama = string.Equals(providerId, "ollama", StringComparison.OrdinalIgnoreCase);
+            var credential = isOllama ? null : _qSecrets.Get(providerId);
+            if (!isOllama && string.IsNullOrWhiteSpace(credential))
+            {
+                await OnUiAsync(() =>
+                {
+                    if (!string.Equals(Settings.QSelectedProvider, providerId, StringComparison.OrdinalIgnoreCase)) return;
+                    _qModelRefreshStatus = "Add an API key in Settings to load models.";
+                    RaisePropertyChanged(nameof(QModelRefreshStatus));
+                }).ConfigureAwait(false);
+                return;
+            }
+
+            var models = await provider.GetModelsAsync(credential, CancellationToken.None,
+                isOllama ? Settings.QOllamaBaseUrl : null).ConfigureAwait(false);
+            await OnUiAsync(() =>
+            {
+                _qProviderModels[providerId] = models;
+                if (!string.Equals(Settings.QSelectedProvider, providerId, StringComparison.OrdinalIgnoreCase)) return;
+                _qModelRefreshStatus = models.Count == 0
+                    ? "No models returned."
+                    : $"{models.Count} model{(models.Count == 1 ? "" : "s")} available";
+                NormalizeProviderReasoningEffort();
+                RaiseMany(nameof(QModelOptions), nameof(QReasoningEffort), nameof(QReasoningEffortOptions), nameof(QModelRefreshStatus));
+                _ = PersistSettingsAsync();
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            await OnUiAsync(() =>
+            {
+                if (!string.Equals(Settings.QSelectedProvider, providerId, StringComparison.OrdinalIgnoreCase)) return;
+                _qModelRefreshStatus = ex.Message.Length > 120 ? ex.Message[..120] : ex.Message;
+                RaisePropertyChanged(nameof(QModelRefreshStatus));
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_qModelRefreshes) _qModelRefreshes.Remove(providerId);
         }
     }
 
@@ -1347,7 +1442,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     {
         _codexModels = snapshot.Models ?? _codexModels;
         NormalizeProviderReasoningEffort();
-        RaiseMany(nameof(QCodexIsConnected), nameof(QShowCodexSignOut), nameof(QCodexChipText), nameof(QCodexAccountDetails),
+        RaiseMany(nameof(QProviderOptions), nameof(QCodexIsConnected), nameof(QShowCodexSignOut), nameof(QCodexChipText), nameof(QCodexAccountDetails),
             nameof(QModelOptions), nameof(QSelectedModel), nameof(QReasoningEffortOptions), nameof(QReasoningEffort));
     });
 

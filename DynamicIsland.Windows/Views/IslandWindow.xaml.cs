@@ -47,6 +47,7 @@ public partial class IslandWindow : Window
     private bool _lastShowWidgetsPanel;
     private bool _urgentAlertVisible;
     private Storyboard? _qThinkingAnimation;
+    private bool _qThinkingAnimationRunning;
     private bool _qFollowLatest = true;
 
     private const double TimerPanelNormalCornerRadius = 28d;
@@ -92,7 +93,11 @@ public partial class IslandWindow : Window
         _collapseTimer.Tick += (_, _) =>
         {
             _collapseTimer.Stop();
-            if (!_timerPanelOpen && !GlassShell.IsMouseOver && !_dragging && !_viewModel.PinExpanded) _viewModel.IsExpanded = false;
+            if (!_timerPanelOpen && !GlassShell.IsMouseOver && !_dragging && !_viewModel.PinExpanded
+                && QMenuButton?.ContextMenu?.IsOpen != true
+                && QProviderSelector?.IsDropDownOpen != true && QModelSelector?.IsDropDownOpen != true
+                && QEffortSelector?.IsDropDownOpen != true
+                ) _viewModel.IsExpanded = false;
         };
         _timerPanelLeaveTimer.Tick += (_, _) => TryAutoCloseTimerPanel();
         _idleTimer.Tick += (_, _) =>
@@ -1976,7 +1981,7 @@ public partial class IslandWindow : Window
     /// <summary>Fills the Q prompt without submitting, then hands focus to it.</summary>
     public void PrefillQPrompt(string? text)
     {
-        if (!string.IsNullOrEmpty(text)) QPromptBox.Text = text;
+        QPromptBox.Text = text ?? string.Empty;
         UpdateQPromptComposer();
         Dispatcher.BeginInvoke(() =>
         {
@@ -2022,13 +2027,43 @@ public partial class IslandWindow : Window
         if (!_sourceReady) return;
         try
         {
-            _qThinkingAnimation ??= (Storyboard)Resources["QThinkingAnimation"];
-            if (_viewModel.QShowInlineThinking)
+            var shouldRun = _viewModel.QShowInlineThinking;
+            if (shouldRun == _qThinkingAnimationRunning) return;
+
+            _qThinkingAnimation ??= CreateQThinkingAnimation();
+            if (shouldRun)
                 _qThinkingAnimation.Begin(this, isControllable: true);
             else
                 _qThinkingAnimation.Remove(this);
+            _qThinkingAnimationRunning = shouldRun;
         }
         catch { }
+    }
+
+    private static Storyboard CreateQThinkingAnimation()
+    {
+        // Keep the waiting cue quiet: three dots take turns brightening, with no moving bar
+        // or surrounding glow competing with the response text.
+        var storyboard = new Storyboard { RepeatBehavior = RepeatBehavior.Forever };
+        AddDotPulse(storyboard, "QThinkingDot1", TimeSpan.Zero);
+        AddDotPulse(storyboard, "QThinkingDot2", TimeSpan.FromMilliseconds(220));
+        AddDotPulse(storyboard, "QThinkingDot3", TimeSpan.FromMilliseconds(440));
+        return storyboard;
+    }
+
+    private static void AddDotPulse(Storyboard storyboard, string targetName, TimeSpan beginTime)
+    {
+        var pulse = new DoubleAnimation
+        {
+            From = 0.38,
+            To = 0.95,
+            Duration = TimeSpan.FromMilliseconds(520),
+            AutoReverse = true,
+            BeginTime = beginTime
+        };
+        Storyboard.SetTargetName(pulse, targetName);
+        Storyboard.SetTargetProperty(pulse, new PropertyPath(UIElement.OpacityProperty));
+        storyboard.Children.Add(pulse);
     }
 
     private void ScheduleQTranscriptScroll()
@@ -2087,6 +2122,15 @@ public partial class IslandWindow : Window
         QPromptBox.Focus();
     }
     private async void QSend_Click(object sender, RoutedEventArgs e) => await SubmitQPromptAsync();
+    private void QSelector_DropDownClosed(object sender, EventArgs e)
+    {
+        if (_viewModel.ShowQSurface && !GlassShell.IsMouseOver)
+        {
+            _collapseTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(100, _viewModel.Settings.CollapseDelayMilliseconds));
+            _collapseTimer.Start();
+        }
+    }
+
     private async void QPromptBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.Enter && Keyboard.Modifiers != ModifierKeys.Shift)
