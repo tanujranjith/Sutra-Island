@@ -414,7 +414,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             .Replace("__", string.Empty, StringComparison.Ordinal)
             .Replace("`", string.Empty, StringComparison.Ordinal);
         cleaned = Regex.Replace(cleaned, @"(?m)^\s{0,3}#{1,6}\s+", string.Empty);
-        return cleaned.Trim();
+        return MathMarkupFormatter.Format(cleaned);
     }
     public MediaInfo Media { get => _media; private set { if (SetProperty(ref _media, value)) UpdateArtwork(value.Artwork); } }
     public AudioState Audio { get => _audio; private set => SetProperty(ref _audio, value); }

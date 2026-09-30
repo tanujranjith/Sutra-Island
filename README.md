@@ -14,7 +14,11 @@ active window, uses OCR and optional vision input, and streams answers directly
 inside the Island. See [`Q.md`](Q.md) for setup, provider configuration, and the
 privacy model.
 
-## What's new in v1.0.15
+## What's new in v1.0.16
+
+- **Readable Q equations:** convert common LaTeX math delimiters, subscripts, superscripts, fractions, roots, Greek letters, and operators into Unicode so equations no longer show raw TeX commands.
+
+### v1.0.15
 
 - **Capture updated notifications:** refresh the Windows snapshot on notification events, serialize overlapping polls, and detect changed message content even when Windows reuses a notification ID.
 

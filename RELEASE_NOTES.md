@@ -1,3 +1,18 @@
+# Sutra Island v1.0.16
+
+## Q response formatting
+
+- Convert common inline and display math markup into readable Unicode in Q responses, including scripts, fractions, roots, Greek letters, and operators.
+- Preserve the underlying response text for copying; only the on-screen display is formatted.
+
+## Downloads
+
+- `DynamicIsland.exe`: updated self-contained Windows x64 app.
+- `DynamicIsland-Codex-Test-v1.0.16-win-x64.zip`: app, setup documentation, and pinned SHA-256-verified Codex 0.151.0 runtime. Extract the complete folder.
+- `SHA256SUMS.txt`: checksums of both downloads.
+
+---
+
 # Sutra Island v1.0.15
 
 ## Notifications
