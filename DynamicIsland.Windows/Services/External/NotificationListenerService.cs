@@ -52,7 +52,9 @@ public sealed class NotificationListenerService : IDisposable
             if (!_enabled || generation != _generation) return;
             if (access != UserNotificationListenerAccessStatus.Allowed)
             { SetStatus(new(IntegrationState.PermissionRequired, "Allow notification access in Windows Settings.", "ms-settings:privacy-notifications")); return; }
-            await PollAsync();
+            // Recover Windows toasts that arrived while the island's listener was stopped.
+            // The view model filters notifications already recorded in the island history.
+            await PollAsync(replayExisting: true);
             if (!_enabled || generation != _generation || Status.State == IntegrationState.PermissionRequired) return;
             if (_enabled && generation == _generation)
             {
@@ -122,7 +124,7 @@ public sealed class NotificationListenerService : IDisposable
         _notificationChangedHandler = null;
     }
 
-    private async Task PollAsync()
+    private async Task PollAsync(bool replayExisting = false)
     {
         if (!_enabled || _listener is null) return;
         if (_polling) { _pollAgain = true; return; }
@@ -138,7 +140,7 @@ public sealed class NotificationListenerService : IDisposable
             }
             var notes = await _listener.GetNotificationsAsync(NotificationKinds.Toast);
             if (!_enabled || generation != _generation) return;
-            var fresh = _tracker.Observe(notes.Select(Extract).OfType<NotificationInfo>());
+            var fresh = _tracker.Observe(notes.Select(Extract).OfType<NotificationInfo>(), replayExisting);
             SetStatus(new(IntegrationState.Ready, "Connected"));
             if (fresh.Count > 0) BatchReceived?.Invoke(this, fresh);
         }

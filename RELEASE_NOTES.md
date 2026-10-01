@@ -1,3 +1,18 @@
+# Sutra Island v1.0.18
+
+## Notification recovery
+
+- Surface active Windows notifications that arrived while the island listener was stopped or restarting.
+- Use the island's saved notification history to avoid replaying notifications it already presented.
+
+## Downloads
+
+- `DynamicIsland.exe`: updated self-contained Windows x64 app.
+- `DynamicIsland-Codex-Test-v1.0.18-win-x64.zip`: app, setup documentation, and pinned SHA-256-verified Codex 0.151.0 runtime. Extract the complete folder.
+- `SHA256SUMS.txt`: checksums of both downloads.
+
+---
+
 # Sutra Island v1.0.17
 
 ## Q vector equation formatting

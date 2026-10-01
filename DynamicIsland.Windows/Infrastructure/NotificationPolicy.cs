@@ -11,7 +11,7 @@ public sealed class NotificationSnapshotTracker(TimeProvider? clock = null)
     private readonly Dictionary<(string App, string Title, string Body), DateTimeOffset> _recentContent = new();
     private bool _initialized;
 
-    public IReadOnlyList<NotificationInfo> Observe(IEnumerable<NotificationInfo> snapshot)
+    public IReadOnlyList<NotificationInfo> Observe(IEnumerable<NotificationInfo> snapshot, bool replayExisting = false)
     {
         var items = snapshot.DistinctBy(n => n.Identity).OrderBy(n => n.CreatedAt).ThenBy(n => n.Id).ToArray();
         var now = _clock.GetUtcNow();
@@ -31,7 +31,7 @@ public sealed class NotificationSnapshotTracker(TimeProvider? clock = null)
                                   now - seenAt <= DuplicateContentWindow;
             // Windows may reuse a toast ID when its message changes. Treat changed content
             // under a known ID as new, while suppressing identical messages across IDs.
-            if (_initialized && (!knownIdentity || identityContentChanged) && !recentlyVisible)
+            if ((_initialized || replayExisting) && (!knownIdentity || identityContentChanged) && !recentlyVisible)
                 fresh.Add(item);
             _recent[item.Identity] = new(item.App, item.AppId, item.Title, item.Body, now);
             _recentContent[content] = now;
