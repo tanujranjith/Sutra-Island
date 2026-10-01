@@ -19,7 +19,11 @@ public static class MathMarkupFormatter
         RegexOptions.Compiled);
 
     private static readonly Regex FormattingCommands = new(
-        @"\\(?:text|textrm|mathrm|mathbf|mathit|mathsf|mathtt|operatorname)\s*\{(?<value>[^{}]*)\}",
+        @"\\(?:text|textrm|mathrm|mathbf|boldsymbol|mathit|mathsf|mathtt|operatorname)\s*\{(?<value>[^{}]*)\}",
+        RegexOptions.Compiled);
+
+    private static readonly Regex MatrixEnvironment = new(
+        @"\\begin\{(?<environment>pmatrix|bmatrix|Bmatrix|matrix|vmatrix|Vmatrix)\}(?<content>[\s\S]*?)\\end\{\k<environment>\}",
         RegexOptions.Compiled);
 
     private static readonly Regex GroupedScript = new(@"(?<operator>[_^])\{(?<value>[^{}]+)\}", RegexOptions.Compiled);
@@ -106,7 +110,8 @@ public static class MathMarkupFormatter
 
     private static string FormatExpression(string expression)
     {
-        var formatted = expression.Replace(@"\\", Environment.NewLine, StringComparison.Ordinal)
+        var formatted = MatrixEnvironment.Replace(expression, FormatMatrixEnvironment)
+            .Replace(@"\\", Environment.NewLine, StringComparison.Ordinal)
             .Replace(@"\%", "%", StringComparison.Ordinal)
             .Replace(@"\$", "$", StringComparison.Ordinal)
             .Replace(@"\_", "_", StringComparison.Ordinal)
@@ -125,7 +130,12 @@ public static class MathMarkupFormatter
             formatted = next;
         }
 
-        formatted = ReplaceAccent(formatted, @"\vec", "⃗");
+        // WPF's text font may not contain the combining vector arrow glyph. Spell
+        // the marker out so it cannot turn into a missing-glyph square.
+        formatted = Regex.Replace(formatted, Regex.Escape(@"\vec") + @"\s*\{(?<value>[^{}]+)\}",
+            match => $"vector {match.Groups["value"].Value}");
+        formatted = Regex.Replace(formatted, Regex.Escape(@"\overrightarrow") + @"\s*\{(?<value>[^{}]+)\}",
+            match => $"vector {match.Groups["value"].Value}");
         formatted = ReplaceAccent(formatted, @"\hat", "̂");
         formatted = ReplaceAccent(formatted, @"\bar", "̄");
 
@@ -159,5 +169,33 @@ public static class MathMarkupFormatter
             return new string(value.Select(character => symbols[character]).ToArray());
 
         return subscript ? $"₍{value}₎" : $"⁽{value}⁾";
+    }
+
+    private static string FormatMatrixEnvironment(Match match)
+    {
+        var environment = match.Groups["environment"].Value;
+        var rows = Regex.Split(match.Groups["content"].Value.Trim(), @"\\\\")
+            .Select(row => row.Split('&').Select(cell => FormatExpression(cell.Trim())).ToArray())
+            .Where(row => row.Any(cell => !string.IsNullOrWhiteSpace(cell)))
+            .ToArray();
+
+        if (rows.Length == 0) return string.Empty;
+
+        var isVector = rows.Length == 1 || rows.All(row => row.Length == 1);
+        if (isVector)
+        {
+            var entries = rows.SelectMany(row => row).ToArray();
+            var (open, close) = environment switch
+            {
+                "bmatrix" => ("[", "]"),
+                "Bmatrix" => ("{", "}"),
+                "vmatrix" or "Vmatrix" => ("|", "|"),
+                _ => ("(", ")")
+            };
+            return $"{open}{string.Join(", ", entries)}{close}";
+        }
+
+        var renderedRows = rows.Select(row => $"({string.Join(", ", row)})");
+        return $"matrix[{string.Join("; ", renderedRows)}]";
     }
 }

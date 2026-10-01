@@ -1,3 +1,18 @@
+# Sutra Island v1.0.17
+
+## Q vector equation formatting
+
+- Render vector notation as readable text so missing combining-arrow glyphs do not appear as boxes.
+- Convert common LaTeX vector matrix environments into correctly separated coordinate tuples.
+
+## Downloads
+
+- `DynamicIsland.exe`: updated self-contained Windows x64 app.
+- `DynamicIsland-Codex-Test-v1.0.17-win-x64.zip`: app, setup documentation, and pinned SHA-256-verified Codex 0.151.0 runtime. Extract the complete folder.
+- `SHA256SUMS.txt`: checksums of both downloads.
+
+---
+
 # Sutra Island v1.0.16
 
 ## Q response formatting

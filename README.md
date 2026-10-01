@@ -14,7 +14,11 @@ active window, uses OCR and optional vision input, and streams answers directly
 inside the Island. See [`Q.md`](Q.md) for setup, provider configuration, and the
 privacy model.
 
-## What's new in v1.0.16
+## What's new in v1.0.17
+
+- **Clear vector equations:** render vector arrows as readable labels and convert common LaTeX column vectors into correctly separated tuples.
+
+### v1.0.16
 
 - **Readable Q equations:** convert common LaTeX math delimiters, subscripts, superscripts, fractions, roots, Greek letters, and operators into Unicode so equations no longer show raw TeX commands.
 
