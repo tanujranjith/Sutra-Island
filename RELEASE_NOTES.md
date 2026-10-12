@@ -1,3 +1,11 @@
+# Sutra Island v1.0.21
+
+## Media playback
+
+- Make the expanded playback bars seekable by clicking or dragging across the timeline.
+
+---
+
 # Sutra Island v1.0.20
 
 ## Command palette
