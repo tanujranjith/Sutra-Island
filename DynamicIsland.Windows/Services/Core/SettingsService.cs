@@ -45,6 +45,25 @@ public sealed class SettingsService(LoggingService log)
         }
     }
 
+    public AppSettings LoadSynchronously()
+    {
+        Directory.CreateDirectory(_directory);
+        if (!File.Exists(SettingsPath)) return new AppSettings();
+
+        try
+        {
+            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath), JsonOptions)
+                ?? new AppSettings();
+            Normalize(settings);
+            return settings;
+        }
+        catch (Exception ex)
+        {
+            log.Error("Synchronous settings fallback failed; defaults were restored", ex);
+            return new AppSettings();
+        }
+    }
+
     public async Task SaveAsync(AppSettings settings)
     {
         Normalize(settings);

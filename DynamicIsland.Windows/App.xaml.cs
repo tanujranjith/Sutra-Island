@@ -60,19 +60,24 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        if (e.Args.Contains("--verify-upgrades") || e.Args.Contains("--verify-q-providers") || e.Args.Contains("--verify-q-compare"))
+        if (e.Args.Contains("--verify-upgrades") || e.Args.Contains("--verify-q-providers") || e.Args.Contains("--verify-q-compare") || e.Args.Contains("--verify-notification-click"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             if (!Infrastructure.AppDataPaths.IsPreview) { Shutdown(2); return; }
-            try { await Infrastructure.UpgradeVerification.RunAsync(e.Args.Contains("--verify-q-providers"), e.Args.Contains("--verify-q-compare")); Shutdown(0); }
+            try { await Infrastructure.UpgradeVerification.RunAsync(e.Args.Contains("--verify-q-providers"), e.Args.Contains("--verify-q-compare"), e.Args.Contains("--verify-notification-click")); Shutdown(0); }
             catch (Exception ex) { Directory.CreateDirectory(Infrastructure.AppDataPaths.Root); File.WriteAllText(Path.Combine(Infrastructure.AppDataPaths.Root, "verification-error.txt"), ex.ToString()); Shutdown(1); }
             return;
         }
+        _log = new LoggingService();
+        _log.Info($"Application startup entered: pid={Environment.ProcessId}");
         var openSettingsFromCommandLine = e.Args
             .Any(arg => string.Equals(arg, "--settings", StringComparison.OrdinalIgnoreCase));
+        var showIslandFromCommandLine = e.Args
+            .Any(arg => string.Equals(arg, "--show-island", StringComparison.OrdinalIgnoreCase));
         _singleInstance = new Mutex(true, "Local\\DynamicIsland.Windows.SingleInstance" + Infrastructure.AppDataPaths.InstanceSuffix, out var firstInstance);
         if (!firstInstance)
         {
+            _log.Info("Another instance owns the single-instance lock; asking it to open Settings.");
             // Double-clicking the executable should reveal the running app too.
             try
             {
@@ -93,11 +98,29 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             }
         });
 
-        _log = new LoggingService();
         _settingsService = new SettingsService(_log);
-        _settings = await _settingsService.LoadAsync();
+        _log.Info("Loading application settings.");
+        try
+        {
+            _settings = await _settingsService.LoadAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        catch (TimeoutException ex)
+        {
+            _log.Error("Application settings did not load asynchronously within 10 seconds; retrying synchronously.", ex);
+            _settings = _settingsService.LoadSynchronously();
+        }
+        _log.Info("Application settings loaded.");
         _log.SetDebugEnabled(_settings.DebugLogging);
         _log.Info("Application starting");
+        _tray = new TrayService(_settings, ShowSettings,
+            () =>
+            {
+                if (_islandViewModel is not null && _qScreen is not null)
+                    _ = _islandViewModel.StartQAsync(_qScreen.LastForegroundTarget);
+            },
+            Recenter, SaveAndApplyAsync, ShutdownApplication, ToggleFocus,
+            () => _settings?.FocusModeEnabled ?? false);
+        _log.Info("System tray icon initialized");
 
         DispatcherUnhandledException += (_, args) =>
         {
@@ -162,12 +185,11 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _media.AvailableAppsChanged += (_, apps) => Dispatcher.BeginInvoke(() =>
             _settingsViewModel.SetAvailableApps(apps));
 
-        _tray = new TrayService(_settings, ShowSettings, () => _ = _islandViewModel!.StartQAsync(_qScreen!.LastForegroundTarget), Recenter, SaveAndApplyAsync, ShutdownApplication,
-            ToggleFocus, () => _settings.FocusModeEnabled);
         _timerAlarm.EventRaised += (_, args) => Dispatcher.BeginInvoke(() =>
             _tray.ShowNotification(args.Title, args.Message));
 
         _islandWindow.Show();
+        if (showIslandFromCommandLine) Recenter();
         if (!Infrastructure.AppDataPaths.IsPreview) _ = _codexAccount.RefreshAsync();
         _hotkeys = new GlobalHotkeyService(_log);
         _hotkeys.Attach(_islandWindow);

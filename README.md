@@ -14,7 +14,28 @@ active window, uses OCR and optional vision input, and streams answers directly
 inside the Island. See [`Q.md`](Q.md) for setup, provider configuration, and the
 privacy model.
 
-## What's new in v1.0.17
+## What's new in v1.0.20
+
+- **Unit conversions:** type `12 in to ft`, `5 kg to lb`, `72 F to C`, or
+  `convert 2 hours to minutes` in the palette for a live result. Press Enter or
+  click to copy it. Supports length, weight, temperature, volume, time, area,
+  speed, and data size. Volume uses US customary measures; KB/MB/GB use powers
+  of 1000 and KiB/MiB/GiB use 1024.
+- **Reliable notifications:** polling recovers when Windows events or reads fail.
+  Dismissing a grouped banner suppresses delayed duplicate copies as well.
+- **Smoother animations:** notifications grow from the island and the timer
+  panel morphs from its orb, with reduced-motion support and better handling of
+  interrupted transitions.
+- **More reliable startup:** delayed settings loads have a fallback, and
+  `--show-island` opens the island directly.
+
+### v1.0.18
+
+- **Notification recovery:** surface active Windows notifications received
+  while the listener was stopped or restarting without replaying items already
+  shown in notification history.
+
+### v1.0.17
 
 - **Clear vector equations:** render vector arrows as readable labels and convert common LaTeX column vectors into correctly separated tuples.
 

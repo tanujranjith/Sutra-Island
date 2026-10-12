@@ -8,7 +8,7 @@ public enum PaletteCommand
     Alarm, CancelAlarm, ShowAlarms,
     StartStopwatch, PauseStopwatch, ResumeStopwatch, ResetStopwatch,
     FocusOn, FocusOff, Expand, Collapse, OpenSettings,
-    Help
+    Help, Convert
 }
 
 public sealed record CommandDefinition(
@@ -54,12 +54,14 @@ public static class CommandCatalog
         new(PaletteCommand.Collapse, "collapse", [], "Collapse the island", "collapse"),
         new(PaletteCommand.OpenSettings, "open settings", ["settings"], "Open settings", "open settings"),
         new(PaletteCommand.Help, "help", ["show commands", "commands"], "Show available commands", "help"),
+        new(PaletteCommand.Convert, "convert", [], "Convert units; Enter copies the result", "12 in to ft"),
     ];
 
     // Shown when the input is empty — the most useful entry points first.
     public static readonly CommandDefinition[] DefaultSuggestions =
     [
         ById(PaletteCommand.Help),
+        ById(PaletteCommand.Convert),
         ById(PaletteCommand.Ask),
         ById(PaletteCommand.Timer),
         ById(PaletteCommand.Alarm),

@@ -1,3 +1,29 @@
+# Sutra Island v1.0.20
+
+## Command palette
+
+- Convert common length, weight, temperature, volume, time, area, speed, and data-size units as you type; press Enter or click to copy the result with its unit.
+- Volume conversions use US customary measures. KB/MB/GB are decimal units; KiB/MiB/GiB are binary units.
+
+## Notifications and animations
+
+- Recover notification delivery through background polling when Windows events or reads are unavailable, and resume automatically after temporary failures or restored access.
+- Dismissing a notification suppresses delayed duplicate copies and removes grouped copies from Windows when possible.
+- Morph notification banners from the island and timer panels from the timer orb, including interrupted transitions and reduced-motion behavior.
+
+## Startup
+
+- Fall back to synchronous settings loading if the asynchronous startup read takes too long.
+- Add `--show-island` to open the island directly.
+
+## Downloads
+
+- `DynamicIsland.exe`: updated self-contained Windows x64 app.
+- `DynamicIsland-Codex-Test-v1.0.20-win-x64.zip`: app, setup documentation, and pinned SHA-256-verified Codex 0.151.0 runtime. Extract the complete folder.
+- `SHA256SUMS.txt`: checksums of both downloads.
+
+---
+
 # Sutra Island v1.0.18
 
 ## Notification recovery

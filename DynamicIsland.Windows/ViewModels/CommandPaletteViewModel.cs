@@ -16,8 +16,11 @@ public sealed class CommandPaletteSuggestion
     }
 
     public CommandPaletteSuggestion(string expression, decimal result)
+        : this(expression, CalculatorParser.Format(result)) { }
+
+    public CommandPaletteSuggestion(string expression, string result)
     {
-        Name = CalculatorParser.Format(result);
+        Name = result;
         Description = expression;
         Example = "Enter to copy";
         Glyph = "\uE8EF";
@@ -58,6 +61,7 @@ public sealed class CommandPaletteSuggestion
         PaletteCommand.Expand => "\uE70E",
         PaletteCommand.Collapse => "\uE70D",
         PaletteCommand.OpenSettings => "\uE713",
+        PaletteCommand.Convert => "\uE8AB",
         _ => "\uE812",
     };
 }
@@ -126,6 +130,14 @@ public sealed class CommandPaletteViewModel : ObservableObject
     public async Task ExecuteAsync()
     {
         if (string.IsNullOrWhiteSpace(_query)) return;
+        if (UnitConversionParser.IsCandidate(_query))
+        {
+            if (UnitConversionParser.TryConvert(_query, out var converted, out var conversionError))
+                ShowStatus($"Result: {converted}", isError: false);
+            else
+                ShowStatus(conversionError ?? "Complete the conversion.", isError: true);
+            return;
+        }
         if (CalculatorParser.IsCandidate(_query))
         {
             if (CalculatorParser.TryEvaluate(_query, out var value, out var calculationError))
@@ -170,8 +182,16 @@ public sealed class CommandPaletteViewModel : ObservableObject
     private void RefreshSuggestions(bool forceAll = false)
     {
         Suggestions.Clear();
+        var isConversion = !forceAll && !_showingAllCommands && UnitConversionParser.IsCandidate(_query);
         var isCalculation = !forceAll && !_showingAllCommands && CalculatorParser.IsCandidate(_query);
-        if (isCalculation)
+        if (isConversion)
+        {
+            if (UnitConversionParser.TryConvert(_query, out var result, out var error))
+                Suggestions.Add(new CommandPaletteSuggestion(_query.Trim(), result));
+            else
+                ShowStatus(error ?? "Complete the conversion.", isError: true);
+        }
+        else if (isCalculation)
         {
             if (CalculatorParser.TryEvaluate(_query, out var result, out var error))
                 Suggestions.Add(new CommandPaletteSuggestion(_query.Trim(), result));
@@ -190,7 +210,7 @@ public sealed class CommandPaletteViewModel : ObservableObject
         _selectedIndex = 0;
         RaisePropertyChanged(nameof(SelectedIndex));
         RaisePropertyChanged(nameof(SelectedSuggestion));
-        if (!isCalculation && !_showingAllCommands && !forceAll &&
+        if (!isConversion && !isCalculation && !_showingAllCommands && !forceAll &&
             !string.IsNullOrWhiteSpace(_query) && Suggestions.Count == 0)
             ShowStatus("No matching commands. Type help to see all.", isError: false);
         SuggestionsRefreshed?.Invoke(this, EventArgs.Empty);

@@ -9,6 +9,7 @@ public sealed class NotificationSnapshotTracker(TimeProvider? clock = null)
     private readonly TimeProvider _clock = clock ?? TimeProvider.System;
     private readonly Dictionary<string, SeenNotification> _recent = new(StringComparer.Ordinal);
     private readonly Dictionary<(string App, string Title, string Body), DateTimeOffset> _recentContent = new();
+    private readonly NotificationDismissalTracker _dismissed = new(clock);
     private bool _initialized;
 
     public IReadOnlyList<NotificationInfo> Observe(IEnumerable<NotificationInfo> snapshot, bool replayExisting = false)
@@ -21,6 +22,7 @@ public sealed class NotificationSnapshotTracker(TimeProvider? clock = null)
         // Keep delivered identities across those gaps so the same toast cannot fire twice.
         foreach (var item in items)
         {
+            if (_dismissed.Contains(item)) continue;
             var content = (string.IsNullOrWhiteSpace(item.AppId) ? item.App.Trim() : item.AppId.Trim(),
                 item.Title.Trim(), item.Body.Trim());
             var knownIdentity = _recent.TryGetValue(item.Identity, out var previous);
@@ -67,7 +69,43 @@ public sealed class NotificationSnapshotTracker(TimeProvider? clock = null)
         _initialized = false;
     }
 
+    public void Dismiss(IEnumerable<NotificationInfo> notifications) => _dismissed.Remember(notifications);
+
     private sealed record SeenNotification(string App, string AppId, string Title, string Body, DateTimeOffset SeenAt);
+}
+
+// A dismissal outlives the short arrival debounce and listener retries. Compare creation
+// times, not time since delivery, so a delayed copy stays dismissed while later messages work.
+public sealed class NotificationDismissalTracker(TimeProvider? clock = null)
+{
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
+    private readonly List<(NotificationInfo Notification, DateTimeOffset DismissedAt)> _items = [];
+
+    public void Remember(IEnumerable<NotificationInfo> notifications)
+    {
+        Prune();
+        foreach (var notification in notifications)
+        {
+            _items.RemoveAll(item => item.Notification.Identity == notification.Identity);
+            _items.Add((notification, _clock.GetUtcNow()));
+        }
+        if (_items.Count > 512) _items.RemoveRange(0, _items.Count - 512);
+    }
+
+    public bool Contains(NotificationInfo incoming)
+    {
+        Prune();
+        return _items.Any(item =>
+            (incoming.Id is not null && incoming.CreatedAt is not null &&
+             item.Notification.Id == incoming.Id && item.Notification.CreatedAt == incoming.CreatedAt) ||
+            (NotificationContent.SameMessage(item.Notification.AppId, item.Notification.App,
+                item.Notification.Title, item.Notification.Body, incoming.AppId, incoming.App, incoming.Title, incoming.Body) &&
+             (incoming.CreatedAt is { } created && item.Notification.CreatedAt is { } original
+                 ? (created - original).Duration() <= TimeSpan.FromMinutes(2)
+                 : _clock.GetUtcNow() - item.DismissedAt <= TimeSpan.FromMinutes(2))));
+    }
+
+    private void Prune() => _items.RemoveAll(item => _clock.GetUtcNow() - item.DismissedAt > TimeSpan.FromHours(24));
 }
 
 public sealed class NotificationQueue(TimeProvider? clock = null)

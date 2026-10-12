@@ -846,7 +846,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public CornerRadius IslandInnerCornerRadius => new(Math.Max(0, ClampedCornerRadius - 1));
 
     // ===== Notification banner (transient) =====
-    public bool ShowNotification => _notification is not null && NotificationContent.HasVisibleContent(_notification) && Settings.ShowNotifications && !FocusModeEnabled && !DeferOrdinaryBanners;
+    public bool ShowNotification => _notification is not null && NotificationContent.HasVisibleContent(_notification) && Settings.ShowNotifications && !FocusModeEnabled && !SuppressOrdinaryBanners;
     public string NotificationApp => _notification?.App ?? string.Empty;
     public string NotificationTitle => _notification?.Title ?? string.Empty;
     public string NotificationBody => _notification?.Body ?? string.Empty;
@@ -859,7 +859,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     // Privacy activity has its own attached indicator/drop-down presentation in IslandWindow.
     public bool IsAirPodsBannerActive => _airPodsBannerActive && !FocusModeEnabled && !ShowNotification
         && !(_volumeWarningActive && Settings.VolumeWarningEnabled);
-    public bool ShowBanner => !DeferOrdinaryBanners && (ShowNotification || (_volumeWarningActive && Settings.VolumeWarningEnabled && !FocusModeEnabled)
+    public bool ShowBanner => !SuppressOrdinaryBanners && (ShowNotification || (_volumeWarningActive && Settings.VolumeWarningEnabled && !FocusModeEnabled)
         || IsAirPodsBannerActive);
     public string BannerApp
     {
@@ -1566,7 +1566,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         if (_currentNotificationHistoryItem is not null)
             _notificationHistoryService.Dismiss(_currentNotificationHistoryItem.Id);
         if (_currentGroup is { } group) foreach (var item in group.Items) _notificationHistoryService.Dismiss(item.Id);
-        ClearCurrentNotificationBanner();
+        ClearCurrentNotificationBanner(dismissFromSource: true);
         RefreshNotificationHistory();
     }
 

@@ -18,7 +18,10 @@ public sealed partial class IslandViewModel
         get => _interactionProtected;
         set { if (SetProperty(ref _interactionProtected, value)) { RaisePropertyChanged(nameof(ShowBanner)); RaisePropertyChanged(nameof(ShowNotification)); } }
     }
-    public bool DeferOrdinaryBanners => InteractionProtected || TimerEditorOpen || IsQActive || HasUrgentAlert;
+    // Focus/capture defers incoming banners, but must not hide the banner receiving
+    // that focus. Otherwise clicking X removes its own hit target before dismissal.
+    private bool SuppressOrdinaryBanners => TimerEditorOpen || IsQActive || HasUrgentAlert;
+    public bool DeferOrdinaryBanners => InteractionProtected || SuppressOrdinaryBanners;
     public TimerState? DisplayTimer => _timerAlarmService.DisplayTimer(Settings.PinnedActivity == IslandActivity.Timer ? Settings.PinnedTimerId : null);
     public string TimerOrbGlyph => DisplayTimer?.Phase == TimerPhase.Paused ? "\uE768" : "\uE916";
     public string TimerOrbTooltip => DisplayTimer?.Phase == TimerPhase.Paused ? "Paused timer" : "Running timer";

@@ -8,8 +8,13 @@ namespace DynamicIsland.Windows.ViewModels;
 public sealed partial class IslandViewModel
 {
     private readonly NotificationQueue _pendingNotifications = new();
+    private readonly NotificationDismissalTracker _dismissedNotifications = new();
     private readonly List<(NotificationInfo Message, DateTimeOffset AcceptedAt)> _recentAcceptedNotifications = [];
+    private readonly List<DeliveredNotificationSource> _deliveredNotificationSources = [];
+    private readonly Dictionary<string, DateTimeOffset> _handledNotificationIdentities = new(StringComparer.Ordinal);
     private static readonly TimeSpan NotificationRepeatWindow = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan NotificationIdentityRetention = TimeSpan.FromHours(24);
+    private const int MaxRememberedNotificationIdentities = 512;
     private NotificationGroup? _currentGroup;
     private double _bannerSeconds;
     private bool _lastNotificationVisible;
@@ -27,9 +32,21 @@ public sealed partial class IslandViewModel
         ClearCurrentNotificationBanner();
     });
 
-    private void ClearCurrentNotificationBanner()
+    private void ClearCurrentNotificationBanner(bool dismissFromSource = false)
     {
-        if (_currentGroup is { } group) _pendingNotifications.RemoveMatching(group.Items);
+        if (_currentGroup is { } group)
+        {
+            if (dismissFromSource)
+            {
+                var historyIds = group.Items.Select(item => item.Id).ToHashSet();
+                var sources = _deliveredNotificationSources.Where(item => historyIds.Contains(item.HistoryId))
+                    .Select(item => item.Notification).ToArray();
+                _dismissedNotifications.Remember(sources);
+                _notificationService.Dismiss(sources);
+            }
+            RememberHandledNotifications(group);
+            _pendingNotifications.RemoveMatching(group.Items);
+        }
         _currentGroup = null;
         _currentNotificationHistoryItem = null;
         _notification = null;
@@ -44,8 +61,17 @@ public sealed partial class IslandViewModel
         var accepted = new List<NotificationHistoryItem>();
         var now = DateTimeOffset.UtcNow;
         _recentAcceptedNotifications.RemoveAll(item => now - item.AcceptedAt > NotificationRepeatWindow);
+        _deliveredNotificationSources.RemoveAll(item => now - item.AcceptedAt > NotificationIdentityRetention);
+        foreach (var expired in _handledNotificationIdentities
+                     .Where(item => now - item.Value > NotificationIdentityRetention)
+                     .Select(item => item.Key).ToArray())
+            _handledNotificationIdentities.Remove(expired);
         foreach (var n in batch.Where(n => PassesNotificationFilter(n.App) && NotificationContent.HasVisibleContent(n)))
         {
+            if (_dismissedNotifications.Contains(n)) continue;
+            var sourceIdentity = GetNotificationSourceIdentity(n);
+            if (sourceIdentity is not null && _handledNotificationIdentities.ContainsKey(sourceIdentity))
+                continue;
             if (_recentAcceptedNotifications.Any(item => NotificationContent.SameMessage(
                     item.Message.AppId, item.Message.App, item.Message.Title, item.Message.Body,
                     n.AppId, n.App, n.Title, n.Body)))
@@ -58,15 +84,46 @@ public sealed partial class IslandViewModel
             if (accepted.Any(item => NotificationContent.SameMessage(item.AppId, item.App, item.Title,
                     item.Body, n.AppId, n.App, n.Title, n.Body)))
                 continue;
-            accepted.Add(Settings.NotificationHistoryEnabled
+            var historyItem = Settings.NotificationHistoryEnabled
                 ? _notificationHistoryService.Add(n.App, n.Title, n.Body, n.CreatedAt, n.AppId)
-                : new(Guid.NewGuid(), n.App, n.Title, n.Body, n.CreatedAt ?? DateTimeOffset.Now, AppId: n.AppId));
+                : new NotificationHistoryItem(Guid.NewGuid(), n.App, n.Title, n.Body,
+                    n.CreatedAt ?? DateTimeOffset.Now, AppId: n.AppId);
+            accepted.Add(historyItem);
+            if (sourceIdentity is not null)
+                _deliveredNotificationSources.Add(new(historyItem.Id, sourceIdentity, n, now));
             _recentAcceptedNotifications.Add((n, now));
         }
+        if (_deliveredNotificationSources.Count > MaxRememberedNotificationIdentities)
+            _deliveredNotificationSources.RemoveRange(0,
+                _deliveredNotificationSources.Count - MaxRememberedNotificationIdentities);
         if (accepted.Count == 0) return;
         _pendingNotifications.Enqueue(accepted);
         RefreshNotificationHistory(); PumpNotifications();
     });
+
+    private void RememberHandledNotifications(NotificationGroup group)
+    {
+        var historyIds = group.Items.Select(item => item.Id).ToHashSet();
+        var now = DateTimeOffset.UtcNow;
+        foreach (var source in _deliveredNotificationSources.Where(item => historyIds.Contains(item.HistoryId)))
+            _handledNotificationIdentities[source.Identity] = now;
+
+        if (_handledNotificationIdentities.Count > MaxRememberedNotificationIdentities)
+        {
+            foreach (var oldest in _handledNotificationIdentities.OrderBy(item => item.Value)
+                         .Take(_handledNotificationIdentities.Count - MaxRememberedNotificationIdentities)
+                         .Select(item => item.Key).ToArray())
+                _handledNotificationIdentities.Remove(oldest);
+        }
+    }
+
+    private static string? GetNotificationSourceIdentity(NotificationInfo notification) =>
+        notification.Id is uint id && notification.CreatedAt is DateTimeOffset createdAt
+            ? $"{notification.AppId}|{id}|{createdAt:O}"
+            : null;
+
+    private sealed record DeliveredNotificationSource(Guid HistoryId, string Identity, NotificationInfo Notification, DateTimeOffset AcceptedAt);
+
     private void PumpNotifications()
     {
         var contentChanged = false;

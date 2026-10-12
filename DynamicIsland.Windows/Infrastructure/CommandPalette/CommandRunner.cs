@@ -238,6 +238,11 @@ public sealed class CommandRunner(
                 host.ShowSettings();
                 return Ok();
 
+            case PaletteCommand.Convert:
+                return UnitConversionParser.TryConvert(argument, out var converted, out var conversionError)
+                    ? new CommandResult(Close: false, Message: $"Result: {converted}")
+                    : Fail(conversionError!);
+
             case PaletteCommand.Help:
                 return new CommandResult(Close: false,
                     Message: "All commands — ↑↓ to browse, Enter to run.", ShowAllCommands: true);

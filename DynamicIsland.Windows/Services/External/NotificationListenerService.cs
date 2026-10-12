@@ -11,24 +11,37 @@ public sealed class NotificationListenerService : IDisposable
 {
     private readonly LoggingService _log;
     private readonly Dispatcher _dispatcher;
-    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(4) };
+    private readonly DispatcherTimer _timer;
+    private readonly INotificationSource _source;
+    private readonly TimeSpan _readTimeout;
     private readonly NotificationSnapshotTracker _tracker = new();
-    private UserNotificationListener? _listener;
-    private TypedEventHandler<UserNotificationListener, UserNotificationChangedEventArgs>? _notificationChangedHandler;
+    private CancellationTokenSource? _activeRead;
     private int _generation;
     private bool _enabled;
-    private bool _polling;
     private bool _pollAgain;
+    private bool _subscriptionAttempted;
+    private bool _eventsAvailable;
+    private bool _replayExisting;
+    private IReadOnlyList<NotificationInfo> _lastSnapshot = [];
+    internal long SuccessfulPollCount { get; private set; }
+    internal DateTimeOffset? LastSuccessfulPollAt { get; private set; }
     public event EventHandler<IReadOnlyList<NotificationInfo>>? BatchReceived;
     public event EventHandler? StatusChanged;
     public IntegrationStatus Status { get; private set; } = IntegrationStatus.Disabled;
     public bool IsActive => Status.State == IntegrationState.Ready;
-    public NotificationListenerService(LoggingService log)
+
+    public NotificationListenerService(LoggingService log) : this(log, new WindowsNotificationSource(log)) { }
+
+    internal NotificationListenerService(LoggingService log, INotificationSource source, TimeSpan? readTimeout = null)
     {
         _log = log;
+        _source = source;
+        _readTimeout = readTimeout ?? TimeSpan.FromSeconds(8);
         _dispatcher = System.Windows.Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
+        _timer = new DispatcherTimer(DispatcherPriority.Normal, _dispatcher) { Interval = TimeSpan.FromSeconds(4) };
         _timer.Tick += async (_, _) => await PollAsync();
     }
+
     public TimeSpan PollInterval => _timer.Interval;
     public void Configure(TimeSpan pollInterval)
     {
@@ -39,140 +52,253 @@ public sealed class NotificationListenerService : IDisposable
         _timer.Interval = interval;
         if (wasRunning) _timer.Start();
     }
-    private void SetStatus(IntegrationStatus value) { if (Status == value) return; Status = value; StatusChanged?.Invoke(this, EventArgs.Empty); }
+
+    private void SetStatus(IntegrationStatus value)
+    {
+        if (Status == value) return;
+        Status = value;
+        StatusChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public async Task StartAsync(bool requestPermission = false)
     {
         if (_enabled) return;
-        _enabled = true; var generation = ++_generation;
+        _enabled = true;
+        var generation = ++_generation;
+        _replayExisting = true;
         SetStatus(new(IntegrationState.Connecting, "Connecting…"));
+        // Polling is the independent fallback, not a consequence of successfully attaching
+        // the foreground event. An unpackaged desktop app can read toasts while that event fails.
+        _timer.Start();
         try
         {
-            _listener = UserNotificationListener.Current;
-            var access = requestPermission ? await _listener.RequestAccessAsync() : _listener.GetAccessStatus();
-            if (!_enabled || generation != _generation) return;
-            if (access != UserNotificationListenerAccessStatus.Allowed)
-            { SetStatus(new(IntegrationState.PermissionRequired, "Allow notification access in Windows Settings.", "ms-settings:privacy-notifications")); return; }
-            // Recover Windows toasts that arrived while the island's listener was stopped.
-            // The view model filters notifications already recorded in the island history.
-            await PollAsync(replayExisting: true);
-            if (!_enabled || generation != _generation || Status.State == IntegrationState.PermissionRequired) return;
-            if (_enabled && generation == _generation)
-            {
-                SubscribeToNotificationChanges(generation);
-                // Reconcile the brief gap between the initial baseline and event subscription.
-                await PollAsync();
-                if (_enabled && generation == _generation && Status.State != IntegrationState.PermissionRequired)
-                    _timer.Start();
-            }
+            if (requestPermission) await _source.RequestAccessAsync();
+            if (_enabled && generation == _generation) await PollAsync();
         }
         catch (Exception ex)
         {
-            if (generation == _generation)
-            {
-                UnsubscribeFromNotificationChanges();
-                SetStatus(new(IntegrationState.Unavailable, "Notification access is unavailable in this Windows/app configuration."));
-                _log.Debug(ex.Message);
-            }
+            if (_enabled && generation == _generation) ReportPollError(ex);
         }
     }
+
     public async Task RetryAsync() { Stop(); await StartAsync(true); }
+
+    internal void Dismiss(IEnumerable<NotificationInfo> notifications)
+    {
+        var shown = notifications.ToArray();
+        // Include duplicate system IDs that the arrival debounce hid from the banner.
+        var dismissed = shown.Concat(_lastSnapshot.Where(candidate => shown.Any(item =>
+            NotificationContent.SameMessage(candidate.AppId, candidate.App, candidate.Title, candidate.Body,
+                item.AppId, item.App, item.Title, item.Body)))).DistinctBy(item => item.Identity).ToArray();
+        _tracker.Dismiss(dismissed);
+        foreach (var notification in dismissed)
+        {
+            try { _source.Dismiss(notification); }
+            catch (Exception ex) { _log.Debug($"Windows notification dismissal failed; local suppression remains active: {ex.Message}"); }
+        }
+    }
+
     public void Stop()
     {
         _enabled = false;
         _generation++;
         _timer.Stop();
         _pollAgain = false;
+        var pending = _activeRead;
+        _activeRead = null;
+        pending?.Cancel();
         UnsubscribeFromNotificationChanges();
-        _listener = null;
         _tracker.Reset();
         SetStatus(IntegrationStatus.Disabled);
     }
 
     private void SubscribeToNotificationChanges(int generation)
     {
-        if (_listener is null || _notificationChangedHandler is not null) return;
-        _notificationChangedHandler = (sender, args) =>
+        if (_subscriptionAttempted) return;
+        _subscriptionAttempted = true;
+        try
         {
-            if (args.ChangeKind != UserNotificationChangedKind.Added) return;
-            try
+            _source.Subscribe(() =>
             {
-                // Re-read the listener snapshot on the same dispatcher used by polling,
-                // instead of accessing WinRT notification objects from the callback thread.
+                // WinRT callbacks can arrive off the UI thread. Serialize snapshot reads on
+                // the dispatcher, and ignore callbacks belonging to a stopped subscription.
+                if (_dispatcher.HasShutdownStarted) return;
                 _dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
                 {
-                    if (!_enabled || generation != _generation) return;
-                    _log.Debug("Notification-added event received; refreshing the Windows snapshot.");
-                    _ = PollAsync();
+                    if (_enabled && generation == _generation) _ = PollAsync();
                 }));
-            }
-            catch (Exception ex)
-            {
-                if (generation == _generation)
-                    _log.Debug($"Notification change could not be read: {ex.Message}");
-            }
-        };
-        _listener.NotificationChanged += _notificationChangedHandler;
+            });
+            _eventsAvailable = true;
+        }
+        catch (Exception ex)
+        {
+            _eventsAvailable = false;
+            _log.Info($"Notification change events unavailable (0x{ex.HResult:X8}); continuing background polling every {_timer.Interval.TotalSeconds:0}s.");
+        }
     }
 
     private void UnsubscribeFromNotificationChanges()
     {
-        if (_listener is not null && _notificationChangedHandler is not null)
-        {
-            try { _listener.NotificationChanged -= _notificationChangedHandler; }
-            catch (Exception ex) { _log.Debug($"Notification change listener could not be detached: {ex.Message}"); }
-        }
-        _notificationChangedHandler = null;
+        try { _source.Unsubscribe(); }
+        catch (Exception ex) { _log.Debug($"Notification change listener could not be detached: {ex.Message}"); }
+        _subscriptionAttempted = false;
+        _eventsAvailable = false;
     }
 
-    private async Task PollAsync(bool replayExisting = false)
+    private async Task PollAsync()
     {
-        if (!_enabled || _listener is null) return;
-        if (_polling) { _pollAgain = true; return; }
-        _polling = true; var generation = _generation;
+        if (!_enabled) return;
+        if (_activeRead is not null) { _pollAgain = true; return; }
+        using var cancellation = new CancellationTokenSource();
+        _activeRead = cancellation;
+        var generation = _generation;
         try
         {
-            if (_listener.GetAccessStatus() != UserNotificationListenerAccessStatus.Allowed)
+            if (!_source.HasAccess)
             {
-                _timer.Stop();
                 UnsubscribeFromNotificationChanges();
-                SetStatus(new(IntegrationState.PermissionRequired, "Notification access was revoked.", "ms-settings:privacy-notifications"));
+                SetStatus(new(IntegrationState.PermissionRequired, "Allow notification access in Windows Settings.", "ms-settings:privacy-notifications"));
+                // Keep the fallback alive so restoring Windows access resumes delivery without
+                // opening the island or pressing Retry. Never request permission from a timer.
                 return;
             }
-            var notes = await _listener.GetNotificationsAsync(NotificationKinds.Toast);
+            SubscribeToNotificationChanges(generation);
+            var notes = await _source.ReadAsync(cancellation.Token).WaitAsync(_readTimeout, cancellation.Token);
             if (!_enabled || generation != _generation) return;
-            var fresh = _tracker.Observe(notes.Select(Extract).OfType<NotificationInfo>(), replayExisting);
-            SetStatus(new(IntegrationState.Ready, "Connected"));
+            _lastSnapshot = notes;
+            var fresh = _tracker.Observe(notes, _replayExisting);
+            _replayExisting = false;
+            SuccessfulPollCount++;
+            LastSuccessfulPollAt = DateTimeOffset.UtcNow;
+            if (Status.State != IntegrationState.Ready)
+                _log.Info($"Notification polling connected: interval={_timer.Interval.TotalSeconds:0}s, foreground events={_eventsAvailable}.");
+            SetStatus(new(IntegrationState.Ready, _eventsAvailable ? "Connected" : "Connected (polling)"));
             if (fresh.Count > 0) BatchReceived?.Invoke(this, fresh);
         }
-        catch (Exception ex) { if (generation == _generation) { SetStatus(new(IntegrationState.Error, "Notifications could not refresh. Retry.")); _log.Debug(ex.Message); } }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            if (ex is TimeoutException) cancellation.Cancel();
+            if (_enabled && generation == _generation) ReportPollError(ex);
+        }
         finally
         {
-            _polling = false;
-            if (_pollAgain)
+            // Stop/restart can start another read before the old WinRT operation finishes.
+            // Only the read that owns this gate may release it or consume the queued refresh.
+            if (ReferenceEquals(_activeRead, cancellation))
             {
-                _pollAgain = false;
-                if (_enabled && generation == _generation) _ = PollAsync();
+                _activeRead = null;
+                if (_pollAgain)
+                {
+                    _pollAgain = false;
+                    if (_enabled && generation == _generation) _ = PollAsync();
+                }
             }
         }
     }
-    private static NotificationInfo? Extract(UserNotification n)
+
+    private void ReportPollError(Exception ex)
+    {
+        if (Status.State != IntegrationState.Error)
+            _log.Error("Windows notification refresh failed; background polling will retry automatically", ex);
+        SetStatus(new(IntegrationState.Error, "Notification refresh delayed. Retrying automatically…"));
+    }
+
+    public void Dispose() => Stop();
+}
+
+internal interface INotificationSource
+{
+    bool HasAccess { get; }
+    Task RequestAccessAsync();
+    Task<IReadOnlyList<NotificationInfo>> ReadAsync(CancellationToken cancellationToken);
+    void Subscribe(Action added);
+    void Unsubscribe();
+    void Dismiss(NotificationInfo notification);
+}
+
+internal sealed class WindowsNotificationSource(LoggingService log) : INotificationSource
+{
+    private UserNotificationListener? _listener;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _appNames = new(StringComparer.Ordinal);
+    private readonly Dictionary<(uint Id, DateTimeOffset CreatedAt), (string App, string AppId)> _appMetadata = new();
+    private TypedEventHandler<UserNotificationListener, UserNotificationChangedEventArgs>? _handler;
+    private UserNotificationListener Listener => _listener ??= UserNotificationListener.Current;
+    public bool HasAccess => Listener.GetAccessStatus() == UserNotificationListenerAccessStatus.Allowed;
+    public async Task RequestAccessAsync() => await Listener.RequestAccessAsync();
+    public void Dismiss(NotificationInfo notification)
+    {
+        if (notification.Id is not uint id || notification.CreatedAt is not { } createdAt || !HasAccess) return;
+        // A publisher may reuse an ID. Never remove a newer toast using a stale banner.
+        if (Listener.GetNotification(id) is { } current && current.CreationTime == createdAt)
+            Listener.RemoveNotification(id);
+    }
+    public async Task<IReadOnlyList<NotificationInfo>> ReadAsync(CancellationToken cancellationToken)
+    {
+        // Keep the WinRT read in the listener's original dispatcher context. Some desktop
+        // Windows configurations do not complete this API when called from a worker thread.
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        var notes = await Listener.GetNotificationsAsync(NotificationKinds.Toast).AsTask(cancellationToken);
+        var readMilliseconds = timer.Elapsed.TotalMilliseconds;
+        var result = new List<NotificationInfo>();
+        var active = new HashSet<(uint Id, DateTimeOffset CreatedAt)>();
+        foreach (var note in notes)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Extract(note) is { } notification)
+            {
+                result.Add(notification);
+                if (notification.Id is uint id && notification.CreatedAt is DateTimeOffset createdAt)
+                    active.Add((id, createdAt));
+            }
+        }
+        foreach (var expired in _appMetadata.Keys.Where(key => !active.Contains(key)).ToArray()) _appMetadata.Remove(expired);
+        log.Debug($"Windows notification snapshot: count={notes.Count}, readMs={readMilliseconds:0}, decodeMs={timer.Elapsed.TotalMilliseconds - readMilliseconds:0}.");
+        return result;
+    }
+    public void Subscribe(Action added)
+    {
+        TypedEventHandler<UserNotificationListener, UserNotificationChangedEventArgs> handler = (_, args) =>
+        {
+            if (args.ChangeKind == UserNotificationChangedKind.Added) added();
+        };
+        Listener.NotificationChanged += handler;
+        _handler = handler;
+    }
+    public void Unsubscribe()
+    {
+        if (_listener is not null && _handler is not null)
+        {
+            var handler = _handler;
+            _handler = null;
+            _listener.NotificationChanged -= handler;
+        }
+    }
+    private NotificationInfo? Extract(UserNotification n)
     {
         try
         {
             var binding = n.Notification.Visual.GetBinding(KnownNotificationBindings.ToastGeneric);
             if (binding is null) return null;
-            var app = n.AppInfo?.DisplayInfo?.DisplayName?.Trim() ?? string.Empty;
-            var text = binding.GetTextElements()
-                .Select(element => element.Text?.Trim() ?? string.Empty)
-                .Where(NotificationContent.HasVisibleText)
-                .ToArray();
-            var appId = n.AppInfo?.AppUserModelId ?? app;
-            var notification = new NotificationInfo(app,
-                text.FirstOrDefault() ?? string.Empty,
-                string.Join("  ", text.Skip(1)), n.Id, n.CreationTime, appId);
+            var identity = (n.Id, n.CreationTime);
+            if (!_appMetadata.TryGetValue(identity, out var metadata))
+            {
+                // AppInfo/DisplayInfo can require expensive package metadata resolution. A
+                // retained toast's app identity cannot change, while its text still can.
+                var info = n.AppInfo;
+                var appId = info?.AppUserModelId ?? string.Empty;
+                var app = info is null ? string.Empty : string.IsNullOrEmpty(appId)
+                    ? info.DisplayInfo?.DisplayName?.Trim() ?? string.Empty
+                    : _appNames.GetOrAdd(appId, _ => info.DisplayInfo?.DisplayName?.Trim() ?? string.Empty);
+                metadata = (app, string.IsNullOrEmpty(appId) ? app : appId);
+                _appMetadata[identity] = metadata;
+            }
+            var text = binding.GetTextElements().Select(element => element.Text?.Trim() ?? string.Empty)
+                .Where(NotificationContent.HasVisibleText).ToArray();
+            var notification = new NotificationInfo(metadata.App, text.FirstOrDefault() ?? string.Empty,
+                string.Join("  ", text.Skip(1)), identity.Id, identity.CreationTime, metadata.AppId);
             return NotificationContent.HasVisibleContent(notification) ? notification : null;
         }
         catch { return null; }
     }
-    public void Dispose() => Stop();
 }

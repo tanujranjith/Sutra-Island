@@ -16,9 +16,9 @@ using ThemeMode = DynamicIsland.Windows.Models.ThemeMode;
 namespace DynamicIsland.Windows.Infrastructure;
 
 // Opt-in native fixture harness. No media, Bluetooth, microphone, screen capture or provider service is started.
-internal static class UpgradeVerification
+internal static partial class UpgradeVerification
 {
-    public static async Task RunAsync(bool providersOnly = false, bool comparisonOnly = false)
+    public static async Task RunAsync(bool providersOnly = false, bool comparisonOnly = false, bool notificationClickOnly = false)
     {
         providersOnly |= comparisonOnly;
         if (!AppDataPaths.IsPreview) throw new InvalidOperationException("Verification requires ISLAND_PREVIEW=1.");
@@ -35,7 +35,8 @@ internal static class UpgradeVerification
         using var battery = new BatteryService(); using var clock = new ClockService(); using var timers = new TimerAlarmService(log);
         using var theme = new ThemeService(); using var weather = new WeatherService(log); using var monitor = new SystemMonitorService();
         using var spectrum = new AudioSpectrumService(log); using var stocks = new StocksService(log); using var calendar = new CalendarService(log);
-        using var notifications = new NotificationListenerService(log); using var privacy = new PrivacySensorService(log);
+        var notificationSource = new NotificationSourceFixture();
+        using var notifications = new NotificationListenerService(log, notificationSource); using var privacy = new PrivacySensorService(log);
         var qFixture = new ProviderFixture("fixture", holdAfterFirstChunk: true);
         var fixtures = new[] { "openai", "gemini", "anthropic", "codex", "ollama" }
             .Select(id => new ProviderFixture(id)).Append(qFixture).ToArray();
@@ -54,6 +55,13 @@ internal static class UpgradeVerification
         var shell = (FrameworkElement)window.FindName("GlassShell");
         var report = new List<string>();
         void Check(bool value, string description) { if (!value) throw new InvalidOperationException(description); report.Add("PASS " + description); }
+        if (notificationClickOnly)
+        {
+            await VerifyNotificationClicksAsync(settings, vm, window, Check);
+            File.WriteAllLines(Path.Combine(output, "checks.txt"), report);
+            window.Close(); PresentationTraceSources.DataBindingSource.Listeners.Remove(bindingLog);
+            return;
+        }
         var migrationPath = Path.Combine(AppDataPaths.Root, "migration.json");
         const string legacy = """{"Timer":{"Label":"Legacy tea","Phase":2,"TotalSeconds":300,"PausedRemainingSeconds":120},"Alarm":{"Phase":1,"Label":"Legacy wake","Hour":8,"TargetAt":"2099-01-01T08:00:00+00:00"}}""";
         File.WriteAllText(migrationPath, legacy);
@@ -109,6 +117,8 @@ internal static class UpgradeVerification
         settings.AnimationIntensity = AnimationIntensity.Expressive;
         vm.IsExpanded = false; window.ApplySettings();
         vm.IsExpanded = true; window.UpdateLayout();
+        var stableShellClip = shell.Clip;
+        Check(!shell.UseLayoutRounding && !shell.SnapsToDevicePixels, "Main island permits fractional motion during expansion");
         var stableViewport = viewport.RenderSize;
         var contentResizes = 0;
         SizeChangedEventHandler countResize = (_, _) => contentResizes++;
@@ -120,14 +130,16 @@ internal static class UpgradeVerification
                 $"Expansion frame {frame}: no outer scrollbar");
             Check(viewport.RenderSize == stableViewport, $"Expansion frame {frame}: stable content viewport");
         }
-        await Task.Delay(180); window.UpdateLayout();
+        await Task.Delay(240); window.UpdateLayout();
         expandedContent.SizeChanged -= countResize;
         Check(contentResizes <= 1, "Expanded content avoids per-frame layout resizing");
+        Check(ReferenceEquals(shell.Clip, stableShellClip), "Main island reuses the rounded clip across expansion frames");
+        Check(shell.UseLayoutRounding && shell.SnapsToDevicePixels, "Main island restores sharp pixel alignment after expansion");
         Check(Math.Abs(shell.ActualWidth - viewport.ActualWidth) < 1 && Math.Abs(shell.ActualHeight - viewport.ActualHeight) < 1,
             "Expansion lands on the content viewport bounds");
         await Capture("expansion-settled");
         vm.IsExpanded = false; await Task.Delay(50); vm.IsExpanded = true;
-        await Task.Delay(450); window.UpdateLayout();
+        await Task.Delay(490); window.UpdateLayout();
         Check(Math.Abs(shell.ActualWidth - viewport.ActualWidth) < 1, "Interrupted morph returns to the expanded bounds");
         vm.IsExpanded = false; window.UpdateLayout();
         await Task.Delay(90); window.UpdateLayout();
@@ -138,6 +150,10 @@ internal static class UpgradeVerification
         await Task.Delay(360); window.UpdateLayout();
         Check(Math.Abs(shell.ActualWidth - settings.IslandWidth) < 1 && compactContent.Visibility == Visibility.Visible,
             "Collapse commits the compact layout after the morph");
+        await VerifyNotificationListenerAsync(log, Check);
+        await VerifyTimerMotionAsync(settings, vm, window, Check, output);
+        await VerifyNotificationMotionAsync(settings, vm, window, Check, output);
+        await VerifyNotificationClicksAsync(settings, vm, window, Check);
         settings.AnimationIntensity = AnimationIntensity.Reduced;
         vm.IsExpanded = true; window.ApplySettings(); await Capture("apple-no-airpods");
         var widgets = (ScrollViewer)window.FindName("LiveWidgetsScroller");
@@ -184,6 +200,16 @@ internal static class UpgradeVerification
         Check(vm.BannerSeq == sequence, "Polling does not replay the banner animation");
         await Capture("notification-burst"); vm.DismissCurrentNotificationCommand.Execute(null);
         Check(history.Items.Count == 0, "Grouped dismissal targets displayed items");
+        Check(notificationSource.Dismissed.TakeLast(2).Select(item => item.Id).Order().SequenceEqual(new uint?[] { 1, 2 }),
+            "X dismissal reaches both grouped source notifications");
+        ((System.Collections.IList)typeof(IslandViewModel)
+            .GetField("_recentAcceptedNotifications", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(vm)!).Clear();
+        for (uint duplicate = 10; duplicate < 12; duplicate++)
+        {
+            Invoke("OnNotificationBatch", null, new NotificationInfo[] { new("Mail", "Second", "Two", duplicate, DateTimeOffset.Now, "fixture.mail") });
+            Invoke("PumpNotifications");
+            Check(!vm.ShowNotification && history.Items.Count == 0, $"X dismissal suppresses recreated copy {duplicate - 9} after the arrival debounce expires");
+        }
         settings.ShowNotifications = false; Invoke("PumpNotifications");
         Check(!vm.ShowNotification, "Disabling notifications clears the banner");
         settings.ShowNotifications = true; settings.FocusModeEnabled = true;
