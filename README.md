@@ -6,7 +6,7 @@ Built with C#, WPF, and .NET 10. The current source version is **1.1.9**. See [r
 
 ![Current graphite island with fixture media](media/graphite-island.png)
 
-This capture shows the current native interface with verification data. Older images in `media/` are retained as historical references.
+The screenshots show the current native interface with illustrative verification data. Click a gallery image to view it at full size. Older images in `media/` are retained as historical references.
 
 ## Features
 
@@ -17,7 +17,29 @@ This capture shows the current native interface with verification data. Older im
 - **Command palette:** open with `Ctrl+Alt+K` by default to search commands and settings, control media and timers, calculate, convert units, and solve single-variable linear equations. For example, `3x+44x=1253` shows a copyable solution; nonlinear equations and systems of equations are not supported. Press Enter on a result to copy it. Use Up on an empty query to recall a previously run command.
 - **Customization:** choose visible activities, appearance, position, keyboard shortcuts, and reduced-motion behavior in Settings.
 
-![Current timer interface with two example timers](media/graphite-timer.png)
+## Screenshots
+
+| Sutra Assistant | Settings and live preview |
+| --- | --- |
+| [<img src="media/graphite-assistant.png" width="430" alt="Sutra Assistant chat with provider, model, reasoning, and optional screen-context controls">](media/graphite-assistant.png) | [<img src="media/graphite-settings.png" width="430" alt="Settings sidebar, island content switches, and compact live preview">](media/graphite-settings.png) |
+| Typed chat with optional screen context. Provider and reply labels here are test data. | Choose visible activities and preview the island as you customize it. |
+
+| Timers, alarms, and stopwatch | Command palette |
+| --- | --- |
+| [<img src="media/graphite-timer.png" width="430" alt="Timer editor showing two named timers, countdown progress, and custom duration controls">](media/graphite-timer.png) | [<img src="media/graphite-command-palette.png" width="430" alt="Command palette showing audio output, converter, notifications, clipboard, focus, and stopwatch actions">](media/graphite-command-palette.png) |
+| Manage named timers, use presets, or enter a custom duration. | Open with `Ctrl+Alt+K` to find actions and tools. |
+
+### Command panels
+
+| Volume | Seek |
+| --- | --- |
+| [<img src="media/command-volume.png" width="430" alt="Volume panel with output name, live level slider, presets, and mute control">](media/command-volume.png) | [<img src="media/command-seek.png" width="430" alt="Seek panel with track details, elapsed time, position slider, and ten-second skip buttons">](media/command-seek.png) |
+| Adjust the level, choose a preset, or mute the current output. | Scrub the active track or use the panel's skip controls. |
+
+| Clipboard history | Unit converter |
+| --- | --- |
+| [<img src="media/command-clipboard.png" width="430" alt="Clipboard history panel with search, recent text clips, and refresh controls">](media/command-clipboard.png) | [<img src="media/command-convert.png" width="430" alt="Unit converter displaying 72 degrees Fahrenheit converted to Celsius">](media/command-convert.png) |
+| Search recent clips and select an item to copy it. | Choose units, enter a value, and copy the live result. |
 
 ## Command examples
 
