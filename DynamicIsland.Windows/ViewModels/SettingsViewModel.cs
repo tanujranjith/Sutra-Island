@@ -114,6 +114,28 @@ public sealed class SettingsViewModel : ObservableObject
     public bool ShowBattery { get => _settings.ShowBattery; set => Set(v => _settings.ShowBattery = v, value); }
     public bool ShowClock { get => _settings.ShowClock; set => Set(v => _settings.ShowClock = v, value); }
     public bool ShowDate { get => _settings.ShowDate; set => Set(v => _settings.ShowDate = v, value); }
+    public bool ShowCompactDate { get => _settings.ShowCompactDate; set => Set(v => _settings.ShowCompactDate = v, value); }
+    public bool CapsLockNotifications { get => _settings.CapsLockNotifications; set => Set(v => _settings.CapsLockNotifications = v, value); }
+    public bool NumLockNotifications { get => _settings.NumLockNotifications; set => Set(v => _settings.NumLockNotifications = v, value); }
+    public bool WakeListeningEnabled
+    {
+        get => _settings.WakeListeningEnabled;
+        set
+        {
+            if (_settings.WakeListeningEnabled == value) return;
+            Set(v => _settings.WakeListeningEnabled = v, value);
+            // Persist microphone consent immediately, including explicit opt-out,
+            // rather than relying on the Settings window eventually being closed.
+            _ = _settingsService.SaveAsync(_settings);
+        }
+    }
+    public bool VoiceReadAloud { get => _settings.VoiceReadAloud; set => Set(v => _settings.VoiceReadAloud = v, value); }
+    public string VoiceName { get => _settings.VoiceName; set => Set(v => _settings.VoiceName = v, value); }
+    public IReadOnlyList<string> InstalledVoices => Services.Q.SpeechInputService.GetInstalledVoices();
+    public void RefreshRuntimePreferences()
+    {
+        foreach (var property in new[] { nameof(ShowNotifications), nameof(WakeListeningEnabled), nameof(VoiceReadAloud), nameof(VoiceName), nameof(ShowDate), nameof(ShowCompactDate), nameof(CapsLockNotifications), nameof(NumLockNotifications) }) RaisePropertyChanged(property);
+    }
     public bool ShowTimerAlarm { get => _settings.ShowTimerAlarm; set => Set(v => _settings.ShowTimerAlarm = v, value); }
     public bool FocusModeEnabled { get => _settings.FocusModeEnabled; set { Set(v => _settings.FocusModeEnabled = v, value); RaisePropertyChanged(nameof(FocusModeLabel)); _apply(); } }
     public string FocusModeLabel => FocusModeEnabled ? "Focus mode" : "All widgets";
@@ -381,7 +403,26 @@ public sealed class SettingsViewModel : ObservableObject
     public string WorldClockZones { get => _settings.WorldClockZones; set { Set(v => _settings.WorldClockZones = v ?? "", value); _apply(); } }
     public bool ShowNextMeeting { get => _settings.ShowNextMeeting; set { Set(v => _settings.ShowNextMeeting = v, value); _apply(); } }
     public bool ShowNotifications { get => _settings.ShowNotifications; set { Set(v => _settings.ShowNotifications = v, value); _apply(); } }
-    public int NotificationPollSeconds { get => _settings.NotificationPollSeconds; set => SetSize(v => _settings.NotificationPollSeconds = v, value, 1, 30); }
+    public double NotificationPollSeconds
+    {
+        get => _settings.NotificationPollSeconds;
+        set => Set(v => _settings.NotificationPollSeconds = v,
+            Math.Clamp(double.IsFinite(value) ? Math.Round(value, 1) : 1, 0.1, 30));
+    }
+    public int MediaPollMilliseconds { get => _settings.MediaPollMilliseconds; set => SetSize(v => _settings.MediaPollMilliseconds = v, value, 100, 3000); }
+    public int AudioPollMilliseconds { get => _settings.AudioPollMilliseconds; set => SetSize(v => _settings.AudioPollMilliseconds = v, value, 100, 3000); }
+    public int SystemMonitorPollMilliseconds { get => _settings.SystemMonitorPollMilliseconds; set => SetSize(v => _settings.SystemMonitorPollMilliseconds = v, value, 200, 5000); }
+    public int TimerPollMilliseconds { get => _settings.TimerPollMilliseconds; set => SetSize(v => _settings.TimerPollMilliseconds = v, value, 100, 2000); }
+    public int ClockPollSeconds { get => _settings.ClockPollSeconds; set => SetSize(v => _settings.ClockPollSeconds = v, value, 1, 60); }
+    public int WindowPollSeconds { get => _settings.WindowPollSeconds; set => SetSize(v => _settings.WindowPollSeconds = v, value, 1, 10); }
+    public int ConnectivityPollSeconds { get => _settings.ConnectivityPollSeconds; set => SetSize(v => _settings.ConnectivityPollSeconds = v, value, 1, 60); }
+    public int BatteryPollSeconds { get => _settings.BatteryPollSeconds; set => SetSize(v => _settings.BatteryPollSeconds = v, value, 1, 60); }
+    public int PrivacyPollSeconds { get => _settings.PrivacyPollSeconds; set => SetSize(v => _settings.PrivacyPollSeconds = v, value, 1, 60); }
+    public int ThemePollSeconds { get => _settings.ThemePollSeconds; set => SetSize(v => _settings.ThemePollSeconds = v, value, 1, 60); }
+    public int AirPodsPollSeconds { get => _settings.AirPodsPollSeconds; set => SetSize(v => _settings.AirPodsPollSeconds = v, value, 1, 120); }
+    public int CalendarPollMinutes { get => _settings.CalendarPollMinutes; set => SetSize(v => _settings.CalendarPollMinutes = v, value, 1, 60); }
+    public int StocksPollMinutes { get => _settings.StocksPollMinutes; set => SetSize(v => _settings.StocksPollMinutes = v, value, 1, 60); }
+    public int WeatherPollMinutes { get => _settings.WeatherPollMinutes; set => SetSize(v => _settings.WeatherPollMinutes = v, value, 1, 180); }
     public Array NotificationFilterOptions => Enum.GetValues<NotificationFilter>();
     public NotificationFilter NotificationFilterMode { get => _settings.NotificationFilterMode; set { Set(v => _settings.NotificationFilterMode = v, value); _apply(); } }
     public string NotificationAppFilter { get => _settings.NotificationAppFilter; set { Set(v => _settings.NotificationAppFilter = v ?? "", value); _apply(); } }
@@ -797,7 +838,8 @@ public sealed class SettingsViewModel : ObservableObject
             new SettingsSection("appearance", "Appearance", Glyph(0xE790)),
             new SettingsSection("position", "Position", Glyph(0xE809)),
             new SettingsSection("activities", "Widgets & connections", Glyph(0xE753)),
-            new SettingsSection("q", "Q Assistant", Glyph(0xE720)),
+            new SettingsSection("polling", "Polling rate", Glyph(0xE895)),
+            new SettingsSection("q", "Sutra Assistant", Glyph(0xE720)),
             new SettingsSection("shortcuts", "Shortcuts & behavior", Glyph(0xE765)),
             new SettingsSection("advanced", "Advanced", Glyph(0xE9F5)),
         };

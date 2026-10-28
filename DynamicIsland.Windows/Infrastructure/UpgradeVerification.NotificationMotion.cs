@@ -33,10 +33,16 @@ internal static partial class UpgradeVerification
             var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
             using var file = File.Create(Path.Combine(output, name + ".png")); encoder.Save(file);
         }
+        // This scenario starts with a fresh queue, independently of command and voice fixtures.
+        vm.ClearNotificationHistoryCommand.Execute(null); vm.DismissVisibleBanner();
+        vm.ClearQ(); vm.KeepExpanded=false; window.CloseTimerPanel();
+        settings.AutoHideFullscreen=false; window.Show();
+        await System.Windows.Application.Current.Dispatcher.InvokeAsync(window.UpdateLayout, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         settings.AnimationIntensity = AnimationIntensity.Normal;
         vm.IsExpanded = false; vm.InteractionProtected = false;
         vm.ApplySettings(); window.ApplySettings();
         Deliver(1001); window.UpdateLayout();
+        File.WriteAllText(Path.Combine(output,"notification-seed-state.txt"), System.Text.Json.JsonSerializer.Serialize(new { host.Visibility, window.IsLoaded, window.IsVisible, vm.IsAirPodsBannerActive, vm.BannerTitle, vm.BannerBody, host.RevealProgress, CardOpacity=card.Opacity, vm.ShowNotification, vm.ShowBanner, vm.FocusModeEnabled, vm.InteractionProtected, vm.HasUrgentAlert, settings.ShowNotifications, vm.IsReducedMotion }));
         check(host.Visibility == Visibility.Visible && host.RevealProgress < 0.1 && card.Opacity == 0,
             "Notification motion: begins as a text-free seed instead of flashing the final card");
         var shellSize = shell.RenderSize;

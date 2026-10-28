@@ -14,6 +14,12 @@ public sealed class ThemeService : IDisposable
 
     public event EventHandler? SystemThemeChanged;
 
+    public void ConfigurePolling(TimeSpan interval)
+    {
+        var normalized = TimeSpan.FromSeconds(Math.Clamp(interval.TotalSeconds, 1, 60));
+        if (_timer.Interval != normalized) _timer.Interval = normalized;
+    }
+
     public ThemeService()
     {
         _lastSystemDark = IsSystemDark();
@@ -30,6 +36,7 @@ public sealed class ThemeService : IDisposable
     public bool IsDark(ThemeMode mode) => mode switch
     {
         ThemeMode.Dark => true,
+        ThemeMode.Graphite => true,
         ThemeMode.Light => false,
         _ => IsSystemDark()
     };

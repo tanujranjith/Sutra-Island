@@ -18,6 +18,12 @@ public sealed class StocksService(LoggingService log) : IDisposable
     public event EventHandler<IReadOnlyList<StockQuote>>? Changed;
     public IReadOnlyList<StockQuote> Current { get; private set; } = [];
 
+    public void ConfigurePolling(TimeSpan interval)
+    {
+        var normalized = TimeSpan.FromMinutes(Math.Clamp(interval.TotalMinutes, 1, 60));
+        if (_timer.Interval != normalized) _timer.Interval = normalized;
+    }
+
     private static HttpClient CreateClient()
     {
         var c = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };

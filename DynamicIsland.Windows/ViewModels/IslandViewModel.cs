@@ -61,6 +61,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private readonly System.Windows.Threading.DispatcherTimer _quoteTimer = new();
     private readonly System.Windows.Threading.DispatcherTimer _visualizerTimer = new() { Interval = TimeSpan.FromMilliseconds(33) };
     private readonly System.Windows.Threading.DispatcherTimer _connectivityTimer = new() { Interval = TimeSpan.FromSeconds(2) };
+    private bool _wifiConnected, _wifiRefreshInProgress, _disposed;
     private readonly System.Windows.Threading.DispatcherTimer _qAutoCloseTimer = new();
     private readonly System.Windows.Threading.DispatcherTimer _timerUiTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private double _visualizerPhase;
@@ -182,7 +183,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         _quoteTimer.Tick += (_, _) => OnUi(AdvanceQuote);
         _visualizerTimer.Tick += (_, _) => OnUi(() =>
         {
-            if (!IsAudioActive)
+            if (!IsAudioActive || !VisualizerSurfaceVisible || !(IsExpanded ? ShowMusicVisualizer : ShowCompactEqualizer))
                 return;
 
             var elapsed = _visualizerClock.Elapsed;
@@ -191,7 +192,8 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             RaiseVisualizerProperties();
         });
         _visualizerTimer.Start();
-        _connectivityTimer.Tick += (_, _) => OnUi(() => RaiseMany(nameof(WifiConnected), nameof(WifiStatusText), nameof(WifiStatusBrush)));
+        _connectivityTimer.Tick += async (_, _) => await RefreshWifiAsync();
+        _ = RefreshWifiAsync();
         _connectivityTimer.Start();
         _qAutoCloseTimer.Tick += (_, _) =>
         {
@@ -208,9 +210,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         SelectOutputDeviceCommand = new RelayCommand<string>(id => { if (!string.IsNullOrEmpty(id)) _audioService.SetDefaultOutputDevice(id); });
         ToggleFocusCommand = new RelayCommand(() =>
         {
-            Settings.FocusModeEnabled = !Settings.FocusModeEnabled;
-            _ = PersistSettingsAsync();
-            RaiseFocusModeProperties();
+            SetFocusMode(!Settings.FocusModeEnabled);
         });
         OpenNotificationHistoryCommand = new RelayCommand(RefreshNotificationHistory);
         ClearNotificationHistoryCommand = new RelayCommand(() =>
@@ -228,6 +228,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         });
         RefreshNotificationHistory();
         _batteryService.Changed += OnBatteryChanged;
+        InitializeFocusSession();
         _clockService.Tick += OnClockTick;
         _timerAlarmService.Changed += OnTimerAlarmChanged;
         _timerUiTimer.Tick += (_, _) => RaiseMany(nameof(TimerText), nameof(TimerProgress), nameof(TimerRemainingProgress));
@@ -239,6 +240,8 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     public AppSettings Settings { get; }
     public QRunState QState => QCompareEnabled && _qComparison.Snapshot.State != QRunState.Idle ? _qComparison.Snapshot.State : _qSnapshot.State;
+    public AssistantActionFeedback? QActionFeedback => QCompareEnabled ? null : _qSnapshot.Action;
+    public bool QHasActionFeedback => QActionFeedback is not null;
     public QMode QCurrentMode => _qSnapshot.Mode;
     public string QStatusText => _qSnapshot.Status;
     public string QHeaderStatusText => QState switch
@@ -255,10 +258,10 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     };
     public string QResponse => _qSnapshot.Response;
     public string QPromptText => _qSnapshot.Prompt;
-    public string QPromptDisplay => string.IsNullOrWhiteSpace(QPromptText) ? "Ask Q about what you’re looking at." : QPromptText;
+    public string QPromptDisplay => string.IsNullOrWhiteSpace(QPromptText) ? "Ask a question or control the island: volume, media, timers, focus and settings." : QPromptText;
     public bool QHasPrompt => !string.IsNullOrWhiteSpace(QPromptText);
-    public bool QShowInlineThinking => QState is QRunState.Capturing or QRunState.Thinking or QRunState.Streaming;
-    public bool QCanStop => QState is QRunState.Capturing or QRunState.Listening or QRunState.Thinking or QRunState.Streaming;
+    public bool QShowInlineThinking => QActionFeedback is null && (QState is QRunState.Capturing or QRunState.Thinking or QRunState.Streaming);
+    public bool QCanStop => VoiceBusy || QState is QRunState.Capturing or QRunState.Listening or QRunState.Thinking or QRunState.Streaming;
     public bool QCanCopyResponse => !string.IsNullOrWhiteSpace(QResponse);
     public bool QCanRetry => !string.IsNullOrWhiteSpace(QPromptText) && QState is QRunState.Complete or QRunState.Cancelled or QRunState.Error;
     public bool QShowResponseActions => QCanStop || QCanCopyResponse || QCanRetry;
@@ -276,20 +279,20 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             QRunState.Listening => "Listening for your question…",
             QRunState.Thinking or QRunState.Streaming => string.Empty,
             QRunState.Error when !string.IsNullOrWhiteSpace(QError) => QError,
-            _ => "Ask Q about what you’re looking at."
+            _ => "Ask a question or control the island. Choose Use screen for help with a window."
         }
         : CleanQResponseText(QResponse);
     public string QError => _qSnapshot.Error ?? string.Empty;
     public string QSourceText => _qSnapshot.Context is { } context
         ? string.IsNullOrWhiteSpace(context.ProcessName) ? "Active window" : context.ProcessName
-        : "Screen context ready";
+        : QUseScreenNext ? "Screen for next question" : "Chat · no screen";
     public string QCompactText => QState switch
     {
-        QRunState.Capturing => "Q · Reading…",
-        QRunState.Thinking or QRunState.Streaming => "Q · Thinking…",
-        QRunState.Complete => string.IsNullOrWhiteSpace(QResponse) ? "Q · Complete" : QResponse.Replace(Environment.NewLine, " "),
-        QRunState.Error => "Q · Try again",
-        _ => "Q · Ready"
+        QRunState.Capturing => "Sutra Assistant · Reading…",
+        QRunState.Thinking or QRunState.Streaming => "Sutra Assistant · Thinking…",
+        QRunState.Complete => string.IsNullOrWhiteSpace(QResponse) ? "Sutra Assistant · Complete" : QResponse.Replace(Environment.NewLine, " "),
+        QRunState.Error => "Sutra Assistant · Try again",
+        _ => "Sutra Assistant · Ready"
     };
     public bool IsQActive => QState != QRunState.Idle;
     public bool ShowQSurface => IsQActive && !TimerEditorOpen;
@@ -304,6 +307,9 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         .Select(provider => new QProviderChoice(provider.Info.Id, provider.Info.Id == "codex"
             ? CodexProviderLabel.For(_codexAccount?.Snapshot.Account) : provider.Info.DisplayName)).ToArray();
     public bool QCanChangeProvider => !QCanStop;
+    public string QSelectedProviderLabel => QIsCodexSelected
+        ? CodexProviderLabel.For(_codexAccount?.Snapshot.Account)
+        : _qProviders.Find(Settings.QSelectedProvider)?.Info.DisplayName ?? Settings.QSelectedProvider;
     public event EventHandler? QProviderSelectionChanged;
     public string QSelectedProvider
     {
@@ -420,6 +426,10 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public AudioState Audio { get => _audio; private set => SetProperty(ref _audio, value); }
     public BatteryState Battery { get => _battery; private set => SetProperty(ref _battery, value); }
     public bool IsExpanded { get => _isExpanded; set { if (SetProperty(ref _isExpanded, value)) { if (value && Settings.QuoteRotation == QuoteRotation.EveryExpand) AdvanceQuote(); RaiseExpansionProperties(); } } }
+    private double _nativeFrostInset;
+    public double NativeFrostInset { get=>_nativeFrostInset; set {if(SetProperty(ref _nativeFrostInset,value))RaiseMany(nameof(IslandSurfaceBrush), nameof(IslandBaseSurfaceBrush));} }
+    private bool _nativeFrostActive;
+    public bool NativeFrostActive { get => _nativeFrostActive; set { if(SetProperty(ref _nativeFrostActive,value)) RaiseThemeProperties(); } }
     public bool IsCompact => !IsExpanded;
     // When a settings window is open we pin the island expanded so size/appearance changes are visible live.
     public bool KeepExpanded { get => _keepExpanded; set { if (SetProperty(ref _keepExpanded, value)) { RaisePropertyChanged(nameof(PinExpanded)); if (value) IsExpanded = true; } } }
@@ -429,19 +439,20 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private bool IsCustomTheme => Settings.Theme == ThemeMode.Custom;
     private MediaBrush? CustomTextBrush => Settings.UseCustomColors && !string.IsNullOrWhiteSpace(Settings.TextColorHex)
         ? FrozenBrush(Settings.TextColorHex) : null;
-    public MediaBrush PrimaryTextBrush => IsCustomTheme ? FrozenBrush(QThemePalette.Text) : CustomTextBrush ?? (IsDarkTheme ? FrozenBrush("#F8FBFF") : FrozenBrush("#172033"));
-    public MediaBrush SecondaryTextBrush => IsCustomTheme ? FrozenBrush(QThemePalette.Muted) : CustomTextBrush ?? (IsDarkTheme ? FrozenBrush("#AAB5C6") : FrozenBrush("#526078"));
+    public MediaBrush PrimaryTextBrush => IsCustomTheme ? FrozenBrush(QThemePalette.Text) : CustomTextBrush ?? (IsDarkTheme ? FrozenBrush("#F4F2F4") : FrozenBrush("#172033"));
+    public MediaBrush SecondaryTextBrush => IsCustomTheme ? FrozenBrush(QThemePalette.Muted) : CustomTextBrush ?? (IsDarkTheme ? FrozenBrush("#9998A4") : FrozenBrush("#526078"));
     public MediaBrush AccentTextBrush => AccentBrush;
     // Effective accent: album-art adaptive > custom > default. Drives the accent brush used across the island.
     private string EffectiveAccentHex =>
+        Settings.Theme == ThemeMode.Graphite && !Settings.UseCustomColors ? "#B9A5FD" :
         Settings.AdaptiveAccent && _adaptiveAccent is not null ? _adaptiveAccent
         : Settings.UseCustomColors ? Settings.AccentColorHex
-        : "#5AA7FF";
+        : "#B9A5FD";
     public MediaBrush AccentBrush => FrozenBrush(EffectiveAccentHex);
     public MediaBrush AccentSoftBrush => FrozenBrush(WithAlpha(EffectiveAccentHex, 0x33));
-    public MediaBrush IslandSurfaceBrush => IsCustomTheme ? FrozenBrush(QThemePalette.Surface) : IsDarkTheme ? FrozenBrush("#FA000000") : FrozenBrush("#FFF5F5F7");
-    public MediaBrush IslandCardBrush => IsCustomTheme ? FrozenBrush(QThemePalette.Card) : IsDarkTheme ? FrozenBrush("#FF1C1C1E") : FrozenBrush("#FFFFFFFF");
-    public MediaBrush IslandDividerBrush => IsCustomTheme ? FrozenBrush(QThemePalette.Border) : IsDarkTheme ? FrozenBrush("#FF2D2D30") : FrozenBrush("#FFD1D1D6");
+    public MediaBrush IslandSurfaceBrush => Settings.Theme == ThemeMode.Graphite ? NativeFrostActive ? Infrastructure.FrostedMaterial.WithOpaqueCaps(FrozenBrush("#DC101114"),NativeFrostInset) : FrozenBrush("#FF101114") : IsCustomTheme ? FrozenBrush(QThemePalette.Surface) : IsDarkTheme ? FrozenBrush("#FF101114") : FrozenBrush("#FFF5F5F7");
+    public MediaBrush IslandCardBrush => Settings.Theme == ThemeMode.Graphite ? FrozenBrush("#701D1F25") : IsCustomTheme ? FrozenBrush(QThemePalette.Card) : IsDarkTheme ? FrozenBrush("#FF1D1F25") : FrozenBrush("#FFFFFFFF");
+    public MediaBrush IslandDividerBrush => IsCustomTheme ? FrozenBrush(QThemePalette.Border) : IsDarkTheme ? FrozenBrush("#FF35343E") : FrozenBrush("#FFD1D1D6");
     // Shell controls and progress bars need real theme-aware contrast. The old shared
     // AppleWhite resources disappeared against the light island surface.
     public MediaBrush ShellControlBrush => IsCustomTheme ? FrozenBrush(QThemePalette.Text) : IsDarkTheme ? FrozenBrush("#FFF5F5F7") : FrozenBrush("#FF1C1C1E");
@@ -512,9 +523,15 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public bool IsReducedMotion => Settings.AnimationIntensity == AnimationIntensity.Reduced;
     public bool IsPlaying => Media.IsPlaying;
     public bool IsMuted => Audio.SystemMuted;
+    public bool VisualizerSurfaceVisible { get; set; } = true;
     public bool IsAudioActive => Audio.Availability == AudioAvailability.Available && Audio.ActiveAudioOutput && !Audio.SystemMuted;
     public bool ShowAudioStatusText => !IsAudioActive;
     public bool ShowDate => Settings.ShowDate;
+    public bool ShowCompactDate => Settings.ShowCompactDate && !IsHolePunchMode;
+    public bool ShowCompactBattery => ShowBattery && !ShowCompactDate;
+    public string? DateToolTip => ShowDate || Settings.ShowCompactDate ? DateLongText : null;
+    public bool ShowClockOrDate => ShowClock || ShowDate;
+    public string CompactDateText => _now.ToString("m", System.Globalization.CultureInfo.CurrentCulture);
     public bool IsAppleStyle => Settings.IslandVisualMode == IslandVisualMode.Apple;
     public bool IsStatsStyle => Settings.IslandVisualMode == IslandVisualMode.Stats;
     // ===== Mic / camera in-use indicators (read from the Windows privacy consent store) =====
@@ -792,6 +809,8 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     public bool ShowClipboard => Settings.ShowClipboard;
     // True when any of the grouped live-activity widgets is enabled (so the panel can be shown/hidden cleanly).
+    public bool ShowGraphiteWidgets => !FocusModeEnabled && (ShowStocks || ShowCountdown || ShowNextMeeting || ShowWorldClocks || ShowBatteryTime);
+    public bool ShowGraphiteAccessories => ShowAirPodsCard || ShowGraphiteWidgets;
     public bool ShowWidgetsPanel => !FocusModeEnabled && (ShowWeather || ShowStocks || ShowCountdown || ShowNextMeeting
         || ShowWorldClocks || ShowBatteryTime || ShowConnectivity);
     public Thickness LiveWidgetRailMargin => new(ShowAirPodsCard ? 8 : 0, 8, 0, 0);
@@ -820,12 +839,30 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public double BatteryTimeWidgetWidth => GetLiveWidgetCardWidth(142d);
     public double SmallLiveWidgetWidth => GetLiveWidgetCardWidth(132d);
     public bool ShowConnectivity => Settings.ShowConnectivity;
-    public bool WifiConnected => IsWifiConnected();
+    public bool WifiConnected => _wifiConnected;
     public string WifiStatusText => WifiConnected ? "Connected" : "Offline";
     public MediaBrush WifiStatusBrush => FrozenBrush(WifiConnected ? "#FF30D158" : "#FFFF9F0A");
     public bool BluetoothAvailable => _airPods.IsAvailable;
     public string BluetoothStatusText => BluetoothAvailable ? "Available" : "Unavailable";
     public MediaBrush BluetoothStatusBrush => FrozenBrush(BluetoothAvailable ? "#FF30D158" : "#FFFF9F0A");
+    private async Task RefreshWifiAsync()
+    {
+        if (_disposed || _wifiRefreshInProgress) return;
+        _wifiRefreshInProgress = true;
+        try
+        {
+            var connected = await Task.Run(IsWifiConnected);
+            await OnUiAsync(() =>
+            {
+                if (!_disposed && _wifiConnected != connected)
+                {
+                    _wifiConnected = connected;
+                    RaiseMany(nameof(WifiConnected), nameof(WifiStatusText), nameof(WifiStatusBrush));
+                }
+            });
+        }
+        finally { await OnUiAsync(() => _wifiRefreshInProgress = false); }
+    }
     private static bool IsWifiConnected()
     {
         try { return NetworkInterface.GetAllNetworkInterfaces().Any(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && n.OperationalStatus == OperationalStatus.Up); }
@@ -846,7 +883,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public CornerRadius IslandInnerCornerRadius => new(Math.Max(0, ClampedCornerRadius - 1));
 
     // ===== Notification banner (transient) =====
-    public bool ShowNotification => _notification is not null && NotificationContent.HasVisibleContent(_notification) && Settings.ShowNotifications && !FocusModeEnabled && !SuppressOrdinaryBanners;
+    public bool ShowNotification => !IsLockBannerActive && _notification is not null && NotificationContent.HasVisibleContent(_notification) && Settings.ShowNotifications && !FocusModeEnabled && !SuppressOrdinaryBanners;
     public string NotificationApp => _notification?.App ?? string.Empty;
     public string NotificationTitle => _notification?.Title ?? string.Empty;
     public string NotificationBody => _notification?.Body ?? string.Empty;
@@ -857,14 +894,15 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     // ===== Unified banner (Windows notification, volume warning, or AirPods) =====
     // Privacy activity has its own attached indicator/drop-down presentation in IslandWindow.
-    public bool IsAirPodsBannerActive => _airPodsBannerActive && !FocusModeEnabled && !ShowNotification
+    public bool IsAirPodsBannerActive => !IsLockBannerActive && _airPodsBannerActive && !FocusModeEnabled && !ShowNotification
         && !(_volumeWarningActive && Settings.VolumeWarningEnabled);
-    public bool ShowBanner => !SuppressOrdinaryBanners && (ShowNotification || (_volumeWarningActive && Settings.VolumeWarningEnabled && !FocusModeEnabled)
+    public bool ShowBanner => IsLockBannerActive || !SuppressOrdinaryBanners && (ShowNotification || (_volumeWarningActive && Settings.VolumeWarningEnabled && !FocusModeEnabled)
         || IsAirPodsBannerActive);
     public string BannerApp
     {
         get
         {
+            if (IsLockBannerActive) return "Keyboard";
             if (ShowNotification) return NotificationContent.Truncate(NotificationApp, 48);
             if (_volumeWarningActive && Settings.VolumeWarningEnabled) return "Volume";
             if (IsAirPodsBannerActive) return _airPods.DisplayName;
@@ -875,6 +913,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     {
         get
         {
+            if (IsLockBannerActive) return _lockFeedbackText;
             if (ShowNotification) return NotificationContent.Truncate(NotificationTitle, 120);
             if (_volumeWarningActive && Settings.VolumeWarningEnabled) return "High volume";
             if (IsAirPodsBannerActive) return BuildAirPodsBannerTitle();
@@ -885,6 +924,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     {
         get
         {
+            if (IsLockBannerActive) return "";
             if (ShowNotification) return NotificationContent.Truncate(NotificationBody, 260);
             if (_volumeWarningActive && Settings.VolumeWarningEnabled) return $"Volume is at {_lastWarnedVolumePercent}% — consider lowering it to protect your hearing.";
             if (IsAirPodsBannerActive) return BuildAirPodsBannerBody();
@@ -997,7 +1037,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     }
 
     // ===== Behaviour =====
-    public bool PinExpanded => KeepExpanded || (Settings.AlwaysExpanded && !IsHolePunchMode);
+    public bool PinExpanded => KeepExpanded || (Settings.AlwaysExpanded && !IsHolePunchMode) || (VoiceBusy && Settings.QAutoExpandIsland);
     public string MediaTitle => Media.HasSession ? (Media.DisplayTitle ?? "Media") : "No media playing";
     public string MediaArtist => Media.HasSession
         ? string.Join("  |  ", new[] { Media.Artist, Media.SourceAppName }.Where(x => !string.IsNullOrWhiteSpace(x)))
@@ -1039,9 +1079,9 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private bool _isFavorite;
     public bool IsFavorite { get => _isFavorite; private set { if (SetProperty(ref _isFavorite, value)) RaisePropertyChanged(nameof(FavoriteGlyph)); } }
     public string FavoriteGlyph => IsFavorite ? "\uEB52" : "\uEB51"; // filled heart vs outline
-    // Rewind / fast-forward controls (10s back, 30s forward). Enabled only when the active session reports
+    // Rewind / fast-forward controls (30s back, 30s forward). Enabled only when the active session reports
     // it can change position AND exposes a duration; otherwise the buttons disable and explain why via tooltip.
-    private const int SeekBackSeconds = 10;
+    private const int SeekBackSeconds = 30;
     private const int SeekForwardSeconds = 30;
     public bool CanSeek => Media.CanSeek && Media.Duration.TotalSeconds > 0;
     public string SeekBackTooltip => CanSeek ? $"Back {SeekBackSeconds} seconds" : "This source doesn't support seeking";
@@ -1085,7 +1125,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         _ => "No alarm"
     };
 
-    public string CompactGlyph => IsQActive ? "Q" : ShowQuoteInCompact ? "\u201C"
+    public string CompactGlyph => IsQActive ? "S" : ShowQuoteInCompact ? "\u201C"
         : PrimaryActivity switch
         {
             IslandActivity.Alarm => "\uEA8F",
@@ -1165,6 +1205,8 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     public void ApplySettings()
     {
+        var connectivityInterval = TimeSpan.FromSeconds(Math.Clamp(Settings.ConnectivityPollSeconds, 1, 60));
+        if (_connectivityTimer.Interval != connectivityInterval) _connectivityTimer.Interval = connectivityInterval;
         EnsureCompareProvider();
         if (QCompareEnabled && _qComparison.Snapshot.Left.State != QRunState.Idle
             && (_qComparison.Snapshot.Left.ProviderId != QSelectedProvider || _qComparison.Snapshot.Left.Model != QSelectedModel)) ResetComparisonAnswers();
@@ -1203,6 +1245,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             return;
         }
         if (!Settings.QEnabled) return;
+        _qScreenSession = true; QUseScreenNext = false;
         CancelQActivation();
         var activation = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Clamp(Settings.QTimeoutSeconds, 5, 300)));
         _qActivation = activation;
@@ -1259,16 +1302,19 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     public async Task SubmitQAsync(string prompt)
     {
-        if (string.IsNullOrWhiteSpace(prompt) || QCanStop) return;
+        if (string.IsNullOrWhiteSpace(prompt) || QState is QRunState.Capturing or QRunState.Listening or QRunState.Thinking or QRunState.Streaming) return;
         if (!Settings.QDisclosureAccepted)
         {
             OnUi(() => RaiseQProperties());
             return;
         }
-        if (QCompareEnabled) { await SubmitComparisonAsync(prompt); return; }
-        await RefreshCodexModelsAsync().ConfigureAwait(false);
+        if (QCompareEnabled) { await SubmitComparisonAsync(prompt); QUseScreenNext = false; return; }
+        var captureScreen = _qScreenSession || QUseScreenNext;
+        QUseScreenNext = false;
+        var localControl = !captureScreen && _qSnapshot.Mode == QMode.Ask && _assistantControls?.CanHandleDirect(prompt) == true;
+        if (!localControl) await RefreshCodexModelsAsync().ConfigureAwait(false);
         var baseUrl = string.Equals(Settings.QSelectedProvider, "ollama", StringComparison.OrdinalIgnoreCase) ? Settings.QOllamaBaseUrl : null;
-        var credential = _qSecrets.Get(Settings.QSelectedProvider);
+        var credential = localControl ? null : _qSecrets.Get(Settings.QSelectedProvider);
         var customSystemPrompt = _qSnapshot.Mode == QMode.Say ? Settings.QSaySystemPrompt : Settings.QAskSystemPrompt;
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(Settings.QTimeoutSeconds));
         await _qSession.SubmitAsync(prompt, _qSnapshot.Mode, Settings.QSelectedProvider, Settings.QSelectedModel, credential, baseUrl,
@@ -1277,7 +1323,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             cancellationToken: timeout.Token,
             maxResponseTokens: Settings.QMaxResponseTokens,
             customSystemPrompt: customSystemPrompt,
-            reasoningEffort: Settings.QReasoningEffort).ConfigureAwait(false);
+            reasoningEffort: Settings.QReasoningEffort, contextPolicy: captureScreen ? QContextPolicy.Capture : QContextPolicy.None).ConfigureAwait(false);
     }
 
     public async Task<string?> DictateQAsync()
@@ -1312,7 +1358,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         CancelQActivation(); _qAutoCloseTimer.Stop(); _qComparison.Cancel(); _qSession.Cancel();
         if (capturing) { _qSnapshot = _qSnapshot with { State = QRunState.Cancelled, Status = "Capture stopped", Error = null }; RaiseQProperties(); }
     }
-    public void ClearQ() { CancelQActivation(); _qAutoCloseTimer.Stop(); _qComparison.Clear(); _qSession.Clear(); IsExpanded = false; }
+    public void ClearQ() { _voice?.Stop(); _qScreenSession = false; QUseScreenNext = false; CancelQActivation(); _qAutoCloseTimer.Stop(); _qComparison.Clear(); _qSession.Clear(); IsExpanded = false; }
     public void CopyQResponse() { if (!string.IsNullOrWhiteSpace(QResponse)) System.Windows.Clipboard.SetText(QResponse); }
 
     private async Task RefreshCodexModelsAsync(bool force = false)
@@ -1452,7 +1498,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     {
         _codexModels = snapshot.Models ?? _codexModels;
         NormalizeProviderReasoningEffort();
-        RaiseMany(nameof(QProviderOptions), nameof(QCodexIsConnected), nameof(QShowCodexSignOut), nameof(QCodexChipText), nameof(QCodexAccountDetails),
+        RaiseMany(nameof(QProviderOptions), nameof(QSelectedProvider), nameof(QSelectedProviderLabel), nameof(QCodexIsConnected), nameof(QShowCodexSignOut), nameof(QCodexChipText), nameof(QCodexAccountDetails),
             nameof(QModelOptions), nameof(QSelectedModel), nameof(QReasoningEffortOptions), nameof(QReasoningEffort));
     });
 
@@ -1471,16 +1517,18 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         if (snapshot != _qSession.Snapshot) return;
         _qSnapshot = snapshot;
         RaiseQProperties();
+        PumpNotifications();
     });
 
     private void RaiseQProperties()
     {
+        RaiseMany(nameof(QActionFeedback), nameof(QHasActionFeedback));
         RaiseComparisonProperties();
         RaisePropertyChanged(nameof(QCanChangeProvider));
         UpdateQAutoCloseTimer();
-        RaiseMany(nameof(QState), nameof(QCurrentMode), nameof(QStatusText), nameof(QHeaderStatusText), nameof(QResponse), nameof(QResponseDisplay), nameof(QPromptText), nameof(QPromptDisplay), nameof(QHasPrompt), nameof(QInlineStatusText), nameof(QShowInlineThinking), nameof(QCanStop), nameof(QCanCopyResponse), nameof(QCanRetry), nameof(QShowResponseActions), nameof(QError), nameof(QShortcuts), nameof(QHasShortcuts), nameof(QSelectedModel), nameof(QModelOptions), nameof(QReasoningEffort), nameof(QReasoningEffortOptions), nameof(QIsCodexSelected), nameof(QCodexIsConnected), nameof(QShowCodexSignOut), nameof(QCodexChipText), nameof(QCodexAccountDetails),
+        RaiseMany(nameof(QState), nameof(AssistantMascotState), nameof(QCurrentMode), nameof(QStatusText), nameof(QHeaderStatusText), nameof(QResponse), nameof(QResponseDisplay), nameof(QPromptText), nameof(QPromptDisplay), nameof(QHasPrompt), nameof(QInlineStatusText), nameof(QShowInlineThinking), nameof(QCanStop), nameof(QCanCopyResponse), nameof(QCanRetry), nameof(QShowResponseActions), nameof(QError), nameof(QShortcuts), nameof(QHasShortcuts), nameof(QSelectedModel), nameof(QModelOptions), nameof(QReasoningEffort), nameof(QReasoningEffortOptions), nameof(QIsCodexSelected), nameof(QCodexIsConnected), nameof(QShowCodexSignOut), nameof(QCodexChipText), nameof(QCodexAccountDetails),
         nameof(QSourceText), nameof(QCompactText), nameof(IsQActive), nameof(ShowQSurface), nameof(QIsAsk), nameof(QIsSay), nameof(QIsListening),
-        nameof(QNeedsConsent), nameof(QSpeechAvailable), nameof(QSelectedProvider), nameof(ShowCompactMediaContent), nameof(ShowCompactQContent), nameof(ShowCompactHolePunchQOutput), nameof(ShowCompactArtSurface), nameof(ShowCompactStatusContent),
+        nameof(QNeedsConsent), nameof(QSpeechAvailable), nameof(QSelectedProvider), nameof(QSelectedProviderLabel), nameof(ShowCompactMediaContent), nameof(ShowCompactQContent), nameof(ShowCompactHolePunchQOutput), nameof(ShowCompactArtSurface), nameof(ShowCompactStatusContent),
         nameof(PrimaryActivity), nameof(CompactGlyph), nameof(CompactPrimaryText), nameof(CompactSecondaryText), nameof(ShowCompactArt),
         nameof(ShowCompactMediaRing), nameof(ShowCompactTimerRing), nameof(ShowCompactRingTrack), nameof(ShowCompactEqualizer));
     }
@@ -1488,7 +1536,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private void UpdateQAutoCloseTimer()
     {
         _qAutoCloseTimer.Stop();
-        if (!Settings.QAutoCloseAfterResponse || QState != QRunState.Complete) return;
+        if (!Settings.QAutoCloseAfterResponse || VoiceBusy || QState != QRunState.Complete) return;
         _qAutoCloseTimer.Interval = TimeSpan.FromSeconds(Math.Clamp(Settings.QAutoCloseDelaySeconds, 1, 300));
         _qAutoCloseTimer.Start();
     }
@@ -1527,7 +1575,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     {
         _weather = value;
         RaiseMany(nameof(ShowWeather), nameof(WeatherGlyph), nameof(WeatherTempText), nameof(WeatherDescText),
-            nameof(WeatherCityText), nameof(ShowWidgetsPanel), nameof(LiveWidgetRailWidth));
+            nameof(WeatherCityText), nameof(ShowGraphiteWidgets), nameof(ShowGraphiteAccessories), nameof(ShowWidgetsPanel), nameof(LiveWidgetRailWidth));
     });
     private void OnSysStatsChanged(object? sender, SystemStats value) => OnUi(() =>
     {
@@ -1536,7 +1584,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         while (_netHistory.Count > SparkHistoryLength) _netHistory.Dequeue();
         _netSparkline = Sparkline(_netHistory, 46, 16);
         RaiseMany(nameof(ShowSystemMonitor), nameof(ShowCompactRam), nameof(CpuText), nameof(RamText), nameof(NetText),
-            nameof(RamPercentValue), nameof(NetSparkline), nameof(WifiConnected), nameof(WifiStatusText), nameof(WifiStatusBrush));
+            nameof(RamPercentValue), nameof(NetSparkline));
     });
     private void OnStocksChanged(object? sender, IReadOnlyList<StockQuote> value) => OnUi(() =>
     {
@@ -1544,13 +1592,13 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         _stockTiles = value
             .Select(q => new StockTile(q.Symbol, q.PriceText, q.ChangeText, q.Up, Sparkline(q.History, 34, 12)))
             .ToArray();
-        RaiseMany(nameof(ShowStocks), nameof(Stocks), nameof(ShowWidgetsPanel), nameof(LiveWidgetRailWidth));
+        RaiseMany(nameof(ShowStocks), nameof(Stocks), nameof(ShowGraphiteWidgets), nameof(ShowGraphiteAccessories), nameof(ShowWidgetsPanel), nameof(LiveWidgetRailWidth));
     });
     private void OnMeetingChanged(object? sender, MeetingInfo? value) => OnUi(() =>
     {
         _meeting = value;
         RaiseMany(nameof(ShowNextMeeting), nameof(MeetingTitle), nameof(MeetingWhen), nameof(HasMeetingJoin),
-            nameof(ShowWidgetsPanel), nameof(LiveWidgetRailWidth));
+            nameof(ShowGraphiteWidgets), nameof(ShowGraphiteAccessories), nameof(ShowWidgetsPanel), nameof(LiveWidgetRailWidth));
     });
     private void RefreshNotificationHistory()
     {
@@ -1603,7 +1651,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             nameof(PrivacyActivityText), nameof(PrivacyActivityGlyph), nameof(PrivacyIndicatorBrush), nameof(PrivacySeq),
             nameof(PrivacyCameraApps), nameof(PrivacyMicApps), nameof(PrivacySourceNames),
             nameof(PrivacySourceText), nameof(PrivacyDetailText), nameof(HasPrivacySource),
-            nameof(ShowStatusExtras), nameof(ShowWidgetsPanel));
+            nameof(ShowStatusExtras), nameof(ShowGraphiteWidgets), nameof(ShowGraphiteAccessories), nameof(ShowWidgetsPanel));
     });
 
     private void TriggerVolumeWarning(int volumePercent)
@@ -1628,14 +1676,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private void OnSpectrumChanged(object? sender, double[] bands) => OnUi(() =>
     {
         _spectrum = bands;
-        // Bar heights are intentionally not raised here. The visualizer timer consumes the new
-        // targets at display cadence through VisualizerMotion.
-        foreach (var name in new[]
-        {
-            nameof(SpectrumBand0), nameof(SpectrumBand1), nameof(SpectrumBand2), nameof(SpectrumBand3),
-            nameof(SpectrumBand4), nameof(SpectrumBand5), nameof(SpectrumBand6),
-            nameof(UseRealSpectrum), nameof(ShowAnimatedWave), nameof(ShowMusicVisualizer), nameof(ShowCompactEqualizer)
-        }) RaisePropertyChanged(name);
+        // The visualizer timer consumes the latest bands at display cadence.
     });
 
     private static string WithAlpha(string hex, byte alpha)
@@ -1650,9 +1691,11 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     // was needless CPU churn (which the system monitor then read back as inflated usage).
     private void OnClockTick(object? sender, DateTimeOffset value) => OnUi(() =>
     {
+        var dateChanged = _now.Date != value.Date || _now.Offset != value.Offset;
         _now = value;
+        if (dateChanged) RaiseMany(nameof(DateText), nameof(DateLongText), nameof(DateToolTip), nameof(CompactDateText));
         UpdateWorldClockValues();
-        RaiseMany(nameof(ClockText), nameof(ClockTimeText), nameof(ClockAmPm), nameof(DateText), nameof(DateLongText),
+        RaiseMany(nameof(ClockText), nameof(ClockTimeText), nameof(ClockAmPm),
             nameof(CompactPrimaryText), nameof(CompactSecondaryText),
             nameof(CountdownText), nameof(WorldClocks), nameof(MeetingWhen));
     });
@@ -1721,9 +1764,9 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private void RaiseBatteryProperties()
     {
         RaiseMany(nameof(BatteryText), nameof(ChargingText), nameof(BatteryGlyph),
-            nameof(ShowBattery), nameof(IsCharging), nameof(IsPowerConnected), nameof(ShowBatteryLevel),
+            nameof(ShowBattery), nameof(ShowCompactBattery), nameof(IsCharging), nameof(IsPowerConnected), nameof(ShowBatteryLevel),
             nameof(ShowCompactChargingIndicator), nameof(ShowCompactSecondary), nameof(ShowBatteryTime), nameof(BatteryTimeText),
-            nameof(ShowStatusExtras), nameof(ShowWidgetsPanel), nameof(LiveWidgetRailWidth), nameof(PrimaryActivity),
+            nameof(ShowStatusExtras), nameof(ShowGraphiteWidgets), nameof(ShowGraphiteAccessories), nameof(ShowWidgetsPanel), nameof(LiveWidgetRailWidth), nameof(PrimaryActivity),
             nameof(CompactGlyph), nameof(CompactPrimaryText), nameof(CompactSecondaryText),
             nameof(ShowCompactArt), nameof(ShowCompactMediaRing), nameof(ShowCompactRingTrack));
     }
@@ -1737,22 +1780,24 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     private void RaiseExpansionProperties()
     {
-        RaiseMany(nameof(IsCompact), nameof(ShowTimerOrb), nameof(ShowQuoteInCompact), nameof(ShowQuoteInExpanded));
+        RaiseMany(nameof(IslandBaseSurfaceBrush), nameof(IsCompact), nameof(ShowTimerOrb), nameof(ShowQuoteInCompact), nameof(ShowQuoteInExpanded));
     }
 
     public void SetFocusMode(bool enabled)
     {
+        if (!enabled && FocusSessionActive) EndFocusSession(restore: false);
         if (Settings.FocusModeEnabled == enabled) return;
         Settings.FocusModeEnabled = enabled;
         _ = PersistSettingsAsync();
         RaiseFocusModeProperties();
+        PumpNotifications();
     }
 
     private void RaiseFocusModeProperties()
     {
         RaiseMany(nameof(FocusModeEnabled), nameof(FocusModeText),
             nameof(ShowWeather), nameof(ShowSystemMonitor), nameof(ShowCountdown), nameof(ShowStocks), nameof(ShowWorldClocks),
-            nameof(ShowNextMeeting), nameof(ShowQuickLaunch), nameof(ShowBatteryTime), nameof(ShowWidgetsPanel),
+            nameof(ShowNextMeeting), nameof(ShowQuickLaunch), nameof(ShowBatteryTime), nameof(ShowGraphiteWidgets), nameof(ShowGraphiteAccessories), nameof(ShowWidgetsPanel),
             nameof(LiveWidgetRailWidth), nameof(ShowStatusExtras),
             nameof(ShowNotification), nameof(ShowBanner), nameof(IsAirPodsBannerActive),
             nameof(BannerApp), nameof(BannerTitle), nameof(BannerBody), nameof(ShowAirPods), nameof(ShowAirPodsCard));
@@ -1847,7 +1892,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         RaiseAudioProperties();
         RaiseBatteryProperties();
         RaiseFocusModeProperties();
-        RaiseMany(nameof(ShowClock), nameof(ShowDate), nameof(ShowTimerAlarm), nameof(DebugOverlay), nameof(IsReducedMotion),
+        RaiseMany(nameof(ShowClock), nameof(ShowDate), nameof(ShowCompactDate), nameof(ShowCompactBattery), nameof(DateToolTip), nameof(ShowClockOrDate), nameof(ShowTimerAlarm), nameof(DebugOverlay), nameof(IsReducedMotion),
             nameof(ShowCameraInUse), nameof(ShowMicInUse), nameof(ShowPrivacyInUse), nameof(PrivacyActivityText), nameof(PrivacyActivityGlyph),
             nameof(PrivacyIndicatorBrush), nameof(PrivacySourceText), nameof(PrivacyDetailText), nameof(HasPrivacySource),
             nameof(PrivacyCameraApps), nameof(PrivacyMicApps), nameof(PrivacySourceNames),
@@ -1861,7 +1906,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             nameof(ShowBatteryTime), nameof(BatteryTimeText), nameof(ShowQuickLaunch), nameof(LaunchItems),
             nameof(ShowNotification), nameof(ShowBanner), nameof(IsAirPodsBannerActive),
             nameof(BannerApp), nameof(BannerTitle), nameof(BannerBody),
-            nameof(ShowClipboard), nameof(ShowWidgetsPanel), nameof(LiveWidgetRailWidth), nameof(ShowStatusExtras),
+            nameof(ShowClipboard), nameof(ShowGraphiteWidgets), nameof(ShowGraphiteAccessories), nameof(ShowWidgetsPanel), nameof(LiveWidgetRailWidth), nameof(ShowStatusExtras),
             nameof(UseRealSpectrum), nameof(ShowAnimatedWave), nameof(ShowMusicVisualizer), nameof(ShowCompactEqualizer), nameof(ShowConnectivity), nameof(PinExpanded), nameof(ScrollTitles));
         RaiseLiveWidgetLayoutProperties();
         RaiseMediaCommandsCanExecute();
@@ -1886,7 +1931,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     {
         UpdateCachedSettings();
         RaiseMany(nameof(ShowQuickLaunch), nameof(LaunchItems), nameof(ShowWorldClocks), nameof(WorldClocks),
-            nameof(ShowWidgetsPanel), nameof(LiveWidgetRailWidth));
+            nameof(ShowGraphiteWidgets), nameof(ShowGraphiteAccessories), nameof(ShowWidgetsPanel), nameof(LiveWidgetRailWidth));
         RaiseLiveWidgetLayoutProperties();
 
     }
@@ -2041,6 +2086,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         _mediaService.Changed -= OnMediaChanged;
         _audioService.Changed -= OnAudioChanged;
         _weatherService.Changed -= OnWeatherChanged;
@@ -2061,11 +2107,14 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         _connectivityTimer.Stop();
         _qAutoCloseTimer.Stop();
         _timerUiTimer.Stop();
+        _focusSessionTimer.Stop();
         _batteryService.Changed -= OnBatteryChanged;
         _clockService.Tick -= OnClockTick;
         _timerAlarmService.Changed -= OnTimerAlarmChanged;
         _themeService.SystemThemeChanged -= OnSystemThemeChanged;
         _qSession.Changed -= OnQChanged;
+        _lockFeedbackTimer.Stop();
+        if (_voice is not null) _voice.Changed -= OnVoiceChanged;
         CancelQActivation();
         _qComparison.Changed -= OnQComparisonChanged;
         _qComparison.Dispose();

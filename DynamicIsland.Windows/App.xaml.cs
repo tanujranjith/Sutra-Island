@@ -48,23 +48,28 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     private bool _isShuttingDown;
     private ScreenContextService? _qScreen;
     private SpeechInputService? _qSpeech;
+    private AssistantVoiceController? _voice;
+    private KeyboardLockService? _keyboardLocks;
+    private readonly System.Diagnostics.Stopwatch _startupWatch = System.Diagnostics.Stopwatch.StartNew();
     private DpapiSecretStore? _qSecrets;
     private CodexAppServerClient? _codexClient;
     private CodexAccountCoordinator? _codexAccount;
     private IQSessionController? _qSession;
     private CommandPaletteWindow? _paletteWindow;
     private CommandRunner? _paletteRunner;
+    private CommandPaletteViewModel? _paletteViewModel;
     private int _paletteHotkeyId;
     private string _registeredPaletteHotkey = "";
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        if (e.Args.Contains("--verify-upgrades") || e.Args.Contains("--verify-q-providers") || e.Args.Contains("--verify-q-compare") || e.Args.Contains("--verify-notification-click"))
+        Infrastructure.GraphiteMenuSupport.Initialize();
+        if (e.Args.Contains("--verify-notification-motion") || e.Args.Contains("--verify-graphite") || e.Args.Contains("--verify-mascot-bulb") || e.Args.Contains("--verify-composer-keys") || e.Args.Contains("--verify-command-panels") || e.Args.Contains("--verify-sutra-update") || e.Args.Contains("--verify-upgrades") || e.Args.Contains("--verify-q-providers") || e.Args.Contains("--verify-q-compare") || e.Args.Contains("--verify-notification-click"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             if (!Infrastructure.AppDataPaths.IsPreview) { Shutdown(2); return; }
-            try { await Infrastructure.UpgradeVerification.RunAsync(e.Args.Contains("--verify-q-providers"), e.Args.Contains("--verify-q-compare"), e.Args.Contains("--verify-notification-click")); Shutdown(0); }
+            try { if (e.Args.Contains("--verify-notification-motion")) await Infrastructure.UpgradeVerification.RunSutraAsync(notificationMotionOnly: true); else if (e.Args.Contains("--verify-graphite")) await Infrastructure.UpgradeVerification.RunSutraAsync(graphiteOnly: true); else if (e.Args.Contains("--verify-mascot-bulb")) await Infrastructure.UpgradeVerification.RunSutraAsync(mascotOnly: true); else if (e.Args.Contains("--verify-composer-keys")) await Infrastructure.UpgradeVerification.RunSutraAsync(composerOnly: true); else if (e.Args.Contains("--verify-command-panels")) await Infrastructure.UpgradeVerification.RunSutraAsync(commandPanelsOnly: true); else if (e.Args.Contains("--verify-sutra-update")) await Infrastructure.UpgradeVerification.RunSutraAsync(); else await Infrastructure.UpgradeVerification.RunAsync(e.Args.Contains("--verify-q-providers"), e.Args.Contains("--verify-q-compare"), e.Args.Contains("--verify-notification-click")); Shutdown(0); }
             catch (Exception ex) { Directory.CreateDirectory(Infrastructure.AppDataPaths.Root); File.WriteAllText(Path.Combine(Infrastructure.AppDataPaths.Root, "verification-error.txt"), ex.ToString()); Shutdown(1); }
             return;
         }
@@ -116,7 +121,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             () =>
             {
                 if (_islandViewModel is not null && _qScreen is not null)
-                    _ = _islandViewModel.StartQAsync(_qScreen.LastForegroundTarget);
+                    _ = _islandViewModel.StartChatAsync();
             },
             Recenter, SaveAndApplyAsync, ShutdownApplication, ToggleFocus,
             () => _settings?.FocusModeEnabled ?? false);
@@ -171,6 +176,10 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             _weather, _sysMon, _spectrum, _stocks, _calendar, _notifications, _privacy, _notificationHistory,
             _qSession, _qScreen, _qSpeech, _qSecrets, _codexAccount, _airPods, _settingsService, providers);
         _islandViewModel.AttachClipboard(_clipboard);
+        _voice = new AssistantVoiceController(_qSpeech, _qSpeech, _qSpeech, _islandViewModel.SubmitVoiceTurnAsync, CancelAssistantResponse);
+        _islandViewModel.AttachVoice(_voice);
+        _keyboardLocks = new KeyboardLockService(Dispatcher, _log);
+        _keyboardLocks.Changed += _islandViewModel.ShowKeyboardLock;
         _timerViewModel = new TimerAlarmViewModel(_timerAlarm, _settings.Use24HourClock);
         _islandWindow = new IslandWindow(_islandViewModel, _timerViewModel, _position, _settingsService, _log, _qScreen);
         _islandWindow.OpenSettingsRequested += (_, _) => ShowSettings();
@@ -188,9 +197,14 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _timerAlarm.EventRaised += (_, args) => Dispatcher.BeginInvoke(() =>
             _tray.ShowNotification(args.Title, args.Message));
 
+        _islandWindow.ContentRendered += (_, _) => _log.Debug($"Island first render: startupMs={_startupWatch.Elapsed.TotalMilliseconds:0}.");
         _islandWindow.Show();
+        if (!Infrastructure.AppDataPaths.IsPreview) _keyboardLocks.Start();
+        _notifications.Configure(TimeSpan.FromSeconds(_settings.NotificationPollSeconds));
+        if (_settings.ShowNotifications) _ = _notifications.StartAsync();
+        _ = _islandViewModel.ConfigureVoiceAsync();
         if (showIslandFromCommandLine) Recenter();
-        if (!Infrastructure.AppDataPaths.IsPreview) _ = _codexAccount.RefreshAsync();
+        // Provider discovery starts on demand when the assistant is opened.
         _hotkeys = new GlobalHotkeyService(_log);
         _hotkeys.Attach(_islandWindow);
         _hotkeys.Register("Expand/collapse", Interop.NativeMethods.HotkeyModifierControl | Interop.NativeMethods.HotkeyModifierAlt, 0x20,
@@ -204,7 +218,12 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _hotkeys.Register("Open settings", Interop.NativeMethods.HotkeyModifierControl | Interop.NativeMethods.HotkeyModifierAlt, (uint)'S',
             ShowSettings);
         RegisterQHotkey();
-        RegisterCommandPaletteHotkey();
+        _ = Dispatcher.BeginInvoke(async () =>
+        {
+            PrepareCommandPalette();
+            await _paletteWindow!.PrimePresentationAsync();
+            RegisterCommandPaletteHotkey();
+        }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         _clock.Start();
         _battery.Start();
         _audio.Start();
@@ -245,6 +264,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         }
         _settingsWindow.Show();
         _settingsViewModel.RefreshQProviderControls();
+        _settingsViewModel.RefreshRuntimePreferences();
         _settingsViewModel.RefreshPositionControls();
         _settingsWindow.Activate();
         FadeIn(_settingsWindow);
@@ -281,6 +301,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         RegisterCommandPaletteHotkeyIfChanged();
         ApplyGlobalTheme();
         _islandViewModel?.ApplySettings();
+        if (_islandViewModel is not null) _ = _islandViewModel.ConfigureVoiceAsync();
         _islandWindow?.ApplySettings();
         ApplyLiveActivitySettings();
         _tray?.SyncChecks();
@@ -299,6 +320,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
 
     private void RegisterCommandPaletteHotkey()
     {
+        if (_paletteWindow?.IsPresentationReady != true) return;
         if (_hotkeys is null || _settings is null || _settingsViewModel is null) return;
         if (_paletteHotkeyId != 0)
         {
@@ -340,40 +362,59 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
 
     private void ToggleCommandPalette()
     {
-        if (_paletteWindow is { IsVisible: true })
+        if (_paletteWindow is { IsVisible: true, IsPriming: false, IsDismissing: false })
         {
-            _paletteWindow.Close();
+            _paletteWindow.Dismiss();
             return;
         }
-        OpenCommandPalette();
+        _ = OpenCommandPaletteAsync();
     }
 
-    private void OpenCommandPalette()
+    private void PrepareCommandPalette()
+    {
+        if (_paletteWindow is not null || _islandViewModel is null || _timerViewModel is null || _media is null || _audio is null || _timerAlarm is null) return;
+        _paletteRunner ??= new CommandRunner(_islandViewModel, _media, _audio, _timerAlarm, _timerViewModel, this, clipboard: _clipboard);
+        _islandViewModel.AttachAssistantControls(new AssistantIslandControls(_paletteRunner, async () =>
+        {
+            if (_startupService is not null && _settings is not null && _startupService.IsEnabled() != _settings.LaunchOnStartup)
+            { _startupService.SetEnabled(_settings.LaunchOnStartup); _settings.LaunchOnStartup = _startupService.IsEnabled(); }
+            await SaveAndApplyAsync();
+            _settingsViewModel?.RefreshRuntimePreferences();
+        }));
+        _paletteViewModel ??= new CommandPaletteViewModel(_paletteRunner, _settings, () => _settingsService!.SaveAsync(_settings!));
+        _paletteWindow = new CommandPaletteWindow(_paletteViewModel, () => _settings?.ShowIslandInScreenshots ?? false);
+        new System.Windows.Interop.WindowInteropHelper(_paletteWindow).EnsureHandle();
+        _paletteWindow.Measure(new System.Windows.Size(_paletteWindow.Width, double.PositiveInfinity));
+        _paletteWindow.WarmLayout();
+        _paletteWindow.StartPresentationMaintenance();
+    }
+    private async Task OpenCommandPaletteAsync(string? initialQuery = null)
     {
         if (_islandWindow is null || _islandViewModel is null || _timerViewModel is null ||
             _media is null || _audio is null || _timerAlarm is null) return;
-        _paletteWindow?.Close();
-        _paletteRunner ??= new CommandRunner(_islandViewModel, _media, _audio, _timerAlarm, _timerViewModel, this);
-        var viewModel = new CommandPaletteViewModel(_paletteRunner);
-        var window = new CommandPaletteWindow(viewModel, () => _settings?.ShowIslandInScreenshots ?? false);
-        const double paletteWidth = 560;
-        var left = _islandWindow.Left + _islandWindow.Width / 2 - paletteWidth / 2;
-        var shellBottom = _islandWindow.ShellBottomDips;
-        var top = _islandWindow.Top + (shellBottom > 0 ? shellBottom : 70) + 10;
-        var area = SystemParameters.WorkArea;
-        left = Math.Max(area.Left + 8, Math.Min(left, area.Right - paletteWidth - 8));
-        top = Math.Max(area.Top + 8, Math.Min(top, area.Bottom - 96));
-        window.Left = left;
-        window.Top = top;
-        window.Closed += (_, _) =>
-        {
-            if (ReferenceEquals(_paletteWindow, window)) _paletteWindow = null;
-        };
-        _paletteWindow = window;
-        window.Show();
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        PrepareCommandPalette();
+        var window = _paletteWindow!;
+        await window.PrimePresentationAsync();
+        window.PrepareForShow();
+        window.PresentFromIsland(_islandWindow.PaletteAnchorBounds, _islandWindow.PaletteWorkArea, _islandViewModel.IsReducedMotion);
         window.Activate();
+        window.FocusQuery();
+        if (initialQuery is not null) { _paletteViewModel!.Query = initialQuery; await _paletteViewModel.ExecuteAsync(); }
+        _ = Dispatcher.BeginInvoke(() => _log?.Debug($"Palette presented: elapsedMs={watch.Elapsed.TotalMilliseconds:0}."), System.Windows.Threading.DispatcherPriority.Render);
     }
 
+    private void CancelAssistantResponse()
+    { if (Dispatcher.CheckAccess()) _islandViewModel?.CancelQ(); else Dispatcher.BeginInvoke(() => _islandViewModel?.CancelQ()); }
+    void ICommandPaletteHost.OpenChat(string? question, bool useScreen) => Dispatcher.BeginInvoke(async () =>
+    { await _islandViewModel!.StartChatAsync(question, useScreen); _islandWindow?.FocusAssistantComposer(); });
+    void ICommandPaletteHost.ShowSettingsSearch(string query) => Dispatcher.BeginInvoke(() => { ShowSettings(); _settingsWindow?.OpenSearch(query); });
+    void ICommandPaletteHost.RecenterIsland() => Recenter();
+    Task ICommandPaletteHost.OpenClipboardAsync() => ShowClipboardAsync();
+    Task ICommandPaletteHost.OpenCommandPanelAsync(string command) => OpenCommandPaletteAsync(command);
+    void ICommandPaletteHost.ShowNotificationHistory() => Dispatcher.BeginInvoke(() => _islandWindow?.ShowHistory());
+    async Task ICommandPaletteHost.SetNotificationsAsync(bool enabled)
+    { _settings!.ShowNotifications = enabled; await SaveAndApplyAsync(); }
     void ICommandPaletteHost.ShowSettings() => Dispatcher.BeginInvoke(ShowSettings);
 
     void ICommandPaletteHost.ShowTimerPanel() => Dispatcher.BeginInvoke(() =>
@@ -398,18 +439,14 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _islandWindow.FocusTimerPanel();
     });
 
-    void ICommandPaletteHost.OpenQ(string? question, QMode mode, bool compare) => Dispatcher.BeginInvoke(() =>
+    void ICommandPaletteHost.OpenQ(string? question, QMode mode, bool compare) => Dispatcher.BeginInvoke(async () =>
     {
-        if (_islandViewModel is null || _islandWindow is null || _qScreen is null) return;
-        if (compare) _islandViewModel.QCompareEnabled = true;
-        else _islandViewModel.QCompareEnabled = false;
-        // StartQAsync runs its synchronous prefix (which resets the snapshot to Ask) before
-        // the first await, so switching to Say and prefilling after the call is safe.
-        var submitQuestion = mode == QMode.Ask && !compare && !string.IsNullOrWhiteSpace(question);
-        _ = _islandViewModel.StartQAsync(_qScreen.LastForegroundTarget,
-            initialPrompt: submitQuestion ? question : null);
-        if (mode == QMode.Say) _islandViewModel.SetQMode(QMode.Say);
-        if (question is not null) _islandWindow.PrefillQPrompt(submitQuestion ? string.Empty : question);
+        if (_islandViewModel is null || _islandWindow is null) return;
+        await _islandViewModel.StartChatAsync();
+        _islandViewModel.SetQMode(mode);
+        _islandViewModel.QCompareEnabled = compare;
+        if (question is not null) _islandWindow.PrefillQPrompt(question);
+        else _islandWindow.FocusAssistantComposer();
     });
 
     private void RegisterQHotkey()
@@ -427,13 +464,29 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     private void ApplyLiveActivitySettings()
     {
         if (_settings is null) return;
+        _media?.ConfigurePolling(_settings.MediaPollMilliseconds);
+        _audio?.ConfigurePolling(_settings.AudioPollMilliseconds);
+        _sysMon?.ConfigurePolling(_settings.SystemMonitorPollMilliseconds);
+        _timerAlarm?.ConfigurePolling(_settings.TimerPollMilliseconds);
+        _clock?.ConfigurePolling(_settings.ClockPollSeconds);
         _weather?.Configure(_settings.WeatherLocation, _settings.WeatherFahrenheit);
+        _weather?.ConfigurePolling(TimeSpan.FromMinutes(_settings.WeatherPollMinutes));
         _stocks?.Configure(_settings.StockSymbols);
-        if (_battery is not null) { _battery.LowThreshold = _settings.LowBatteryThreshold; _battery.WarningsEnabled = _settings.LowBatteryWarning; }
+        _stocks?.ConfigurePolling(TimeSpan.FromMinutes(_settings.StocksPollMinutes));
+        if (_battery is not null)
+        {
+            _battery.LowThreshold = _settings.LowBatteryThreshold;
+            _battery.WarningsEnabled = _settings.LowBatteryWarning;
+            _battery.ConfigurePolling(TimeSpan.FromSeconds(_settings.BatteryPollSeconds));
+        }
+        _privacy?.ConfigurePolling(TimeSpan.FromSeconds(_settings.PrivacyPollSeconds));
+        _theme?.ConfigurePolling(TimeSpan.FromSeconds(_settings.ThemePollSeconds));
+        _airPods?.ConfigurePolling(TimeSpan.FromSeconds(_settings.AirPodsPollSeconds));
         if (_settings.ShowSystemMonitor || _settings.ShowRamInCompact) _sysMon?.Start();
         else _sysMon?.Stop();
         if (_settings.RealAudioSpectrum) _spectrum?.Start();
         else _spectrum?.Stop();
+        _calendar?.ConfigurePolling(TimeSpan.FromMinutes(_settings.CalendarPollMinutes));
         if (_settings.ShowNextMeeting) _ = _calendar!.StartAsync(_liveSettingsApplied); else _calendar!.Stop();
         _notifications?.Configure(TimeSpan.FromSeconds(_settings.NotificationPollSeconds));
         if (_settings.ShowNotifications) _ = _notifications!.StartAsync(_liveSettingsApplied); else _notifications!.Stop();
@@ -441,71 +494,8 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _liveSettingsApplied = true;
     }
 
-    // Clipboard history flyout: list of recent text items; click to copy back.
-    private async Task ShowClipboardAsync()
-    {
-        if (_clipboard is null || _islandWindow is null) return;
-        var items = await _clipboard.GetRecentTextAsync(8);
-        var panel = new System.Windows.Controls.StackPanel();
-        Window? win = null;
-        if (items.Count == 0)
-        {
-            panel.Children.Add(new System.Windows.Controls.TextBlock
-            {
-                Text = _clipboard.Status.Message,
-                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x9A, 0xA8, 0xBB)),
-                FontSize = 12, Margin = new Thickness(12), TextWrapping = TextWrapping.Wrap, MaxWidth = 300
-            });
-        }
-        else
-        {
-            foreach (var item in items)
-            {
-                var captured = item;
-                var oneLine = item.Replace("\r", " ").Replace("\n", " ");
-                if (oneLine.Length > 70) oneLine = oneLine[..70] + "…";
-                var btn = new System.Windows.Controls.Button
-                {
-                    Content = oneLine, HorizontalContentAlignment = System.Windows.HorizontalAlignment.Left,
-                    Padding = new Thickness(11, 8, 11, 8), Margin = new Thickness(4, 2, 4, 2),
-                    Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x24, 0x2D, 0x3A)),
-                    Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xF1, 0xF5, 0xFB)),
-                    BorderThickness = new Thickness(0), Cursor = System.Windows.Input.Cursors.Hand,
-                    HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch, MaxWidth = 360
-                };
-                btn.Click += (_, _) => { _clipboard!.CopyText(captured); win?.Close(); };
-                panel.Children.Add(btn);
-            }
-        }
-
-        if (items.Count == 0)
-        {
-            var retry = new System.Windows.Controls.Button { Content = "Retry", Margin = new Thickness(8), Padding = new Thickness(8) };
-            retry.Click += async (_, _) => { win?.Close(); await ShowClipboardAsync(); }; panel.Children.Add(retry);
-            if (_clipboard.Status.SettingsUri is string uri)
-            {
-                var setup = new System.Windows.Controls.Button { Content = "Open Windows Settings", Margin = new Thickness(8), Padding = new Thickness(8) };
-                setup.Click += (_, _) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri) { UseShellExecute = true }); panel.Children.Add(setup);
-            }
-        }
-        var card = new System.Windows.Controls.Border
-        {
-            Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1B, 0x22, 0x2D)),
-            BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF)),
-            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Padding = new Thickness(6),
-            Child = panel
-        };
-        win = new Window
-        {
-            WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize, AllowsTransparency = true,
-            Background = System.Windows.Media.Brushes.Transparent, SizeToContent = SizeToContent.WidthAndHeight,
-            Topmost = true, ShowInTaskbar = false, Content = card,
-            Left = _islandWindow.Left + _islandWindow.Width / 2 - 200, Top = _islandWindow.Top + 70
-        };
-        win.Deactivated += (_, _) => win.Close();
-        win.Show();
-        win.Activate();
-    }
+    // Use the same image-aware history from the island menu and command palette.
+    private Task ShowClipboardAsync() => OpenCommandPaletteAsync("clipboard");
 
     // Pin the island open while any settings window is visible so live size/appearance edits are visible.
     private void UpdateKeepExpanded()
@@ -557,6 +547,8 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _timerViewModel?.Dispose();
         _settingsWindow?.Close();
         _islandViewModel?.Dispose();
+        _voice?.Dispose();
+        _keyboardLocks?.Dispose();
         _qSession?.Dispose();
         _codexClient?.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _qSpeech?.Dispose();
@@ -566,6 +558,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _stocks?.Dispose();
         _calendar?.Dispose();
         _notifications?.Dispose();
+        _notificationHistory?.FlushAsync().GetAwaiter().GetResult();
         _qShortcuts?.Dispose();
         _hotkeys?.Dispose();
         _showSettingsSignal?.Set();

@@ -20,6 +20,12 @@ public sealed class BatteryService : IDisposable
     public int LowThreshold { get; set; } = 15;
     public bool WarningsEnabled { get; set; } = true;
 
+    public void ConfigurePolling(TimeSpan interval)
+    {
+        var normalized = TimeSpan.FromSeconds(Math.Clamp(interval.TotalSeconds, 1, 60));
+        if (_timer.Interval != normalized) _timer.Interval = normalized;
+    }
+
     public BatteryService() => _timer.Tick += (_, _) => Refresh();
 
     public void Start()

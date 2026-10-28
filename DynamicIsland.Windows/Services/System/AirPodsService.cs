@@ -46,6 +46,7 @@ public sealed class AirPodsService : IDisposable
     private System.Threading.Timer? _rightTimer;
     private System.Threading.Timer? _pairedPollTimer;
     private System.Threading.Timer? _retryTimer;
+    private TimeSpan _pairedPollInterval = TimeSpan.FromSeconds(15);
 
     public AirPodsState Current
     {
@@ -53,6 +54,17 @@ public sealed class AirPodsService : IDisposable
     }
 
     public event EventHandler<AirPodsState>? Changed;
+
+    public void ConfigurePolling(TimeSpan interval)
+    {
+        var normalized = TimeSpan.FromSeconds(Math.Clamp(interval.TotalSeconds, 1, 120));
+        lock (_gate)
+        {
+            if (_pairedPollInterval == normalized) return;
+            _pairedPollInterval = normalized;
+        }
+        try { _pairedPollTimer?.Change(TimeSpan.Zero, normalized); } catch (ObjectDisposedException) { }
+    }
 
     public AirPodsService(LoggingService log)
     {
@@ -71,7 +83,9 @@ public sealed class AirPodsService : IDisposable
         _lostTimer = new System.Threading.Timer(_ => OnLost(), null, Timeout.Infinite, Timeout.Infinite);
         _leftTimer = new System.Threading.Timer(_ => OnSideReset(AirPodsSide.Left), null, Timeout.Infinite, Timeout.Infinite);
         _rightTimer = new System.Threading.Timer(_ => OnSideReset(AirPodsSide.Right), null, Timeout.Infinite, Timeout.Infinite);
-        _pairedPollTimer = new System.Threading.Timer(_ => _ = RefreshPairedAsync(), null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
+        TimeSpan pairedPollInterval;
+        lock (_gate) pairedPollInterval = _pairedPollInterval;
+        _pairedPollTimer = new System.Threading.Timer(_ => _ = RefreshPairedAsync(), null, TimeSpan.Zero, pairedPollInterval);
         _retryTimer = new System.Threading.Timer(_ => TryRestartWatcher(), null, Timeout.Infinite, Timeout.Infinite);
 
         TryStartWatcher();

@@ -10,6 +10,7 @@ namespace DynamicIsland.Windows.Views;
 
 public partial class SettingsWindow : Window
 {
+    private void GraphiteHeader_Drag(object sender, MouseButtonEventArgs e) { if (e.LeftButton == MouseButtonState.Pressed) DragMove(); }
     private readonly IslandViewModel _islandViewModel;
     private readonly IslandWindow _islandWindow;
     private bool _previewExpanded;
@@ -20,6 +21,8 @@ public partial class SettingsWindow : Window
     public SettingsWindow(SettingsViewModel settingsViewModel, IslandViewModel islandViewModel, IslandWindow islandWindow)
     {
         InitializeComponent();
+        Infrastructure.NativeFrostBackdrop.Attach(this,()=> (GraphiteSettingsShell,new Rect(GraphiteSettingsShell.RenderSize),25), (active,inset) => { var tint=new SolidColorBrush(System.Windows.Media.Color.FromArgb(active?(byte)225:(byte)255,23,24,29)); GraphiteSettingsShell.Background=active?Infrastructure.FrostedMaterial.WithOpaqueCaps(tint,inset):tint; },()=>true);
+        SizeChanged += (_, _) => GraphiteSettingsShell.Clip = new RectangleGeometry(new Rect(0, 0, GraphiteSettingsShell.ActualWidth, GraphiteSettingsShell.ActualHeight), 25, 25);
         _islandViewModel = islandViewModel;
         _islandWindow = islandWindow;
         ExpandedPreviewSurface.Fill = new VisualBrush(_islandWindow.ExpandedPreviewVisual)
@@ -44,7 +47,7 @@ public partial class SettingsWindow : Window
     {
         _previewPaneCollapsed = !_previewPaneCollapsed;
         PreviewPane.Visibility = _previewPaneCollapsed ? Visibility.Collapsed : Visibility.Visible;
-        PreviewColumn.Width = _previewPaneCollapsed ? new GridLength(0) : new GridLength(306);
+        PreviewColumn.Width = _previewPaneCollapsed ? new GridLength(0) : new GridLength(307);
         ShowPreviewButton.Visibility = _previewPaneCollapsed ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -63,10 +66,10 @@ public partial class SettingsWindow : Window
         if (_previewExpanded == expanded && animate) return;
         _previewExpanded = expanded;
 
-        CompactPreviewButton.Background = expanded ? System.Windows.Media.Brushes.Transparent : BrushFrom("#39414D");
-        ExpandedPreviewButton.Background = expanded ? BrushFrom("#39414D") : System.Windows.Media.Brushes.Transparent;
-        CompactPreviewButton.Foreground = expanded ? BrushFrom("#A7AFBA") : System.Windows.Media.Brushes.White;
-        ExpandedPreviewButton.Foreground = expanded ? System.Windows.Media.Brushes.White : BrushFrom("#A7AFBA");
+        CompactPreviewButton.Background = expanded ? System.Windows.Media.Brushes.Transparent : BrushFrom("#362F42");
+        ExpandedPreviewButton.Background = expanded ? BrushFrom("#362F42") : System.Windows.Media.Brushes.Transparent;
+        CompactPreviewButton.Foreground = expanded ? BrushFrom("#9998A4") : System.Windows.Media.Brushes.White;
+        ExpandedPreviewButton.Foreground = expanded ? System.Windows.Media.Brushes.White : BrushFrom("#9998A4");
 
         if (!animate)
         {
@@ -213,6 +216,45 @@ public partial class SettingsWindow : Window
         QApiKeyBox.Clear();
     }
 
+    public void OpenSearch(string query)
+    {
+        var entry = Infrastructure.CommandPalette.SettingsSearchIndex.All.FirstOrDefault(x => x.Property.Equals(query, StringComparison.OrdinalIgnoreCase))
+            ?? Infrastructure.CommandPalette.SettingsSearchIndex.Search(query).FirstOrDefault();
+        var property = entry?.Property ?? query;
+        var pages = new (FrameworkElement Page, string Key)[] { (ContentPage, "content"), (AppearancePage, "appearance"), (PositionPage, "position"), (ActivitiesPage, "activities"), (PollingPage, "polling"), (QPage, "q"), (ShortcutsPage, "shortcuts"), (AdvancedPage, "advanced") };
+        foreach (var (page, key) in pages)
+        {
+            foreach (var control in LogicalDescendants(page).OfType<FrameworkElement>())
+            {
+                var properties = new[] { System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty, System.Windows.Controls.Primitives.Selector.SelectedItemProperty, System.Windows.Controls.Primitives.Selector.SelectedValueProperty, System.Windows.Controls.TextBox.TextProperty, System.Windows.Controls.Primitives.RangeBase.ValueProperty };
+                if (!properties.Any(dp => System.Windows.Data.BindingOperations.GetBindingExpression(control, dp)?.ParentBinding.Path?.Path == property)) continue;
+                SettingsSearchBox.Text = "";
+                if (DataContext is SettingsViewModel settings) settings.SelectedSectionKey = key;
+                ShowSection(key);
+                Dispatcher.BeginInvoke(() =>
+                {
+                    control.BringIntoView(); control.Focus();
+                    var border = LogicalAncestors(control).OfType<Border>().FirstOrDefault();
+                    if (border is null) return;
+                    var saved = border.BorderBrush; var thickness = border.BorderThickness;
+                    border.BorderBrush = System.Windows.Media.Brushes.DodgerBlue; border.BorderThickness = new Thickness(2);
+                    var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+                    timer.Tick += (_, _) => { timer.Stop(); border.BorderBrush = saved; border.BorderThickness = thickness; };
+                    timer.Start();
+                }, System.Windows.Threading.DispatcherPriority.Loaded);
+                return;
+            }
+        }
+        SettingsSearchBox.Text = entry?.Name ?? query;
+        SettingsSearchBox.Focus();
+    }
+    private static IEnumerable<DependencyObject> LogicalDescendants(DependencyObject root)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+        { yield return child; foreach (var nested in LogicalDescendants(child)) yield return nested; }
+    }
+    private static IEnumerable<DependencyObject> LogicalAncestors(DependencyObject child)
+    { for (var parent = LogicalTreeHelper.GetParent(child); parent is not null; parent = LogicalTreeHelper.GetParent(parent)) yield return parent; }
     public void OpenQSettings()
     {
         if (DataContext is SettingsViewModel settings) settings.SelectedSectionKey = "q";
@@ -259,14 +301,15 @@ public partial class SettingsWindow : Window
         ContentTab.Visibility = Matches(ContentTab, "island", "content", "media", "album", "volume", "audio", "battery", "clock", "date", "timer", "equalizer", "ram") ? Visibility.Visible : Visibility.Collapsed;
         AppearanceTab.Visibility = Matches(AppearanceTab, "island", "appearance", "theme", "color", "colour", "accent", "animation", "font", "scale", "art") ? Visibility.Visible : Visibility.Collapsed;
         PositionTab.Visibility = Matches(PositionTab, "island", "position", "monitor", "offset", "display", "placement", "screen") ? Visibility.Visible : Visibility.Collapsed;
-        ActivitiesTab.Visibility = Matches(ActivitiesTab, "widgets", "connections", "activities", "weather", "notifications", "notification", "integrations", "network", "wifi", "bluetooth", "stocks", "calendar", "meeting", "clipboard", "privacy", "countdown") ? Visibility.Visible : Visibility.Collapsed;
-        QTab.Visibility = Matches(QTab, "q", "assistant", "provider", "model", "api", "prompt", "response", "tokens", "screen") ? Visibility.Visible : Visibility.Collapsed;
+        ActivitiesTab.Visibility = Matches(ActivitiesTab, "widgets", "connections", "activities", "weather", "notifications", "notification", "integrations", "network", "wifi", "bluetooth", "stocks", "calendar", "meeting", "clipboard", "privacy", "countdown", "caps", "num", "lock") ? Visibility.Visible : Visibility.Collapsed;
+        PollingTab.Visibility = Matches(PollingTab, "polling", "rate", "refresh", "interval", "frequency", "cadence", "window", "screen", "wifi", "wireless", "connectivity", "clock", "date", "media", "playback", "audio", "timer", "battery", "system monitor", "privacy", "theme", "airpods", "notifications", "calendar", "stocks", "weather") ? Visibility.Visible : Visibility.Collapsed;
+        QTab.Visibility = Matches(QTab, "q", "assistant", "provider", "model", "api", "prompt", "response", "tokens", "screen", "voice", "speech", "wake", "hey sutra") ? Visibility.Visible : Visibility.Collapsed;
         ShortcutsTab.Visibility = Matches(ShortcutsTab, "shortcuts", "behavior", "command palette", "startup", "hotkey", "hover", "click-through", "always on top", "expand") ? Visibility.Visible : Visibility.Collapsed;
         AdvancedTab.Visibility = Matches(AdvancedTab, "advanced", "developer", "backup", "profiles", "warnings", "debug", "import", "export", "reset", "volume warning", "battery warning") ? Visibility.Visible : Visibility.Collapsed;
 
         var showIslandGroup = query.Length == 0 || "island content appearance position".Contains(query, StringComparison.OrdinalIgnoreCase);
         IslandNavLabel.Visibility = showIslandGroup ? Visibility.Visible : Visibility.Collapsed;
-        SettingsSearchEmpty.Visibility = new System.Windows.Controls.Primitives.ToggleButton[] { OverviewTab, ContentTab, AppearanceTab, PositionTab, ActivitiesTab, QTab, ShortcutsTab, AdvancedTab }
+        SettingsSearchEmpty.Visibility = new System.Windows.Controls.Primitives.ToggleButton[] { OverviewTab, ContentTab, AppearanceTab, PositionTab, ActivitiesTab, PollingTab, QTab, ShortcutsTab, AdvancedTab }
             .Any(item => item.Visibility == Visibility.Visible) ? Visibility.Collapsed : Visibility.Visible;
     }
 
@@ -277,6 +320,7 @@ public partial class SettingsWindow : Window
         AppearancePage.Visibility = key == "appearance" ? Visibility.Visible : Visibility.Collapsed;
         PositionPage.Visibility = key == "position" ? Visibility.Visible : Visibility.Collapsed;
         ActivitiesPage.Visibility = key == "activities" ? Visibility.Visible : Visibility.Collapsed;
+        PollingPage.Visibility = key == "polling" ? Visibility.Visible : Visibility.Collapsed;
         QPage.Visibility = key == "q" ? Visibility.Visible : Visibility.Collapsed;
         ShortcutsPage.Visibility = key == "shortcuts" ? Visibility.Visible : Visibility.Collapsed;
         AdvancedPage.Visibility = key == "advanced" ? Visibility.Visible : Visibility.Collapsed;
@@ -286,6 +330,7 @@ public partial class SettingsWindow : Window
         AppearanceTab.IsChecked = key == "appearance";
         PositionTab.IsChecked = key == "position";
         ActivitiesTab.IsChecked = key == "activities";
+        PollingTab.IsChecked = key == "polling";
         QTab.IsChecked = key == "q";
         ShortcutsTab.IsChecked = key == "shortcuts";
         AdvancedTab.IsChecked = key == "advanced";

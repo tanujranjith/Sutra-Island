@@ -109,7 +109,7 @@ internal static partial class UpgradeVerification
             check(Math.Abs(host.Width - width) < 1 && Math.Abs(content.Opacity - opacity) < 0.01
                 && Math.Abs(translate.X - offset) < 1,
                 "Timer interruption: reopening continues from the current closing frame");
-            await Task.Delay(450); window.UpdateLayout();
+            await Task.Delay(450); await WaitForSutraAsync(() => host.IsHitTestVisible || !vm.TimerEditorOpen); window.UpdateLayout();
             check(host.IsHitTestVisible && vm.TimerEditorOpen, "Timer interruption: stale close callback cannot hide reopened panel");
 
             settings.AnimationIntensity = AnimationIntensity.Reduced;

@@ -17,6 +17,7 @@ public sealed class SystemMonitorService : IDisposable
     private readonly NativeMethods.ProcessorPowerInformation[] _powerInfo;
     private CancellationTokenSource? _shutdown;
     private Thread? _thread;
+    private int _pollIntervalMilliseconds = 700;
     private long _lastIdle, _lastKernel, _lastUser;
     private long _lastBytes;
     private long _lastTicks;
@@ -31,6 +32,9 @@ public sealed class SystemMonitorService : IDisposable
 
     public event EventHandler<SystemStats>? Changed;
     public SystemStats Current { get; private set; } = SystemStats.Empty;
+
+    public void ConfigurePolling(int intervalMilliseconds) =>
+        Interlocked.Exchange(ref _pollIntervalMilliseconds, Math.Clamp(intervalMilliseconds, 200, 5000));
 
     public void Start()
     {
@@ -70,7 +74,7 @@ public sealed class SystemMonitorService : IDisposable
         var sincePublish = 0;
         while (!token.IsCancellationRequested)
         {
-            token.WaitHandle.WaitOne(700);
+            token.WaitHandle.WaitOne(Volatile.Read(ref _pollIntervalMilliseconds));
             if (token.IsCancellationRequested) break;
             var next = Read();
             if (++sincePublish >= 2)

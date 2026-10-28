@@ -3,7 +3,45 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:inf="clr-namespace:DynamicIsland.Windows.Infrastructure"
              ShutdownMode="OnExplicitShutdown">
-    <Application.Resources>
+    <Application.Resources><ResourceDictionary><ResourceDictionary.MergedDictionaries><ResourceDictionary Source="Views/GraphiteMenuResources.xaml"/></ResourceDictionary.MergedDictionaries>
+        <LinearGradientBrush x:Key="GlassRimBrush" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#70FFFFFF"/><GradientStop Color="#28E4DCF8" Offset="0.35"/><GradientStop Color="#0AFFFFFF" Offset="0.7"/><GradientStop Color="#35FFFFFF" Offset="1"/></LinearGradientBrush>
+        <!-- Decode once and share the supplied artwork across all branding surfaces. -->
+        <BitmapImage x:Key="SutraIslandLogo" UriSource="/DynamicIsland.Windows;component/Assets/sutra-logo.png" DecodePixelWidth="256" CacheOption="OnLoad" />
+        <BitmapImage x:Key="SutraAssistantLogo" UriSource="/DynamicIsland.Windows;component/Assets/sutra-assistant-logo.png" DecodePixelWidth="256" CacheOption="OnLoad" />
+        <BitmapImage x:Key="SutraMascotArtwork" UriSource="/DynamicIsland.Windows;component/Assets/sutra-assistant-logo.png" DecodePixelWidth="1024" CacheOption="OnLoad" />
+        <ImageBrush x:Key="SutraIslandBrandBrush" ImageSource="{StaticResource SutraIslandLogo}" Viewbox="0.14,0.14,0.72,0.72" Stretch="UniformToFill" />
+        <ImageBrush x:Key="SutraAssistantBrandBrush" ImageSource="{StaticResource SutraAssistantLogo}" Viewbox="0.14,0.14,0.72,0.72" Stretch="UniformToFill" />
+        <DataTemplate x:Key="CompactActivityMark">
+            <Grid>
+                <Border CornerRadius="{Binding CompactIconCorner}">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CompactGlyph}" Value="&#xE121;">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Setter Property="Background" Value="{StaticResource SutraIslandBrandBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding CompactGlyph}" Value="S">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Setter Property="Background" Value="{StaticResource SutraAssistantBrandBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                </Border>
+                <TextBlock Text="{Binding CompactGlyph}" FontFamily="Segoe Fluent Icons" FontSize="{Binding CompactGlyphFontSize}" Foreground="{Binding AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CompactGlyph}" Value="&#xE121;"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                <DataTrigger Binding="{Binding CompactGlyph}" Value="S"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </DataTemplate>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <inf:RingProgressConverter x:Key="RingProgress" />
         <inf:PercentageWidthConverter x:Key="PercentageWidth" />
@@ -165,5 +203,5 @@
             <Setter Property="Padding" Value="20" />
             <Setter Property="Margin" Value="0,0,0,18" />
         </Style>
-    </Application.Resources>
+    </ResourceDictionary></Application.Resources>
 </Application>

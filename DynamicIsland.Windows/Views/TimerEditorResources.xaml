@@ -79,7 +79,7 @@
                             </ToggleButton.Template>
                         </ToggleButton>
                         <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False">
-                            <Border Background="#202127" BorderBrush="#545864" BorderThickness="1" CornerRadius="8" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                            <Border Background="#1D1F25" BorderBrush="#3A3743" BorderThickness="1" CornerRadius="8" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
                                 <ScrollViewer MaxHeight="220" CanContentScroll="True">
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
                                 </ScrollViewer>
@@ -91,9 +91,9 @@
         </Setter>
     </Style>
     <Style x:Key="TimerSurfaceButton" TargetType="Button" BasedOn="{StaticResource SettingsButton}">
-        <Setter Property="Foreground" Value="#FFD7E4F6" />
-        <Setter Property="Background" Value="#FF111E32" />
-        <Setter Property="BorderBrush" Value="#FF2F4C70" />
+        <Setter Property="Foreground" Value="#FFF4F2F4" />
+        <Setter Property="Background" Value="#FF24242B" />
+        <Setter Property="BorderBrush" Value="#FF3B3745" />
         <Setter Property="Padding" Value="16,9" />
         <Setter Property="MinHeight" Value="42" />
         <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
@@ -137,15 +137,15 @@
         </Setter>
     </Style>
     <Style x:Key="TimerPrimaryButton" TargetType="Button" BasedOn="{StaticResource TimerSurfaceButton}">
-        <Setter Property="Foreground" Value="White" />
+        <Setter Property="Foreground" Value="#201A2B" />
         <Setter Property="Background" Value="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
         <Setter Property="BorderBrush" Value="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style x:Key="TimerTextBox" TargetType="TextBox">
         <Setter Property="Foreground" Value="#FFF5F5F7" />
-        <Setter Property="Background" Value="#FF101B2B" />
-        <Setter Property="BorderBrush" Value="#FF2F4C70" />
+        <Setter Property="Background" Value="#FF24242B" />
+        <Setter Property="BorderBrush" Value="#FF3B3745" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CaretBrush" Value="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=Window}}" />
         <Setter Property="MinHeight" Value="42" />

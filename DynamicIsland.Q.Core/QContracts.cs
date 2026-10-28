@@ -25,6 +25,8 @@ public enum QProviderCapabilities
     ModelDiscovery = 8
 }
 
+public enum QContextPolicy { Existing, None, Capture }
+
 public enum QCaptureMode { ActiveWindow, ActiveMonitor }
 
 public sealed record QModelInfo(
@@ -63,7 +65,8 @@ public sealed record QRequest(
     bool IncludeImage,
     int MaxResponseTokens = 8192,
     string? CustomSystemPrompt = null,
-    string ReasoningEffort = "auto");
+    string ReasoningEffort = "auto",
+    string? ControlInstructions = null);
 
 public abstract record QStreamEvent
 {
@@ -110,17 +113,19 @@ public sealed record QSessionSnapshot(
     string? Error,
     QScreenContext? Context,
     string ProviderId,
-    string Model);
+    string Model,
+    AssistantActionFeedback? Action = null);
 
 public interface IQSessionController : IDisposable
 {
+    void AttachControls(IAssistantControls controls) { }
     QSessionSnapshot Snapshot { get; }
     event Action<QSessionSnapshot>? Changed;
     Task BeginAsync(QMode mode, string providerId, string model, QScreenContext? context, CancellationToken cancellationToken = default);
     Task SubmitAsync(string prompt, QMode mode, string providerId, string model, string? credential, string? baseUrl,
         bool includeImage, Func<CancellationToken, Task<QScreenContext?>>? recapture = null,
         CancellationToken cancellationToken = default, int maxResponseTokens = 8192, string? customSystemPrompt = null,
-        string reasoningEffort = "auto");
+        string reasoningEffort = "auto", QContextPolicy contextPolicy = QContextPolicy.Existing);
     void Cancel();
     void Clear();
 }

@@ -19,6 +19,10 @@ public static partial class UnitConversionParser
     private sealed record Unit(string Symbol, string Dimension, decimal Scale, decimal Offset = 0);
 
     private static readonly Dictionary<string, Unit> Units = CreateUnits();
+    public static IReadOnlyList<string> Categories { get; } = Units.Values.Select(unit => unit.Dimension).Distinct()
+        .Select(name => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(name)).ToArray();
+    public static IReadOnlyList<string> SymbolsFor(string category) => Units.Values
+        .Where(unit => unit.Dimension.Equals(category, StringComparison.OrdinalIgnoreCase)).Select(unit => unit.Symbol).Distinct().ToArray();
 
     public static bool IsCandidate(string? query)
     {

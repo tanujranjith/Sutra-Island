@@ -1,16 +1,50 @@
-# Q visual assistant
+# Sutra Assistant
 
-Q is Sutra Island’s on-demand visual assistant. Press the configured Q
-activation shortcuts (`Ctrl+Alt+Q` by default) from another
-application to capture the current context and ask a question without opening a
-separate chat window. By default, Q expands the Island automatically. Disable
-**Auto-expand island for Q** in **Settings → Q Assistant** if you want Q to stay
+This guide describes the assistant in Sutra Island v1.1.9. Ordinary chat starts without screen capture. Select **Use screen** for a question or deliberately invoke a screen-help shortcut to include screen context. Provider availability, models and account access depend on the configured provider.
+
+**Use screen** applies to the next chat question. A screen-help shortcut starts a screen session: follow-up questions in that session can capture screen context again until you start a regular chat or clear the session. Screen image inclusion also depends on your settings and provider capabilities.
+## Control the island
+
+Typed chat and Hey Sutra share the island's existing controls. Clear requests run locally; the selected provider can map other natural phrasing to the same actions. Results come from the control service, including errors.
+
+- "Set volume to 10" or "Increase volume by five"; mute/unmute; play/pause, next/previous, and seek.
+- "Set a timer for five minutes called tea", pause/resume/cancel named timers, set/cancel alarms, dismiss/snooze ringing alarms, and start/pause/reset the stopwatch or record a lap.
+- Start/end focus sessions, enable/disable notification mirroring, dismiss banners, open/clear island notification history, open clipboard history, recenter/expand/collapse the island, and open command panels or settings.
+- Change standard preferences through their setting names: compact date, clock/battery visibility, dimensions, theme, colours, layout, polling, and other scalar island settings. Audio output selection uses device names and checks the selected endpoint.
+
+Say mode and screen help do not run controls. Clipboard contents are not sent to the provider by the clipboard-open action. Provider credentials and system prompts cannot be rewritten by an island action.
+
+
+Sutra Assistant supports ordinary chat, screen help, and local Windows voice. Open Ctrl+Alt+K and choose **chat** for a conversation without screen capture. Use **Use screen** for one question, or invoke the existing screen-help shortcut intentionally.
+
+Sutra Assistant is Sutra Island’s on-demand assistant. Use the configured screen-help
+shortcut (`Ctrl+Alt+Q` by default) from another application to explicitly capture
+context and ask a question. By default, Sutra Assistant expands the Island automatically. Disable
+**Auto-expand island for Q** in **Settings → Sutra Assistant** if you want Q to stay
 compact when it is invoked.
+
+## Voice
+
+In **Settings → Sutra Assistant**, enable **Listen for “Hey Sutra”** to opt in.
+Installed English Windows speech recognition and microphone access are required.
+Say the phrase, wait for the Listening cue, and ask your question. The transcript
+streams in the island, then the completed reply is spoken with the selected
+Windows voice. Repeat the wake phrase for each follow-up; the conversation is
+retained until New chat, Close, or the existing auto-close preference clears it.
+
+Wake listening is off by default. Voice replies can be disabled with **Read voice
+replies aloud**; typed replies are silent. Stop cancels recognition, generation,
+and speech. Turning wake listening off releases the microphone. The palette also
+provides `voice`, `stop assistant`, `read reply`, `wake on`, and `wake off`.
+Closing the chat, including auto-close after a reply, keeps wake listening enabled.
+The wake switch is saved immediately; turn it off explicitly to stop wake listening.
+Windows recognition/synthesis stays local; the transcribed question is sent to the
+configured AI provider. Screen content is included only when explicitly requested.
 
 ## Setup
 
-1. Open **Settings → Q Assistant**.
-2. Enable Q, select a provider and model, and add the provider API key when one is
+1. Open **Settings → Sutra Assistant**.
+2. Enable the assistant, select a provider and model, and add the provider API key when one is
    required.
 3. Choose **Active window** or **Active monitor** as the capture source.
 4. Decide whether to send the captured PNG to vision-capable models. OCR text is
@@ -20,7 +54,7 @@ compact when it is invoked.
 6. Use **Test connection**, then invoke Q with the selected **Q activation
    shortcut**.
 
-In **Settings → Q Assistant**, enable **Auto-close Q after response** if you want
+In **Settings → Sutra Assistant**, enable **Auto-close Q after response** if you want
 completed Q sessions to close automatically. **Q auto-close delay** controls the
 wait before closing, from 1 to 300 seconds; it is off by default.
 
@@ -73,8 +107,8 @@ API key.
 - Type a prompt, use Windows dictation when available, or send follow-ups from
   the composer. Enter sends; Shift+Enter inserts a new line. The composer no longer
   has an Ask/Say toggle; `say` remains available in the command palette.
-- Enter `ask <question>` in the command palette to capture context and submit
-  automatically. Bare `ask` opens Q for typing.
+- Enter `ask <question>` in the command palette to submit without screen capture.
+  Use `ask screen <question>` for explicit screen help. Bare `ask` opens chat for typing.
 - Use **Stop**, **Copy**, **Retry**, **New question**, and **Close Q** as the session
   state allows.
 - Under **Q activation shortcuts**, enable any combination of `Ctrl+Alt+Q`,
@@ -124,7 +158,7 @@ Expanded mode shows two independently scrollable answers with separate **Copy** 
 
 Collapsed comparison shows `Gemini: answer` and `OAI: answer` (labels follow the selected providers). Long answers are ellipsized; hovering a line shows its full text, and opening the island shows both full answers. Comparison temporarily reserves a wider 480-DIP compact island with two readable rows; turning Compare off restores the ordinary configured size. Compare mode and the second provider/model persist across restarts.
 
-Choose **… → Q settings and API keys** in Q (or open Settings → Q Assistant), select a provider, paste its key, and click **Save key**. Repeat for other providers: each keeps its own independently encrypted key. The saved-key summary lists configured providers without revealing credentials. **Remove key** only removes the selected provider's key. An empty input is not a missing-key indicator: saved credentials are never filled back into the editor. Codex uses the shared Codex account and Ollama does not require an API key.
+Choose **… → Q settings and API keys** in Q (or open Settings → Sutra Assistant), select a provider, paste its key, and click **Save key**. Repeat for other providers: each keeps its own independently encrypted key. The saved-key summary lists configured providers without revealing credentials. **Remove key** only removes the selected provider's key. An empty input is not a missing-key indicator: saved credentials are never filled back into the editor. Codex uses the shared Codex account and Ollama does not require an API key.
 
 Model lists load automatically when Q opens or its provider changes, using the
 saved credential or Codex account. Use the refresh icon beside the model selector

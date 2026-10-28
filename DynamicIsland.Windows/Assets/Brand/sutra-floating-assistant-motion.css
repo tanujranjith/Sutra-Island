@@ -1,0 +1,100 @@
+/* Based on Sutra by Tanuj Ranjith. Copyright 2026. Apache-2.0. */
+/* Original floating-chat motion definitions; adapted to native WPF in AssistantReplyView. */
+        /* Safe "thinking" state: Sutra mark + shimmering label + animated dots,
+           wrapped in a softly glowing, sheen-swept pill. No raw CoT. */
+        .chatbot-thinking-bubble {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            padding: 7px 12px;
+            border-radius: 14px;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(110deg,
+                color-mix(in srgb, var(--accent, #6aa3ff) 11%, transparent),
+                color-mix(in srgb, var(--accent, #6aa3ff) 4%, transparent));
+            border: 1px solid color-mix(in srgb, var(--accent, #6aa3ff) 22%, transparent);
+        }
+        /* Sweeping sheen across the pill. */
+        .chatbot-thinking-bubble::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: linear-gradient(100deg, transparent 30%,
+                color-mix(in srgb, var(--accent, #6aa3ff) 16%, transparent) 50%, transparent 70%);
+            transform: translateX(-120%);
+            animation: chatbotThinkingSheen 1.9s ease-in-out infinite;
+        }
+        .chatbot-thinking-mark {
+            color: var(--accent, #6aa3ff);
+            font-size: 15px;
+            line-height: 1;
+            animation: chatbotThinkingSpin 2.6s linear infinite, chatbotThinkingPulse 1.4s ease-in-out infinite;
+            filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent, #6aa3ff) 55%, transparent));
+        }
+        .chatbot-thinking-label {
+            letter-spacing: 0.01em;
+            background: linear-gradient(90deg,
+                var(--text-secondary) 0%, var(--text-secondary) 38%,
+                var(--text-primary) 50%, var(--text-secondary) 62%, var(--text-secondary) 100%);
+            background-size: 200% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: chatbotThinkingShimmer 2.2s linear infinite;
+        }
+        .chatbot-thinking-dots { display: inline-flex; gap: 3px; }
+        .chatbot-thinking-dots i {
+            width: 4px; height: 4px; border-radius: 50%;
+            background: var(--accent, #6aa3ff); opacity: 0.5;
+            animation: chatbotThinkingDot 1.2s ease-in-out infinite;
+        }
+        .chatbot-thinking-dots i:nth-child(2) { animation-delay: 0.18s; }
+        .chatbot-thinking-dots i:nth-child(3) { animation-delay: 0.36s; }
+        @keyframes chatbotThinkingPulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+        @keyframes chatbotThinkingSpin { to { transform: rotate(360deg); } }
+        @keyframes chatbotThinkingSheen { 0% { transform: translateX(-120%); } 60%,100% { transform: translateX(120%); } }
+        @keyframes chatbotThinkingShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        @keyframes chatbotThinkingDot { 0%,100% { opacity: 0.3; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
+        /* Blinking "typing" caret shown while an answer streams in. */
+        .assistant-streaming > *:last-child::after {
+            content: "▍";
+            display: inline-block;
+            margin-left: 2px;
+            color: var(--accent, #6aa3ff);
+            font-weight: 400;
+            transform: translateY(1px);
+            animation: chatbotCaretBlink 1.05s steps(1, end) infinite;
+        }
+        @keyframes chatbotCaretBlink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+        /* Each chat bubble eases in as it is appended. */
+        .chatbot-msg { animation: chatbotMsgIn 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+        @keyframes chatbotMsgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) {
+            .chatbot-thinking-mark, .chatbot-thinking-dots i,
+            .chatbot-thinking-bubble::after, .assistant-streaming > *:last-child::after,
+            .chatbot-msg { animation: none; }
+            .chatbot-thinking-dots i { opacity: 0.7; }
+            .chatbot-thinking-label {
+                -webkit-text-fill-color: currentColor;
+                color: var(--text-secondary);
+                background: none;
+                animation: none;
+            }
+            .assistant-streaming > *:last-child::after { opacity: 1; }
+        }
+        body.motion-off .chatbot-thinking-mark,
+        body.motion-off .chatbot-thinking-dots i,
+        body.motion-off .chatbot-thinking-bubble::after,
+        body.motion-off .assistant-streaming > *:last-child::after,
+        body.motion-off .chatbot-msg { animation: none; }
+        body.motion-off .chatbot-thinking-label {
+            -webkit-text-fill-color: currentColor;
+            color: var(--text-secondary);
+            background: none;
+            animation: none;
+        }
+        body.motion-off .assistant-streaming > *:last-child::after { opacity: 1; }

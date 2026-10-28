@@ -6,7 +6,15 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/CommandPalette/PaletteCommandHistory.cs" Link="PaletteCommandHistory.cs" />
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/CoalescingSeekQueue.cs" Link="CoalescingSeekQueue.cs" />
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/CommandPalette/CommandParsers.cs" Link="CommandParsers.cs" />
     <ProjectReference Include="..\DynamicIsland.Q.Core\DynamicIsland.Q.Core.csproj" />
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/CommandPalette/AssistantControlIntent.cs" Link="AssistantControlIntent.cs" /><Compile Include="../DynamicIsland.Windows/Infrastructure/CommandPalette/CommandCatalog.cs" Link="CommandCatalog.cs" />
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/CommandPalette/PaletteSelection.cs" Link="PaletteSelection.cs" />
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/CommandPalette/PalettePanels.cs" Link="PalettePanels.cs" />
+    <Compile Include="../DynamicIsland.Windows/Models/AudioState.cs" Link="AudioState.cs" />
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/CommandPalette/SettingsSearchIndex.cs" Link="SettingsSearchIndex.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
@@ -39,9 +47,10 @@
     <Compile Include="..\DynamicIsland.Windows\Services\Q\CodexModelSelectionPolicy.cs" Link="CodexModelSelectionPolicy.cs" />
     <Compile Include="..\DynamicIsland.Windows\Services\Q\CodexTurnNotificationAccumulator.cs" Link="CodexTurnNotificationAccumulator.cs" />
     <Compile Include="..\DynamicIsland.Windows\Services\Q\CodexErrors.cs" Link="CodexErrors.cs" />
-    <Compile Include="..\DynamicIsland.Windows\Services\Q\CodexRuntimeResolver.cs" Link="CodexRuntimeResolver.cs" />
+    <Compile Include="../DynamicIsland.Windows/Services/Q/CodexRuntimeVersion.cs" Link="CodexRuntimeVersion.cs" /><Compile Include="..\DynamicIsland.Windows\Services\Q\CodexRuntimeResolver.cs" Link="CodexRuntimeResolver.cs" />
     <Compile Include="..\DynamicIsland.Windows\Services\Q\CodexThreadLedger.cs" Link="CodexThreadLedger.cs" />
     <Compile Include="..\DynamicIsland.Windows\Infrastructure\CommandPalette\CalculatorParser.cs" Link="CalculatorParser.cs" />
+    <Compile Include="..\DynamicIsland.Windows\Infrastructure\CommandPalette\AlgebraParser.cs" Link="AlgebraParser.cs" />
     <Compile Include="..\DynamicIsland.Windows\Infrastructure\CommandPalette\UnitConversionParser.cs" Link="UnitConversionParser.cs" />
   </ItemGroup>
 <ItemGroup><Compile Include="..\DynamicIsland.Windows\Infrastructure\TimerEngine.cs" Link="TimerEngine.cs" /></ItemGroup><ItemGroup><Compile Include="..\DynamicIsland.Windows\Infrastructure\AppDataPaths.cs" Link="AppDataPaths.cs" /><Compile Include="..\DynamicIsland.Windows\Infrastructure\ActivityPolicy.cs" Link="ActivityPolicy.cs" /><Compile Include="..\DynamicIsland.Windows\Models\IslandState.cs" Link="IslandState.cs" /></ItemGroup><ItemGroup>    <Compile Include="../DynamicIsland.Windows/Infrastructure/NotificationPolicy.cs" Link="NotificationPolicy.cs" />

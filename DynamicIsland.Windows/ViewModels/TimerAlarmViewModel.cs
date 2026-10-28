@@ -32,10 +32,13 @@ public sealed partial class TimerAlarmViewModel : ObservableObject, IDisposable
         });
         StartCustomCommand = new RelayCommand(() =>
         {
-            if (!double.TryParse(CustomMinutes, out var minutes) || !double.IsFinite(minutes) || minutes < 1d / 60 || minutes > 1440)
+            if (!double.TryParse(CustomHours, out var hours) || !double.IsFinite(hours) || hours < 0
+                || !double.TryParse(CustomMinutes, out var minutes) || !double.IsFinite(minutes) || minutes < 0
+                || !double.TryParse(CustomSeconds, out var seconds) || !double.IsFinite(seconds) || seconds < 0
+                || hours * 3600 + minutes * 60 + seconds is < 1 or > 86400)
             { ValidationMessage = "Enter a duration from 1 second to 1440 minutes."; return; }
             ValidationMessage = "";
-            _service.StartTimer(TimeSpan.FromMinutes(minutes), TimerLabel);
+            _service.StartTimer(TimeSpan.FromSeconds(hours * 3600 + minutes * 60 + seconds), TimerLabel);
         });        TimerPrimaryCommand = new RelayCommand(() =>
         {
             if (_service.State.Timer.Phase == TimerPhase.Running) _service.PauseTimer();
@@ -104,6 +107,9 @@ public sealed partial class TimerAlarmViewModel : ObservableObject, IDisposable
     private static string FormatSw(TimeSpan t) => t.Hours > 0 ? t.ToString(@"h\:mm\:ss\.ff") : t.ToString(@"mm\:ss\.ff");
 
     public string CustomMinutes { get => _customMinutes; set => SetProperty(ref _customMinutes, value); }
+    private string _customHours = "00", _customSeconds = "00";
+    public string CustomHours { get => _customHours; set => SetProperty(ref _customHours, value); }
+    public string CustomSeconds { get => _customSeconds; set => SetProperty(ref _customSeconds, value); }
     public string TimerLabel { get => _timerLabel; set => SetProperty(ref _timerLabel, value); }
     public string AlarmHour { get => _alarmHour; set => SetProperty(ref _alarmHour, value); }
     public string AlarmMinute { get => _alarmMinute; set => SetProperty(ref _alarmMinute, value); }
@@ -124,7 +130,7 @@ public sealed partial class TimerAlarmViewModel : ObservableObject, IDisposable
     public string TimerRemaining => TimerAlarmService.FormatDuration(_service.TimerRemaining);
     public double TimerProgress => _service.TimerProgress * 100;
     public double TimerRemainingProgress => Math.Clamp(100d - TimerProgress, 0d, 100d);
-    public double TimerRingPerimeterUnits => 2d * Math.PI * 157d / 8d;
+    public double TimerRingPerimeterUnits => Math.PI * 250d / 7d;
     public string TimerStateText => _service.State.Timer.Phase.ToString();
     public bool IsTimerControllable => _service.State.Timer.Phase is TimerPhase.Running or TimerPhase.Paused;
     public bool ShowLiveTimer => _service.State.Timer.Phase is TimerPhase.Running or TimerPhase.Paused;

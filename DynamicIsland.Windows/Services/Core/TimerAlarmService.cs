@@ -18,6 +18,7 @@ public sealed class TimerAlarmService : IDisposable
     private readonly LoggingService _log;
     private readonly string _statePath;
     private readonly DispatcherTimer _tickTimer = new(DispatcherPriority.Background);
+    private int _pollIntervalMilliseconds = 500;
     private System.Threading.Timer? _soundTimer;
     private readonly TimerEngine _engine;
     private DateTimeOffset _lastTick = DateTimeOffset.Now;
@@ -70,6 +71,14 @@ public sealed class TimerAlarmService : IDisposable
             _tickTimer.Dispatcher.BeginInvoke(() => { _engine.Tick(true); _lastTick = DateTimeOffset.Now; SaveAndNotify(); });
     }
     public void Start() { UpdateTickInterval(); _tickTimer.Start(); }
+
+    public void ConfigurePolling(int intervalMilliseconds)
+    {
+        var normalized = Math.Clamp(intervalMilliseconds, 100, 2000);
+        if (_pollIntervalMilliseconds == normalized) return;
+        _pollIntervalMilliseconds = normalized;
+        UpdateTickInterval();
+    }
     public TimerState? DisplayTimer(Guid? pin = null) => _engine.DisplayTimer(pin);
     public TimeSpan Remaining(TimerState timer) => _engine.GetRemaining(timer);
     public TimeSpan TimerRemaining => Remaining(State.Timer);
@@ -139,7 +148,9 @@ public sealed class TimerAlarmService : IDisposable
     {
         var active = State.Timers.Any(t => t.Phase == TimerPhase.Running || (t.Phase == TimerPhase.Completed && !t.CompletionAcknowledged)) || State.Alarms.Any(a => a.Phase == AlarmPhase.Ringing);
         var next = State.Alarms.Where(a => a.Phase is AlarmPhase.Scheduled or AlarmPhase.Snoozed).Select(a => (a.Phase == AlarmPhase.Snoozed ? a.SnoozeUntil : a.TargetAt) ?? DateTimeOffset.MaxValue).DefaultIfEmpty(DateTimeOffset.MaxValue).Min();
-        _tickTimer.Interval = TimeSpan.FromMilliseconds(active ? 500 : Math.Clamp((next - _engine.Now).TotalMilliseconds, 500, 30000));
+        _tickTimer.Interval = TimeSpan.FromMilliseconds(active
+            ? _pollIntervalMilliseconds
+            : Math.Clamp((next - _engine.Now).TotalMilliseconds, _pollIntervalMilliseconds, 30000));
     }
     private void SaveAndNotify() { SyncSound(); Save(); UpdateTickInterval(); Changed?.Invoke(this, EventArgs.Empty); }
     private void Save()

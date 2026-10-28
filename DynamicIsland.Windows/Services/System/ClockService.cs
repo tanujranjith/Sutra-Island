@@ -5,7 +5,16 @@ namespace DynamicIsland.Windows.Services;
 public sealed class ClockService : IDisposable
 {
     private readonly DispatcherTimer _timer = new(DispatcherPriority.Background);
+    private int _pollIntervalSeconds = 1;
     public event EventHandler<DateTimeOffset>? Tick;
+
+    public void ConfigurePolling(int intervalSeconds)
+    {
+        var normalized = Math.Clamp(intervalSeconds, 1, 60);
+        if (_pollIntervalSeconds == normalized) return;
+        _pollIntervalSeconds = normalized;
+        ScheduleNext();
+    }
 
     public ClockService()
     {
@@ -28,7 +37,9 @@ public sealed class ClockService : IDisposable
     private void ScheduleNext()
     {
         var now = DateTimeOffset.Now;
-        _timer.Interval = TimeSpan.FromMilliseconds(Math.Max(100, 1000 - now.Millisecond));
+        var secondsToBoundary = _pollIntervalSeconds - now.Second % _pollIntervalSeconds;
+        var milliseconds = secondsToBoundary * 1000 - now.Millisecond;
+        _timer.Interval = TimeSpan.FromMilliseconds(Math.Max(100, milliseconds));
     }
 
     public void Dispose() => _timer.Stop();

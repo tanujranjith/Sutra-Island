@@ -9,7 +9,7 @@ namespace DynamicIsland.Windows.Services;
 /// CapabilityAccessManager consent store. An app in active use has LastUsedTimeStop == 0 while it holds
 /// the device. Read-only registry polling — no device is opened. Raises on the UI thread.
 /// </summary>
-public sealed class PrivacySensorService(LoggingService log) : IDisposable
+public sealed class PrivacySensorService(LoggingService log, Func<PrivacySensorState>? readState = null) : IDisposable
 {
     private readonly DispatcherTimer _timer = new(DispatcherPriority.Background)
     {
@@ -19,6 +19,14 @@ public sealed class PrivacySensorService(LoggingService log) : IDisposable
     public event EventHandler<PrivacySensorState>? Changed;
     public PrivacySensorState Current { get; private set; } = PrivacySensorState.None;
     private bool _started;
+    private bool _polling;
+    private bool _disposed;
+
+    public void ConfigurePolling(TimeSpan interval)
+    {
+        var normalized = TimeSpan.FromSeconds(Math.Clamp(interval.TotalSeconds, 1, 60));
+        if (_timer.Interval != normalized) _timer.Interval = normalized;
+    }
 
     public void Start()
     {
@@ -29,12 +37,18 @@ public sealed class PrivacySensorService(LoggingService log) : IDisposable
         Poll();
     }
 
-    private void Poll()
+    private async void Poll()
     {
-        var next = new PrivacySensorState(ActiveApps("webcam"), ActiveApps("microphone"));
-        if (next == Current) return;
-        Current = next;
-        Changed?.Invoke(this, next);
+        if (_polling || _disposed) return;
+        _polling = true;
+        try
+        {
+            var next = await Task.Run(() => readState?.Invoke() ?? new PrivacySensorState(ActiveApps("webcam"), ActiveApps("microphone")));
+            if (_disposed || next == Current) return;
+            Current = next;
+            Changed?.Invoke(this, next);
+        }
+        finally { _polling = false; }
     }
 
     private IReadOnlyList<string> ActiveApps(string capability)
@@ -195,6 +209,7 @@ public sealed class PrivacySensorService(LoggingService log) : IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         _timer.Stop();
         _started = false;
     }

@@ -18,10 +18,10 @@
     <Product>Sutra Island</Product>
     <Company>Sutra Island</Company>
     <Description>A live desktop island for Windows</Description>
-    <Version>1.0.21</Version>
-    <AssemblyVersion>1.0.21.0</AssemblyVersion>
-    <FileVersion>1.0.21.0</FileVersion>
-    <InformationalVersion>1.0.21</InformationalVersion>
+    <Version>1.1.9</Version>
+    <AssemblyVersion>1.1.9.0</AssemblyVersion>
+    <FileVersion>1.1.9.0</FileVersion>
+    <InformationalVersion>1.1.9</InformationalVersion>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -33,11 +33,16 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\DynamicIsland.Q.Core\DynamicIsland.Q.Core.csproj" />
+    <PackageReference Include="System.Speech" Version="10.0.10" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md" Link="README.md" Pack="false" Condition="Exists('..\README.md')" />
     <None Include="..\MIGRATION_REPORT.md" Link="MIGRATION_REPORT.md" Pack="false" Condition="Exists('..\MIGRATION_REPORT.md')" />
     <Resource Include="Assets\settings-preview-backdrop.png" />
     <Resource Include="Assets\airpods-pro.png" />
+    <Resource Include="Assets\sutra-logo.png" />
+    <Resource Include="Assets\sutra-assistant-logo.png" />
+    <Resource Include="app.ico" />
+    <Resource Include="Assets\Brand\*" />
   </ItemGroup>
 </Project>

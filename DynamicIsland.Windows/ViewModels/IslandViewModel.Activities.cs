@@ -10,13 +10,13 @@ public sealed partial class IslandViewModel
     public bool TimerEditorOpen
     {
         get => _timerEditorOpen;
-        set { if (SetProperty(ref _timerEditorOpen, value)) RaiseMany(nameof(ShowTimerOrb), nameof(ShowQSurface)); }
+        set { if (SetProperty(ref _timerEditorOpen, value)) { RaiseMany(nameof(ShowTimerOrb), nameof(ShowQSurface)); PumpNotifications(); } }
     }
     private bool _interactionProtected;
     public bool InteractionProtected
     {
         get => _interactionProtected;
-        set { if (SetProperty(ref _interactionProtected, value)) { RaisePropertyChanged(nameof(ShowBanner)); RaisePropertyChanged(nameof(ShowNotification)); } }
+        set { if (SetProperty(ref _interactionProtected, value)) { RaisePropertyChanged(nameof(ShowBanner)); RaisePropertyChanged(nameof(ShowNotification)); PumpNotifications(); } }
     }
     // Focus/capture defers incoming banners, but must not hide the banner receiving
     // that focus. Otherwise clicking X removes its own hit target before dismissal.

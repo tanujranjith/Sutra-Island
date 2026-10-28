@@ -125,8 +125,14 @@ public sealed class WindowPositionService
             widthDip * scale, visibleWidth * scale, visibleHeight * scale, 8 * scale,
             horizontal, vertical, settings.SideOffset * scale, settings.TopOffset * scale,
             manual ? settings.ManualLeftPixels : null, manual ? settings.ManualTopPixels : null);
-        NativeMethods.SetWindowPos(handle, nint.Zero, (int)Math.Round(position.X), (int)Math.Round(position.Y),
-            (int)Math.Round(widthDip * scale), (int)Math.Round(heightDip * scale),
+        var x = (int)Math.Round(position.X);
+        var y = (int)Math.Round(position.Y);
+        var width = (int)Math.Round(widthDip * scale);
+        var height = (int)Math.Round(heightDip * scale);
+        if (NativeMethods.GetWindowRect(handle, out var current)
+            && current.Left == x && current.Top == y && current.Width == width && current.Height == height)
+            return;
+        NativeMethods.SetWindowPos(handle, nint.Zero, x, y, width, height,
             NativeMethods.SwpNoActivate | NativeMethods.SwpNoZOrder);
     }
 

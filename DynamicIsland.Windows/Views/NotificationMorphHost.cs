@@ -12,6 +12,9 @@ namespace DynamicIsland.Windows.Views;
 // rounded reveal mask grow, so notification text never stretches during entry.
 public sealed class NotificationMorphHost : Grid
 {
+    public bool ReleaseClipWhenSettled { get; set; }
+    public bool BlendSurfaceWithContent { get; set; }
+    public double ContentSurfaceOpacity { get; set; } = 1;
     public static readonly DependencyProperty RevealProgressProperty = DependencyProperty.Register(
         nameof(RevealProgress), typeof(double), typeof(NotificationMorphHost),
         new FrameworkPropertyMetadata(0d, FrameworkPropertyMetadataOptions.AffectsRender,
@@ -19,7 +22,7 @@ public sealed class NotificationMorphHost : Grid
 
     private readonly RectangleGeometry _contentClip = new();
     private readonly TranslateTransform _contentOffset = new();
-    private static readonly Brush Surface = FrozenBrush(Color.FromArgb(250, 17, 17, 19));
+    private static readonly Brush Surface = FrozenBrush(Color.FromArgb(255, 29, 31, 37));
     private static readonly Pen Edge = new(FrozenBrush(Color.FromArgb(22, 255, 255, 255)), 1);
 
     public double RevealProgress
@@ -69,7 +72,9 @@ public sealed class NotificationMorphHost : Grid
         _contentClip.Rect = new Rect(frame.Bounds.X, 0, frame.Bounds.Width, frame.Bounds.Height);
         _contentClip.RadiusX = _contentClip.RadiusY = radius;
         _contentOffset.Y = frame.Bounds.Y;
-        child.Clip = _contentClip;
+        // A reusable palette can grow after device discovery or a command switch.
+        // Its settled content must not retain the previous animation's reveal mask.
+        child.Clip = ReleaseClipWhenSettled && RevealProgress >= 1 ? null : _contentClip;
         child.RenderTransform = _contentOffset;
         child.Opacity = frame.ContentOpacity;
         var settled = RevealProgress >= 1;
@@ -104,6 +109,16 @@ public sealed class NotificationMorphHost : Grid
             }
             shape = Geometry.Combine(shape, bridge, GeometryCombineMode.Union, null);
         }
+        if (BlendSurfaceWithContent)
+        {
+            // Keep a single material layer as the palette content emerges; at rest its
+            // own translucent background supplies the surface, avoiding an opaque stack.
+            var targetAlpha=Math.Clamp(ContentSurfaceOpacity,0,1);
+            var childAlpha=targetAlpha*frame.ContentOpacity;
+            var remainingAlpha=childAlpha>=1 ? 0 : (targetAlpha-childAlpha)/(1-childAlpha);
+            drawingContext.PushOpacity(Math.Clamp(remainingAlpha,0,1));
+        }
         drawingContext.DrawGeometry(Surface, Edge, shape);
+        if (BlendSurfaceWithContent) drawingContext.Pop();
     }
 }

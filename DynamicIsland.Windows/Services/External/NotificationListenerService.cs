@@ -38,14 +38,15 @@ public sealed class NotificationListenerService : IDisposable
         _source = source;
         _readTimeout = readTimeout ?? TimeSpan.FromSeconds(8);
         _dispatcher = System.Windows.Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
-        _timer = new DispatcherTimer(DispatcherPriority.Normal, _dispatcher) { Interval = TimeSpan.FromSeconds(4) };
+        _timer = new DispatcherTimer(DispatcherPriority.Normal, _dispatcher) { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += async (_, _) => await PollAsync();
     }
 
     public TimeSpan PollInterval => _timer.Interval;
+    internal void TraceAdmission(int count) => _log.Debug($"Notification queue admission: accepted={count}.");
     public void Configure(TimeSpan pollInterval)
     {
-        var interval = TimeSpan.FromSeconds(Math.Clamp(pollInterval.TotalSeconds, 1, 30));
+        var interval = TimeSpan.FromSeconds(Math.Clamp(pollInterval.TotalSeconds, 0.1, 30));
         if (interval == _timer.Interval) return;
         var wasRunning = _timer.IsEnabled;
         if (wasRunning) _timer.Stop();
@@ -220,6 +221,7 @@ internal interface INotificationSource
 internal sealed class WindowsNotificationSource(LoggingService log) : INotificationSource
 {
     private UserNotificationListener? _listener;
+    private NotificationSnapshotReader? _snapshotReader;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _appNames = new(StringComparer.Ordinal);
     private readonly Dictionary<(uint Id, DateTimeOffset CreatedAt), (string App, string AppId)> _appMetadata = new();
     private TypedEventHandler<UserNotificationListener, UserNotificationChangedEventArgs>? _handler;
@@ -233,18 +235,20 @@ internal sealed class WindowsNotificationSource(LoggingService log) : INotificat
         if (Listener.GetNotification(id) is { } current && current.CreationTime == createdAt)
             Listener.RemoveNotification(id);
     }
-    public async Task<IReadOnlyList<NotificationInfo>> ReadAsync(CancellationToken cancellationToken)
+    public Task<IReadOnlyList<NotificationInfo>> ReadAsync(CancellationToken cancellationToken) =>
+        (_snapshotReader ??= new(ReadSnapshotAsync)).ReadAsync(cancellationToken);
+
+    private async Task<IReadOnlyList<NotificationInfo>> ReadSnapshotAsync()
     {
         // Keep the WinRT read in the listener's original dispatcher context. Some desktop
         // Windows configurations do not complete this API when called from a worker thread.
         var timer = System.Diagnostics.Stopwatch.StartNew();
-        var notes = await Listener.GetNotificationsAsync(NotificationKinds.Toast).AsTask(cancellationToken);
+        var notes = await Listener.GetNotificationsAsync(NotificationKinds.Toast);
         var readMilliseconds = timer.Elapsed.TotalMilliseconds;
         var result = new List<NotificationInfo>();
         var active = new HashSet<(uint Id, DateTimeOffset CreatedAt)>();
         foreach (var note in notes)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             if (Extract(note) is { } notification)
             {
                 result.Add(notification);
@@ -254,6 +258,8 @@ internal sealed class WindowsNotificationSource(LoggingService log) : INotificat
         }
         foreach (var expired in _appMetadata.Keys.Where(key => !active.Contains(key)).ToArray()) _appMetadata.Remove(expired);
         log.Debug($"Windows notification snapshot: count={notes.Count}, readMs={readMilliseconds:0}, decodeMs={timer.Elapsed.TotalMilliseconds - readMilliseconds:0}.");
+        if (timer.Elapsed >= TimeSpan.FromSeconds(2))
+            log.Info($"Slow Windows notification snapshot: count={notes.Count}, readMs={readMilliseconds:0}, decodeMs={timer.Elapsed.TotalMilliseconds - readMilliseconds:0}.");
         return result;
     }
     public void Subscribe(Action added)
@@ -300,5 +306,26 @@ internal sealed class WindowsNotificationSource(LoggingService log) : INotificat
             return NotificationContent.HasVisibleContent(notification) ? notification : null;
         }
         catch { return null; }
+    }
+}
+
+internal sealed class NotificationSnapshotReader(Func<Task<IReadOnlyList<NotificationInfo>>> read)
+{
+    private Task<IReadOnlyList<NotificationInfo>>? _pending;
+
+    public async Task<IReadOnlyList<NotificationInfo>> ReadAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // A service timeout cancels only its wait. Keep the Windows operation alive so
+        // the next poll can receive it, rather than repeatedly restarting a slow read
+        // or piling overlapping requests onto the Windows notification service.
+        var pending = _pending ??= read();
+        try { return await pending.WaitAsync(cancellationToken); }
+        finally
+        {
+            // Preserve a result that arrives between a timeout and the next poll.
+            if (pending.IsCompleted && !cancellationToken.IsCancellationRequested && ReferenceEquals(_pending, pending))
+                _pending = null;
+        }
     }
 }

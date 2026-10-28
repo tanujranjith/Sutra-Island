@@ -14,20 +14,40 @@ public interface ICommandPaletteHost
     void ShowAlarmPanel();
     void ShowStopwatchPanel();
     void OpenQ(string? question, QMode mode, bool compare);
+    void OpenChat(string? question, bool useScreen = false);
+    void ShowSettingsSearch(string query);
+    void RecenterIsland();
+    Task OpenClipboardAsync();
+    void ShowNotificationHistory();
+    Task SetNotificationsAsync(bool enabled);
+    Task OpenCommandPanelAsync(string command) => Task.CompletedTask;
 }
 
-public sealed record CommandResult(bool Close, string? Message = null, bool IsError = false, bool ShowAllCommands = false);
+public sealed record CommandResult(bool Close, string? Message = null, bool IsError = false, bool ShowAllCommands = false, PalettePanel Panel = PalettePanel.None);
 
 /// <summary>Executes a parsed palette command against the island, media, timer, and Q services.
 /// Errors return an explanatory message and keep the palette open.</summary>
 public sealed class CommandRunner(
     IslandViewModel island,
     MediaSessionService media,
-    AudioSessionService audio,
+    IPaletteAudioControl audio,
     TimerAlarmService timers,
     TimerAlarmViewModel stopwatchViewModel,
-    ICommandPaletteHost host)
+    ICommandPaletteHost host,
+    IPaletteSeekControl? seekControl = null,
+    IPaletteClipboard? clipboard = null,
+    IPaletteOutputControl? outputs = null)
 {
+    public IPaletteAudioControl Audio => audio;
+    public IPaletteSeekControl Seek => seekControl ?? media;
+    public IslandViewModel Island => island;
+    public TimerAlarmViewModel Stopwatch => stopwatchViewModel;
+    public TimerAlarmService Timers => timers;
+    public MediaSessionService MediaService => media;
+    public IPaletteClipboard? Clipboard => clipboard;
+    public IPaletteOutputControl? Outputs => outputs ?? audio as IPaletteOutputControl;
+    public Task SetMirroringAsync(bool enabled) => host.SetNotificationsAsync(enabled);
+    public Task OpenAssistantPanelAsync(string command) => host.OpenCommandPanelAsync(command);
     public async Task<CommandResult> ExecuteAsync(CommandMatch match)
     {
         try
@@ -46,6 +66,8 @@ public sealed class CommandRunner(
 
     private async Task<CommandResult> ExecuteCoreAsync(CommandMatch match)
     {
+        var panel = PalettePanelPolicy.For(match);
+        if (panel != PalettePanel.None) return new CommandResult(Close: false, Panel: panel);
         var argument = match.Argument;
         switch (match.Command.Id)
         {
@@ -85,13 +107,13 @@ public sealed class CommandRunner(
             }
             case PaletteCommand.Seek:
             {
-                var state = island.Media;
+                var state = Seek.Current;
                 if (!state.HasSession) return Fail("No media is playing.");
                 if (!state.CanSeek || state.Duration <= TimeSpan.Zero)
                     return Fail("This source doesn't support seeking.");
                 if (!CommandParsers.TryParseSeek(argument, out var offset, out var seekError))
                     return Fail(seekError!);
-                await media.SeekByAsync(offset).ConfigureAwait(true);
+                await Seek.SeekByAsync(offset).ConfigureAwait(true);
                 return Ok();
             }
             case PaletteCommand.Mute:
@@ -105,9 +127,43 @@ public sealed class CommandRunner(
                 audio.SetMuted(false);
                 return Ok();
 
+            case PaletteCommand.Volume:
+                if (audio.Current.Availability != AudioAvailability.Available) return Fail("System audio is unavailable.");
+                if (!double.TryParse(argument, System.Globalization.NumberStyles.AllowLeadingSign | System.Globalization.NumberStyles.AllowDecimalPoint, System.Globalization.CultureInfo.InvariantCulture, out var level) || !double.IsFinite(level)) return Fail("Use volume 50, volume +10, or volume -10.");
+                var relative = argument.StartsWith('+') || argument.StartsWith('-');
+                if (!relative && (level < 0 || level > 100)) return Fail("Volume must be between 0 and 100.");
+                if (relative) audio.AdjustMasterVolume((int)Math.Clamp(Math.Round(level), -100, 100)); else audio.SetMasterVolume((int)Math.Round(level));
+                return Ok();
+            case PaletteCommand.OpenMedia:
+                if (!island.Media.HasSession) return Fail("No media app is active.");
+                media.LaunchSource(); return Ok();
+            case PaletteCommand.Recenter: host.RecenterIsland(); return Ok();
+            case PaletteCommand.Clipboard: await host.OpenClipboardAsync(); return Ok();
+            case PaletteCommand.NotificationHistory: host.ShowNotificationHistory(); return Ok();
+            case PaletteCommand.NotificationsOn: await host.SetNotificationsAsync(true); return Ok();
+            case PaletteCommand.NotificationsOff: await host.SetNotificationsAsync(false); return Ok();
+            case PaletteCommand.RetryNotifications: island.RetryNotificationsCommand.Execute(null); return Ok();
+            case PaletteCommand.DismissBanner: island.DismissVisibleBanner(); return Ok();
+            case PaletteCommand.Chat:
+                if (!TryStartQ(out var chatError)) return Fail(chatError!);
+                host.OpenChat(argument); return Ok();
+            case PaletteCommand.VoiceInput:
+                if (!TryStartQ(out var voiceError)) return Fail(voiceError!);
+                if (!island.QSpeechAvailable) return Fail("Install an English Windows speech recognizer and allow microphone access. Typed chat remains available.");
+                host.OpenChat(null); _ = island.StartVoiceAsync(); return Ok();
+            case PaletteCommand.StopAssistant: island.StopAssistant(); return Ok();
+            case PaletteCommand.ReadReply:
+                if (string.IsNullOrWhiteSpace(island.QResponse)) return Fail("There is no reply to read yet.");
+                _ = island.ReadReplyAsync(); return Ok();
+            case PaletteCommand.WakeOn: await island.SetWakeEnabledAsync(true); return Ok();
+            case PaletteCommand.WakeOff: await island.SetWakeEnabledAsync(false); return Ok();
+            case PaletteCommand.AskScreen:
+                if (!TryStartQ(out var screenError)) return Fail(screenError!);
+                host.OpenChat(argument, useScreen: true); return Ok();
+            case PaletteCommand.SearchSettings: host.ShowSettingsSearch(argument); return Ok();
             case PaletteCommand.Ask:
                 if (!TryStartQ(out var askError)) return Fail(askError!);
-                host.OpenQ(string.IsNullOrWhiteSpace(argument) ? null : argument, QMode.Ask, compare: false);
+                host.OpenChat(string.IsNullOrWhiteSpace(argument) ? null : argument);
                 return Ok();
             case PaletteCommand.Say:
                 if (!TryStartQ(out var sayError)) return Fail(sayError!);
@@ -235,7 +291,7 @@ public sealed class CommandRunner(
                 island.IsExpanded = false;
                 return Ok();
             case PaletteCommand.OpenSettings:
-                host.ShowSettings();
+                if (string.IsNullOrWhiteSpace(argument)) host.ShowSettings(); else host.ShowSettingsSearch(argument);
                 return Ok();
 
             case PaletteCommand.Convert:
@@ -252,11 +308,22 @@ public sealed class CommandRunner(
         }
     }
 
+    public string? Availability(PaletteCommand command) => command switch
+    {
+        PaletteCommand.Seek when !Seek.Current.HasSession => "No active media",
+        PaletteCommand.Seek when !Seek.Current.CanSeek || Seek.Current.Duration <= TimeSpan.Zero => "This source does not support seeking",
+        PaletteCommand.Play or PaletteCommand.Pause or PaletteCommand.Next or PaletteCommand.Previous or PaletteCommand.OpenMedia when !island.Media.HasSession => "No active media",
+        PaletteCommand.Volume or PaletteCommand.Mute or PaletteCommand.Unmute when audio.Current.Availability != AudioAvailability.Available => "System audio unavailable",
+        PaletteCommand.VoiceInput when !island.QSpeechAvailable => "Windows speech language or microphone required",
+        PaletteCommand.ReadReply when string.IsNullOrWhiteSpace(island.QResponse) => "No reply yet",
+        PaletteCommand.Chat or PaletteCommand.Ask or PaletteCommand.AskScreen or PaletteCommand.VoiceInput when !island.Settings.QEnabled => "Assistant disabled",
+        _ => null
+    };
     private bool TryStartQ(out string? error)
     {
         if (!island.Settings.QEnabled)
         {
-            error = "Q is disabled in Settings.";
+            error = "Sutra Assistant is disabled in Settings.";
             return false;
         }
         error = null;

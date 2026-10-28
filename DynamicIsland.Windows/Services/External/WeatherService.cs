@@ -26,6 +26,12 @@ public sealed class WeatherService(LoggingService log) : IDisposable
     public event EventHandler<WeatherInfo?>? Changed;
     public WeatherInfo? Current { get; private set; }
 
+    public void ConfigurePolling(TimeSpan interval)
+    {
+        var normalized = TimeSpan.FromMinutes(Math.Clamp(interval.TotalMinutes, 1, 180));
+        if (_timer.Interval != normalized) _timer.Interval = normalized;
+    }
+
     public void Start()
     {
         _timer.Tick += (_, _) => _ = RefreshAsync();

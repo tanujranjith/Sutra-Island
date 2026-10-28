@@ -97,6 +97,8 @@ public sealed partial class IslandViewModel
             _deliveredNotificationSources.RemoveRange(0,
                 _deliveredNotificationSources.Count - MaxRememberedNotificationIdentities);
         if (accepted.Count == 0) return;
+        _notificationService.TraceAdmission(accepted.Count);
+        _bannerAcceptedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         _pendingNotifications.Enqueue(accepted);
         RefreshNotificationHistory(); PumpNotifications();
     });
@@ -124,6 +126,11 @@ public sealed partial class IslandViewModel
 
     private sealed record DeliveredNotificationSource(Guid HistoryId, string Identity, NotificationInfo Notification, DateTimeOffset AcceptedAt);
 
+    private bool _bannerPresentationReady;
+    private bool _ordinaryBannerPaused;
+    private long _bannerAcceptedAt;
+    public double BannerLatencyMilliseconds => _bannerAcceptedAt == 0 ? 0 : System.Diagnostics.Stopwatch.GetElapsedTime(_bannerAcceptedAt).TotalMilliseconds;
+    public void SetBannerPresentationReady() { _bannerPresentationReady = true; PumpNotifications(); RaisePropertyChanged(nameof(ShowBanner)); }
     private void PumpNotifications()
     {
         var contentChanged = false;
@@ -133,9 +140,11 @@ public sealed partial class IslandViewModel
         if (!Settings.ShowNotifications) { _pendingNotifications.Clear(); _currentGroup = null; _notification = null; }
         else
         {
-            if (_currentGroup is not null) _bannerSeconds -= elapsed;
+            var paused = IsLockBannerActive || SuppressOrdinaryBanners || FocusModeEnabled;
+            if (_currentGroup is not null && !paused && !_ordinaryBannerPaused) _bannerSeconds -= elapsed;
+            _ordinaryBannerPaused = paused;
             if (_currentGroup is not null && _bannerSeconds <= 0) { _currentGroup = null; _notification = null; _currentNotificationHistoryItem = null; }
-            if (!DeferOrdinaryBanners && !FocusModeEnabled &&
+            if (_bannerPresentationReady && !IsLockBannerActive && !DeferOrdinaryBanners && !FocusModeEnabled &&
                 _currentGroup is null && _pendingNotifications.Take(false) is { } group)
             {
                 _currentGroup = group; _currentNotificationHistoryItem = group.Latest;

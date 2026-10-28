@@ -45,6 +45,6 @@ public sealed record ThemePalette(string Surface, string Card, string Control, s
         return new(surface.Hex, card.Hex, control.Hex, surface.Blend(backing, .32).Hex,
             surface.Blend(text, .35).Hex, text.Hex, muted.Hex, accent.Hex, control.Hex);
     }
-    public static ThemePalette Dark { get; } = new("#080C12", "#0F1722", "#121923", "#172131", "#344156", "#E8EDF5", "#AAB5C6", "#63ACFF", "#173B65");
+    public static ThemePalette Dark { get; } = new("#17181D", "#1D1F25", "#24242B", "#2C2E37", "#36353F", "#F4F2F4", "#9998A4", "#B9A5FD", "#362F42");
     public static ThemePalette Light { get; } = new("#F5F5F7", "#FFFFFF", "#E8EDF4", "#DCE5F0", "#ABB9CB", "#172033", "#526078", "#075AAF", "#D5E6FA");
 }

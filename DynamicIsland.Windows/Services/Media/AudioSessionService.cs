@@ -4,15 +4,19 @@ using DynamicIsland.Windows.Models;
 
 namespace DynamicIsland.Windows.Services;
 
-public sealed class AudioSessionService(LoggingService log) : IDisposable
+public sealed class AudioSessionService(LoggingService log) : IDisposable, Infrastructure.CommandPalette.IPaletteAudioControl, Infrastructure.CommandPalette.IPaletteOutputControl, Infrastructure.CommandPalette.IPaletteVerifiedAudioControl
 {
     private const float AudibleThreshold = 0.008f;
     private readonly CancellationTokenSource _shutdown = new();
     private Thread? _thread;
     private readonly object _controlGate = new();
+    private int _pollIntervalMilliseconds = 400;
 
     public event EventHandler<AudioState>? Changed;
     public AudioState Current { get; private set; } = AudioState.Unknown;
+
+    public void ConfigurePolling(int intervalMilliseconds) =>
+        Interlocked.Exchange(ref _pollIntervalMilliseconds, Math.Clamp(intervalMilliseconds, 100, 3000));
 
     public void Start()
     {
@@ -24,6 +28,31 @@ public sealed class AudioSessionService(LoggingService log) : IDisposable
 
     public void SetMasterVolume(int percent)
         => ChangeVolume(percent, relative: false);
+
+    public Task<AudioState> ApplyVerifiedAudioAsync(int? absolute, int? delta, bool? muted, CancellationToken token) => Task.Run(() =>
+    {
+        lock (_controlGate)
+        {
+            token.ThrowIfCancellationRequested();
+            IAudioEndpointVolume? endpoint = null; IMMDevice? device = null;
+            try
+            {
+                (device, endpoint) = CoreAudioFactory.ActivateDefault<IAudioEndpointVolume>();
+                Marshal.ThrowExceptionForHR(endpoint.GetMasterVolumeLevelScalar(out var before));
+                var expected = Math.Clamp(absolute ?? (int)Math.Round(before * 100) + (delta ?? 0), 0, 100);
+                if (absolute is not null || delta is not null) Marshal.ThrowExceptionForHR(endpoint.SetMasterVolumeLevelScalar(expected / 100f, nint.Zero));
+                if (muted is bool mute) Marshal.ThrowExceptionForHR(endpoint.SetMute(mute, nint.Zero));
+                Marshal.ThrowExceptionForHR(endpoint.GetMasterVolumeLevelScalar(out var after));
+                Marshal.ThrowExceptionForHR(endpoint.GetMute(out var actualMute));
+                var actual = (int)Math.Round(after * 100);
+                if ((absolute is not null || delta is not null) && Math.Abs(actual - expected) > 1 || muted is not null && actualMute != muted)
+                    throw new InvalidOperationException("Windows did not confirm the audio change. Try again.");
+                Current = Current with { MasterVolumePercent = actual, SystemMuted = actualMute, Availability = AudioAvailability.Available };
+                Changed?.Invoke(this, Current); return Current;
+            }
+            finally { CoreAudioFactory.Release(endpoint); CoreAudioFactory.Release(device); }
+        }
+    }, token);
 
     public void AdjustMasterVolume(int delta)
         => ChangeVolume(delta, relative: true);
@@ -87,6 +116,29 @@ public sealed class AudioSessionService(LoggingService log) : IDisposable
         catch (Exception ex) { log.Error("Unable to switch output device", ex); }
     }
 
+    public Task<IReadOnlyList<AudioOutputDevice>> GetPaletteOutputsAsync() => Task.Run<IReadOnlyList<AudioOutputDevice>>(() =>
+    {
+        lock (_controlGate)
+        {
+            var devices = CoreAudioFactory.GetRenderEndpoints();
+            var currentId = ReadState().OutputDeviceId;
+            return devices.Select(device => new AudioOutputDevice(device.Id, device.Name, device.Id == currentId)).ToArray();
+        }
+    });
+
+    public Task SwitchPaletteOutputAsync(string id) => Task.Run(() =>
+    {
+        lock (_controlGate)
+        {
+            if (!CoreAudioFactory.GetRenderEndpoints().Any(device => device.Id == id))
+                throw new InvalidOperationException("That output device disconnected. Refresh the list.");
+            CoreAudioFactory.SetDefaultRenderDevice(id);
+            var next = ReadState();
+            if (next.OutputDeviceId != id) throw new InvalidOperationException("Windows did not switch output devices. Try again.");
+            Current = next; Changed?.Invoke(this, next);
+        }
+    });
+
     private void PollLoop()
     {
         while (!_shutdown.IsCancellationRequested)
@@ -104,7 +156,8 @@ public sealed class AudioSessionService(LoggingService log) : IDisposable
 
             // Core Audio enumeration is relatively expensive. Keep controls responsive while
             // audio is active, but back off when the machine is silent or audio is unavailable.
-            var delay = next.ActiveAudioOutput ? 400 : 1000;
+            var activeDelay = Volatile.Read(ref _pollIntervalMilliseconds);
+            var delay = next.ActiveAudioOutput ? activeDelay : Math.Max(1000, (activeDelay * 5 + 1) / 2);
             _shutdown.Token.WaitHandle.WaitOne(delay);
         }
     }

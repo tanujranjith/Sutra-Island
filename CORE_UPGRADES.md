@@ -1,5 +1,7 @@
 # Core upgrades — isolated implementation
 
+> Historical development notes from the earlier isolated preview. These instructions and test counts do not describe the current release. See [README.md](README.md) and [RELEASE_NOTES.md](RELEASE_NOTES.md) for the current app.
+
 Branch: `codex/island-core-upgrades`.
 
 Starting release: `5174a86`. Baseline including the five original uncommitted privacy/island edits: **`ae5c8af`**. The original checkout and installed executable are not replaced by this work.

@@ -292,9 +292,9 @@ internal static class CoreAudioFactory
         try
         {
             config = (IPolicyConfig)new CPolicyConfigClient();
-            config.SetDefaultEndpoint(deviceId, ERole.Console);
-            config.SetDefaultEndpoint(deviceId, ERole.Multimedia);
-            config.SetDefaultEndpoint(deviceId, ERole.Communications);
+            Marshal.ThrowExceptionForHR(config.SetDefaultEndpoint(deviceId, ERole.Console));
+            Marshal.ThrowExceptionForHR(config.SetDefaultEndpoint(deviceId, ERole.Multimedia));
+            Marshal.ThrowExceptionForHR(config.SetDefaultEndpoint(deviceId, ERole.Communications));
         }
         finally { Release(config); }
     }

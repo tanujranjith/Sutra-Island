@@ -4,10 +4,10 @@ using WinClipboard = Windows.ApplicationModel.DataTransfer.Clipboard;
 namespace DynamicIsland.Windows.Services;
 
 /// <summary>
-/// Reads Windows clipboard history (Win+V) on demand and copies an item back. Requires clipboard history
+/// Reads Windows clipboard text and image history (Win+V) on demand and copies an original item back. Requires clipboard history
 /// to be enabled; otherwise returns nothing. Best-effort, no special capability needed.
 /// </summary>
-public sealed class ClipboardService(LoggingService log)
+public sealed partial class ClipboardService(LoggingService log) : Infrastructure.CommandPalette.IPaletteClipboard
 {
     public event EventHandler? StatusChanged;
     private bool _enabled;
@@ -16,14 +16,16 @@ public sealed class ClipboardService(LoggingService log)
     private void SetStatus(Models.IntegrationStatus status) { if (Status == status) return; Status = status; StatusChanged?.Invoke(this, EventArgs.Empty); }
     public void Configure(bool enabled)
     { _enabled = enabled; _generation++; SetStatus(enabled ? new(Models.IntegrationState.Ready, "Open clipboard history to view recent items") : Models.IntegrationStatus.Disabled); }
-    public async Task<IReadOnlyList<string>> GetRecentTextAsync(int max = 6)
+    public Task<IReadOnlyList<string>> GetRecentTextAsync(int max = 6) => ReadHistoryAsync(max, true);
+
+    private async Task<IReadOnlyList<string>> ReadHistoryAsync(int max, bool requireEnabled)
     {
-        if (!_enabled) return [];
+        if (requireEnabled && !_enabled) return [];
         var generation = _generation;
         try
         {
             var result = await WinClipboard.GetHistoryItemsAsync();
-            if (!_enabled || generation != _generation) return [];
+            if (requireEnabled && !_enabled || generation != _generation) return [];
             if (result.Status != ClipboardHistoryItemsResultStatus.Success)
             {
                 SetStatus(new(Models.IntegrationState.PermissionRequired, "Enable clipboard history in Windows Settings.", "ms-settings:clipboard"));
@@ -36,24 +38,25 @@ public sealed class ClipboardService(LoggingService log)
                 if (item.Content.Contains(StandardDataFormats.Text))
                 {
                     var text = await item.Content.GetTextAsync();
-                    if (!string.IsNullOrWhiteSpace(text)) items.Add(text.Trim());
+                    if (!string.IsNullOrWhiteSpace(text)) items.Add(text);
                 }
             }
-            if (!_enabled || generation != _generation) return [];
+            if (requireEnabled && !_enabled || generation != _generation) return [];
             SetStatus(new(Models.IntegrationState.Ready, items.Count == 0 ? "Clipboard history is empty" : "Ready"));
             return items;
         }
-        catch (Exception ex) { log.Debug($"Clipboard history unavailable: {ex.Message}"); if (_enabled && generation == _generation) SetStatus(new(Models.IntegrationState.Error, "Clipboard history could not load. Retry.")); return []; }
+        catch (Exception ex) { log.Debug($"Clipboard history unavailable: {ex.Message}"); if ((!requireEnabled || _enabled) && generation == _generation) SetStatus(new(Models.IntegrationState.Error, "Clipboard history could not load. Retry.")); return []; }
     }
 
-    public void CopyText(string text)
+    public bool CopyText(string text)
     {
         try
         {
             var package = new DataPackage();
             package.SetText(text);
             WinClipboard.SetContent(package);
+            return true;
         }
-        catch (Exception ex) { log.Debug($"Clipboard set failed: {ex.Message}"); }
+        catch (Exception ex) { log.Debug($"Clipboard set failed: {ex.Message}"); return false; }
     }
 }

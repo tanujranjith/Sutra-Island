@@ -89,6 +89,7 @@ public sealed class SettingsService(LoggingService log)
     private static void Normalize(AppSettings settings)
     {
         var previousSchema = settings.SchemaVersion;
+        if (previousSchema < 16 && settings.Theme is ThemeMode.System or ThemeMode.Dark) settings.Theme = ThemeMode.Graphite;
         if (previousSchema < 4 && settings.QMaxResponseTokens == 1200)
             settings.QMaxResponseTokens = 8192;
         if (previousSchema < 6)
@@ -97,7 +98,26 @@ public sealed class SettingsService(LoggingService log)
             settings.QAutoExpandIsland = true;
         if (previousSchema < 12)
             settings.RealAudioSpectrum = true;
-        settings.SchemaVersion = Math.Max(12, settings.SchemaVersion);
+        if (previousSchema < 13 && settings.NotificationPollSeconds == 4) settings.NotificationPollSeconds = 1;
+        settings.PaletteFavorites = (settings.PaletteFavorites ?? []).Where(x => Enum.TryParse<Infrastructure.CommandPalette.PaletteCommand>(x, out _)).Distinct().ToList();
+        settings.PaletteRecents = (settings.PaletteRecents ?? []).Where(x => Enum.TryParse<Infrastructure.CommandPalette.PaletteCommand>(x, out _)).Distinct().Take(10).ToList();
+        settings.VoiceName ??= "";
+        settings.SchemaVersion = Math.Max(16, settings.SchemaVersion);
+        settings.NotificationPollSeconds = Math.Clamp(double.IsFinite(settings.NotificationPollSeconds) ? settings.NotificationPollSeconds : 1, 0.1, 30);
+        settings.MediaPollMilliseconds = Math.Clamp(settings.MediaPollMilliseconds, 100, 3000);
+        settings.AudioPollMilliseconds = Math.Clamp(settings.AudioPollMilliseconds, 100, 3000);
+        settings.SystemMonitorPollMilliseconds = Math.Clamp(settings.SystemMonitorPollMilliseconds, 200, 5000);
+        settings.TimerPollMilliseconds = Math.Clamp(settings.TimerPollMilliseconds, 100, 2000);
+        settings.ClockPollSeconds = Math.Clamp(settings.ClockPollSeconds, 1, 60);
+        settings.WindowPollSeconds = Math.Clamp(settings.WindowPollSeconds, 1, 10);
+        settings.ConnectivityPollSeconds = Math.Clamp(settings.ConnectivityPollSeconds, 1, 60);
+        settings.BatteryPollSeconds = Math.Clamp(settings.BatteryPollSeconds, 1, 60);
+        settings.PrivacyPollSeconds = Math.Clamp(settings.PrivacyPollSeconds, 1, 60);
+        settings.ThemePollSeconds = Math.Clamp(settings.ThemePollSeconds, 1, 60);
+        settings.AirPodsPollSeconds = Math.Clamp(settings.AirPodsPollSeconds, 1, 120);
+        settings.CalendarPollMinutes = Math.Clamp(settings.CalendarPollMinutes, 1, 60);
+        settings.StocksPollMinutes = Math.Clamp(settings.StocksPollMinutes, 1, 60);
+        settings.WeatherPollMinutes = Math.Clamp(settings.WeatherPollMinutes, 1, 180);
         if (settings.PinnedActivity is not (IslandActivity.None or IslandActivity.Media or IslandActivity.Timer)) settings.PinnedActivity = IslandActivity.None;
         settings.SelectedMediaApp = string.IsNullOrWhiteSpace(settings.SelectedMediaApp)
             ? "Automatic" : settings.SelectedMediaApp;
@@ -129,7 +149,7 @@ public sealed class SettingsService(LoggingService log)
         if (string.IsNullOrWhiteSpace(settings.ExpandedOrder)) settings.ExpandedOrder = "media,volume,status";
         settings.LowBatteryThreshold = Math.Clamp(settings.LowBatteryThreshold, 5, 50);
         settings.VolumeWarningThreshold = Math.Clamp(settings.VolumeWarningThreshold, 10, 100);
-        settings.NotificationPollSeconds = Math.Clamp(settings.NotificationPollSeconds, 1, 30);
+        settings.NotificationPollSeconds = Math.Clamp(double.IsFinite(settings.NotificationPollSeconds) ? settings.NotificationPollSeconds : 1, 0.1, 30);
         if (!Enum.IsDefined(settings.QCaptureMode)) settings.QCaptureMode = Models.QCaptureMode.ActiveWindow;
         settings.QSelectedProvider = string.IsNullOrWhiteSpace(settings.QSelectedProvider) ? "openai" : settings.QSelectedProvider.Trim();
         settings.QSelectedModel = string.IsNullOrWhiteSpace(settings.QSelectedModel) ? "gpt-4o-mini" : settings.QSelectedModel.Trim();

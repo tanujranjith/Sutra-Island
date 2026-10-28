@@ -60,7 +60,7 @@ public sealed class CodexRuntimeResolver
         {
             var manifest = JsonSerializer.Deserialize<CodexRuntimeManifest>(File.ReadAllText(manifestPath),
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            if (manifest is null || !Version.TryParse(manifest.Version, out var version) || version < MinimumSupportedVersion)
+            if (manifest is null || !CodexRuntimeVersion.TryParse(manifest.Version, out var version) || !version.IsAtLeast(MinimumSupportedVersion))
                 throw new InvalidDataException("The bundled Codex version is not supported.");
             if (manifest.Files is null || manifest.Files.Count != RequiredBundledFiles.Length ||
                 RequiredBundledFiles.Any(required => !manifest.Files.Any(file => string.Equals(file.Name, required, StringComparison.OrdinalIgnoreCase))))

@@ -119,6 +119,7 @@ internal static partial class UpgradeVerification
         vm.IsExpanded = true; window.UpdateLayout();
         var stableShellClip = shell.Clip;
         Check(!shell.UseLayoutRounding && !shell.SnapsToDevicePixels, "Main island permits fractional motion during expansion");
+        Check(expandedContent.CacheMode is null, "Expanded content stays sharp without a temporary bitmap cache");
         var stableViewport = viewport.RenderSize;
         var contentResizes = 0;
         SizeChangedEventHandler countResize = (_, _) => contentResizes++;
@@ -335,10 +336,10 @@ internal static partial class UpgradeVerification
         void CheckToolbar()
         {
             var actions = (ScrollViewer)window.FindName("QQuickActions");
-            var toolbar = (FrameworkElement)window.FindName("QToolbar");
+            var toolbar = (FrameworkElement)window.FindName("QShell");
             var top = actions.TranslatePoint(new System.Windows.Point(), toolbar);
-            check(actions.ActualHeight >= 36 && top.Y + actions.ActualHeight <= toolbar.ActualHeight + 1,
-                "Entire shortcut row fits inside the toolbar");
+            check(actions.ActualHeight >= 29 && top.Y >= 0 && top.Y + actions.ActualHeight <= toolbar.ActualHeight + 1,
+                "Entire shortcut row fits inside the assistant");
             var promptTop = prompt.TranslatePoint(new System.Windows.Point(), toolbar);
             check(top.Y + actions.ActualHeight + 10 <= promptTop.Y, "Shortcut buttons have clearance above the composer");
         }
@@ -397,8 +398,11 @@ internal static partial class UpgradeVerification
         }
         settings.QAutoExpandIsland = true;
         await session.BeginAsync(QMode.Ask, "openai", "openai-default", null);
-        var toggle = (System.Windows.Controls.CheckBox)window.FindName("QCompareToggle");
-        toggle.IsChecked = true;
+        var menuButton = (System.Windows.Controls.Button)window.FindName("QMenuButton");
+        var menu = menuButton.ContextMenu;
+        menu.DataContext = vm; menu.PlacementTarget = menuButton; menu.IsOpen = true;
+        var toggle = menu.Items.OfType<System.Windows.Controls.MenuItem>().Single(item => Equals(item.Header, "Compare two providers"));
+        toggle.IsChecked = true; menu.IsOpen = false;
         vm.QSelectedProvider = "gemini"; vm.QCompareProvider = "openai";
         var initialComparison = (QComparisonView)window.FindName("QComparisonPanel");
         var providerControl = (System.Windows.Controls.ComboBox)initialComparison.FindName("SecondProvider");

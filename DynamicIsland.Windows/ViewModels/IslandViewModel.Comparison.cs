@@ -28,13 +28,14 @@ public sealed partial class IslandViewModel
     public bool QShowSingleTranscript => !QCompareEnabled || QNeedsConsent;
     public bool QShowComparison => QCompareEnabled && !QNeedsConsent;
     public bool QShowCompactComparison => IsQActive && QCompareEnabled;
-    public System.Windows.Media.Brush IslandBaseSurfaceBrush => QShowCompactComparison
-        ? System.Windows.Media.Brushes.Transparent : IslandSurfaceBrush;
+    public System.Windows.Media.Brush IslandBaseSurfaceBrush => IsExpanded && ShowQSurface
+        ? System.Windows.Media.Brushes.Transparent : IsExpanded && IsDarkTheme
+            ? Settings.Theme == ThemeMode.Graphite && NativeFrostActive ? Infrastructure.FrostedMaterial.WithOpaqueCaps(FrozenBrush("#DC191B20"),NativeFrostInset) : FrozenBrush("#FF191B20") : IslandSurfaceBrush;
     public bool QShowCompactSingle => ShowCompactQContent && !QCompareEnabled;
     public double QCompactIconSize => QShowCompactComparison ? 36 : CompactAlbumSize;
     public string QDisclosureText => QCompareEnabled
-        ? "Q sends the same prompt and enabled screen context to both selected providers. Each provider uses its own API billing or account limits."
-        : "Q sends the active window’s text and, when supported, image to your selected provider.";
+        ? "Sutra Assistant sends the same prompt and enabled screen context to both selected providers. Each provider uses its own API billing or account limits."
+        : "Sutra sends your questions to the selected provider. Screen text and images are included only when you request screen help. Provider billing or account limits apply.";
     public string QSendLabel => QCompareEnabled ? "Send to both" : "Send";
     public string QStopLabel => QCompareEnabled ? "Stop both" : "Stop";
     public string QComposerPlaceholder => QCompareEnabled ? "Ask both a follow-up…" : "Ask a follow-up…";
@@ -141,7 +142,7 @@ public sealed partial class IslandViewModel
         await RefreshCodexModelsAsync();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(Settings.QTimeoutSeconds));
         await _qComparison.SubmitAsync(prompt, QCurrentMode, ComparisonTarget(false), ComparisonTarget(true),
-            token => _qScreen.CaptureAsync(_qTargetWindow, Settings.QCaptureMode == Models.QCaptureMode.ActiveMonitor
+            token => !(_qScreenSession || QUseScreenNext) ? Task.FromResult<QScreenContext?>(null) : _qScreen.CaptureAsync(_qTargetWindow, Settings.QCaptureMode == Models.QCaptureMode.ActiveMonitor
                 ? DynamicIsland.Q.Core.QCaptureMode.ActiveMonitor : DynamicIsland.Q.Core.QCaptureMode.ActiveWindow, token),
             Settings.QIncludeScreenImage, timeout.Token, Settings.QMaxResponseTokens,
             QIsSay ? Settings.QSaySystemPrompt : Settings.QAskSystemPrompt);

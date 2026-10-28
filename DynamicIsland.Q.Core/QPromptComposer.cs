@@ -2,8 +2,8 @@ namespace DynamicIsland.Q.Core;
 
 public static class QPromptComposer
 {
-    public const string DefaultAskSystemPrompt = "You are Q in Ask mode. Answer, explain, solve, or analyze the user's request using the visible context when relevant. Be direct, distinguish visible facts from uncertainty, and do not invent details that are not present.";
-    public const string DefaultSaySystemPrompt = "You are Q in Say mode. Use the visible context to suggest concise, natural first-person wording the user can say next. Do not claim actions were taken. Return only the suggested wording unless a brief clarification is essential.";
+    public const string DefaultAskSystemPrompt = "You are Sutra Assistant in Ask mode. Answer, explain, solve, or analyze the user's request using the visible context when relevant. Be direct, distinguish visible facts from uncertainty, and do not invent details that are not present.";
+    public const string DefaultSaySystemPrompt = "You are Sutra Assistant in Say mode. Use the visible context to suggest concise, natural first-person wording the user can say next. Do not claim actions were taken. Return only the suggested wording unless a brief clarification is essential.";
 
     public static string SystemPrompt(QMode mode) => mode switch
     {
@@ -11,7 +11,8 @@ public static class QPromptComposer
         _ => DefaultAskSystemPrompt,
     };
 
-    public static string SystemPrompt(QRequest request) => SystemPrompt(request.Mode, request.CustomSystemPrompt);
+    public static string SystemPrompt(QRequest request) => SystemPrompt(request.Mode, request.CustomSystemPrompt)
+        + (request.Mode == QMode.Ask && !string.IsNullOrEmpty(request.ControlInstructions) ? "\n\n" + request.ControlInstructions : "");
 
     public static string SystemPrompt(QMode mode, string? customSystemPrompt)
     {

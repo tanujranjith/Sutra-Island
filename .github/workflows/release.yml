@@ -23,6 +23,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Resolve and validate release version
         id: version
@@ -108,6 +110,8 @@ jobs:
           name: ${{ steps.version.outputs.tag }}
           body_path: dist/RELEASE_NOTES.md
           generate_release_notes: true
+          make_latest: true
+          fail_on_unmatched_files: true
           files: |
             dist/DynamicIsland.exe
             dist/DynamicIsland-Codex-Test-v${{ steps.version.outputs.app_version }}-win-x64.zip

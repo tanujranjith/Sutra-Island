@@ -36,11 +36,13 @@ public sealed class TrayService : IDisposable
 
         var menu = new Forms.ContextMenuStrip
         {
-            Renderer = new Forms.ToolStripProfessionalRenderer(),
+            Renderer = new GraphiteTrayMenuRenderer(),
+            BackColor = GraphiteTrayMenuRenderer.Surface, ForeColor = GraphiteTrayMenuRenderer.Text,
+            Font = new Font("Segoe UI", 9f), Padding = new Forms.Padding(5), ShowCheckMargin = true,
             ShowImageMargin = false
         };
         menu.Items.Add("Open Settings", null, (_, _) => OnUi(_openSettings));
-        menu.Items.Add("Ask Q", null, (_, _) => OnUi(_openQ));
+        menu.Items.Add("Sutra Assistant", null, (_, _) => OnUi(_openQ));
         menu.Items.Add("Recenter Island", null, (_, _) => OnUi(_recenter));
         _focusMode = new Forms.ToolStripMenuItem("Focus mode") { Checked = isFocusEnabled(), CheckOnClick = false };
         _focusMode.Click += (_, _) => OnUi(_toggleFocus);
@@ -64,6 +66,7 @@ public sealed class TrayService : IDisposable
         menu.Items.Add("Restart App", null, (_, _) => OnUi(Restart));
         menu.Items.Add("Quit", null, (_, _) => OnUi(_quit));
 
+        foreach (Forms.ToolStripItem item in menu.Items) item.Padding = new Forms.Padding(7,5,7,5);
         _icon = new Forms.NotifyIcon
         {
             Text = "Sutra Island",
@@ -111,19 +114,10 @@ public sealed class TrayService : IDisposable
 
     private static Icon CreateIcon()
     {
-        using var bitmap = new Bitmap(64, 64);
-        using var graphics = Graphics.FromImage(bitmap);
-        graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-        graphics.Clear(Color.Transparent);
-        using var shadow = new SolidBrush(Color.FromArgb(80, 0, 0, 0));
-        using var body = new SolidBrush(Color.FromArgb(255, 13, 17, 24));
-        using var accent = new SolidBrush(Color.FromArgb(255, 64, 153, 255));
-        graphics.FillEllipse(shadow, 7, 19, 52, 30);
-        graphics.FillEllipse(body, 5, 15, 54, 30);
-        graphics.FillEllipse(accent, 41, 23, 10, 10);
-        var handle = bitmap.GetHicon();
-        try { return (Icon)Icon.FromHandle(handle).Clone(); }
-        finally { DestroyIcon(handle); }
+        using var stream = System.Windows.Application.GetResourceStream(
+            new Uri("pack://application:,,,/DynamicIsland.Windows;component/app.ico")).Stream;
+        using var icon = new Icon(stream, 32, 32);
+        return (Icon)icon.Clone();
     }
 
     private static void OnUi(Action action) => System.Windows.Application.Current.Dispatcher.BeginInvoke(action);
@@ -135,7 +129,4 @@ public sealed class TrayService : IDisposable
         _icon.Dispose();
     }
 
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool DestroyIcon(nint handle);
 }

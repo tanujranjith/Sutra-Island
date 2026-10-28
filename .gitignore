@@ -20,6 +20,9 @@ dist/
 .idea/
 *.user
 *.suo
+*_wpftmp.csproj
+# Workspace-specific agent deployment instructions live outside the repository.
+AGENTS.md
 
 # ── Logs & misc ────────────────────────────────────────────
 *.log

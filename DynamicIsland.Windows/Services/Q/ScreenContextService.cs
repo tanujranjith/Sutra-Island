@@ -17,12 +17,16 @@ public sealed class ScreenContextService(LoggingService log) : IQScreenContextSe
     {
         var foreground = NativeMethods.GetForegroundWindow();
         if (foreground != nint.Zero && foreground != excludedWindow && NativeMethods.IsWindow(foreground))
+        {
+            NativeMethods.GetWindowThreadProcessId(foreground, out var pid);
+            if (pid == Environment.ProcessId) return;
             LastForegroundTarget = foreground;
+        }
     }
 
     public async Task<QScreenContext?> CaptureAsync(nint targetWindow, QCaptureMode mode, CancellationToken cancellationToken)
     {
-        if (targetWindow == nint.Zero) targetWindow = LastForegroundTarget;
+        if (targetWindow == nint.Zero) { RememberForeground(nint.Zero); targetWindow = LastForegroundTarget; }
         if (targetWindow == nint.Zero || !NativeMethods.IsWindow(targetWindow)) return null;
         if (!NativeMethods.GetWindowRect(targetWindow, out var rect) || rect.Width <= 0 || rect.Height <= 0) return null;
         if (mode == QCaptureMode.ActiveMonitor)

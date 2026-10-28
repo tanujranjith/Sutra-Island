@@ -331,16 +331,16 @@ public sealed class CodexAppServerClient : IAsyncDisposable
     {
         object response = method.EndsWith("requestApproval", StringComparison.Ordinal)
             ? new { id, result = new { decision = "decline" } }
-            : new { id, error = new { code = -32601, message = "Sutra Island Q does not enable tools or interactive requests." } };
+            : new { id, error = new { code = -32601, message = "Sutra Assistant does not enable tools or interactive requests." } };
         _log?.Info($"Codex server request declined: method={method}");
         return WriteAsync(JsonSerializer.Serialize(response), CancellationToken.None);
     }
 
-    private async Task<CodexRuntimeInfo> ValidateRuntimeAsync(CodexRuntimeInfo runtime, CancellationToken cancellationToken)
+    internal async Task<CodexRuntimeInfo> ValidateRuntimeAsync(CodexRuntimeInfo runtime, CancellationToken cancellationToken)
     {
-        if (runtime.Version is not null && Version.TryParse(runtime.Version, out var manifestVersion))
+        if (runtime.Version is not null && CodexRuntimeVersion.TryParse(runtime.Version, out var manifestVersion))
         {
-            if (manifestVersion < CodexRuntimeResolver.MinimumSupportedVersion) throw new CodexAppServerException(CodexFailureKind.RuntimeTooOld, CodexErrorClassifier.UserMessage(CodexFailureKind.RuntimeTooOld));
+            if (!manifestVersion.IsAtLeast(CodexRuntimeResolver.MinimumSupportedVersion)) throw new CodexAppServerException(CodexFailureKind.RuntimeTooOld, CodexErrorClassifier.UserMessage(CodexFailureKind.RuntimeTooOld));
             return runtime;
         }
         using var process = new Process
@@ -352,12 +352,26 @@ public sealed class CodexAppServerClient : IAsyncDisposable
             }
         };
         if (!process.Start()) throw new CodexAppServerException(CodexFailureKind.RuntimeInvalid, "Codex could not be started.");
-        var output = await process.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-        var token = output.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault();
-        if (!Version.TryParse(token, out var version)) throw new CodexAppServerException(CodexFailureKind.RuntimeInvalid, "The Codex version could not be verified.");
-        if (version < CodexRuntimeResolver.MinimumSupportedVersion) throw new CodexAppServerException(CodexFailureKind.RuntimeTooOld, CodexErrorClassifier.UserMessage(CodexFailureKind.RuntimeTooOld));
-        return runtime with { Version = version.ToString(), IsValidated = true };
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        try
+        {
+            var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
+            var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
+            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+            var output = await stdout.ConfigureAwait(false);
+            await stderr.ConfigureAwait(false);
+            if (process.ExitCode != 0) throw new CodexAppServerException(CodexFailureKind.RuntimeInvalid, "Codex could not report its version. Restart or update Codex, then retry.");
+            if (!CodexRuntimeVersion.TryParseOutput(output, out var version)) throw new CodexAppServerException(CodexFailureKind.RuntimeInvalid, "The Codex version could not be verified. Update Codex, then retry.");
+            if (!version.IsAtLeast(CodexRuntimeResolver.MinimumSupportedVersion)) throw new CodexAppServerException(CodexFailureKind.RuntimeTooOld, CodexErrorClassifier.UserMessage(CodexFailureKind.RuntimeTooOld));
+            _log?.Debug($"Codex version verified: source={runtime.Source}, version={version.Value}");
+            return runtime with { Version = version.Value, IsValidated = true };
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new CodexAppServerException(CodexFailureKind.RuntimeInvalid, "Codex did not respond to its version check. Restart Codex, then retry.");
+        }
+        finally { try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { } }
     }
 
     private void OnProcessExited()

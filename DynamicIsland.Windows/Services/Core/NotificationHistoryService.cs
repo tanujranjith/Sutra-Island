@@ -85,12 +85,20 @@ public sealed class NotificationHistoryService
         }
     }
 
+    private readonly object _saveGate = new();
+    private Task _saveTask = Task.CompletedTask;
+    public Task FlushAsync() { lock (_saveGate) return _saveTask; }
     private void Save()
+    {
+        var snapshot = _items.ToArray();
+        lock (_saveGate) _saveTask = _saveTask.ContinueWith(_ => WriteSnapshot(snapshot), TaskScheduler.Default);
+    }
+    private void WriteSnapshot(NotificationHistoryItem[] snapshot)
     {
         try
         {
             var temporary = _path + ".tmp";
-            File.WriteAllText(temporary, JsonSerializer.Serialize(_items, JsonOptions));
+            File.WriteAllText(temporary, JsonSerializer.Serialize(snapshot, JsonOptions));
             File.Move(temporary, _path, true);
         }
         catch (Exception ex) { _log.Debug($"Notification history could not be saved: {ex.Message}"); }

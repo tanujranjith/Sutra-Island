@@ -136,12 +136,12 @@ internal static class NativeMethods
     /// Enables (or disables) the real Windows acrylic backdrop blur behind the window. The tint alpha
     /// is kept low so it reads as frosted blur; the translucent WPF fill on top provides the colour.
     /// </summary>
-    public static void SetAcrylic(nint handle, bool enable, bool dark)
+    public static bool SetAcrylic(nint handle, bool enable, bool dark)
     {
         var policy = new AccentPolicy
         {
             AccentState = enable ? 4 : 0, // ACCENT_ENABLE_ACRYLICBLURBEHIND : ACCENT_DISABLED
-            AccentFlags = 2,
+            AccentFlags = 0,
             GradientColor = dark ? unchecked((int)0x2614181F) : unchecked((int)0x24F4F7FC),
             AnimationId = 0
         };
@@ -156,7 +156,7 @@ internal static class NativeMethods
                 Data = pointer,
                 SizeOfData = size
             };
-            SetWindowCompositionAttribute(handle, ref data);
+            return SetWindowCompositionAttribute(handle, ref data);
         }
         finally { Marshal.FreeHGlobal(pointer); }
     }

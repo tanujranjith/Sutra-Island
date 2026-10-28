@@ -1,10 +1,10 @@
 <Window x:Class="DynamicIsland.Windows.Views.CommandPaletteWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Width="640" SizeToContent="Height" WindowStyle="None" ResizeMode="NoResize"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:DynamicIsland.Windows.Views"
+        Icon="{StaticResource SutraIslandLogo}" Width="640" SizeToContent="Height" WindowStyle="None" ResizeMode="NoResize"
         AllowsTransparency="True" Background="Transparent" ShowInTaskbar="False"
         Topmost="True" ShowActivated="True" WindowStartupLocation="Manual"
-        FontFamily="Segoe UI Variable Text" Foreground="#F7FAFF"
+        FontFamily="Segoe UI Variable Text" Foreground="#F4F2F4"
         PreviewKeyDown="Window_PreviewKeyDown"
         AutomationProperties.Name="Command palette">
     <Window.Resources>
@@ -12,8 +12,8 @@
 
         <!-- Island shell material: near-black translucent card, hairline rim, deep float. -->
         <LinearGradientBrush x:Key="CardWash" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Offset="0" Color="#F514161C" />
-            <GradientStop Offset="1" Color="#F70D0F13" />
+            <GradientStop Offset="0" Color="#FF23242B" />
+            <GradientStop Offset="1" Color="#FF16171C" />
         </LinearGradientBrush>
 
         <Style x:Key="Keycap" TargetType="Border">
@@ -23,12 +23,89 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
+        <Style x:Key="PanelButton" TargetType="Button">
+            <Setter Property="Background" Value="#16FFFFFF" />
+            <Setter Property="Foreground" Value="#F4F2F4" />
+            <Setter Property="BorderBrush" Value="#20FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="17,11" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+                <Border x:Name="ButtonSurface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="11" Padding="{TemplateBinding Padding}">
+                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ButtonSurface" Property="BorderBrush" Value="#80B9A5FD" /></Trigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ButtonSurface" Property="BorderBrush" Value="#FFB9A5FD" /></Trigger>
+                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="ButtonSurface" Property="Opacity" Value="0.7" /></Trigger>
+                    <Trigger Property="IsEnabled" Value="False"><Setter TargetName="ButtonSurface" Property="Opacity" Value="0.4" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="PrimaryPanelButton" TargetType="Button" BasedOn="{StaticResource PanelButton}">
+            <Setter Property="Background" Value="#B9A5FD" /><Setter Property="Foreground" Value="#201A2B" /><Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="CompactAudioButton" TargetType="Button" BasedOn="{StaticResource PanelButton}">
+            <Setter Property="Padding" Value="12,7" /><Setter Property="FontSize" Value="12" />
+            <Setter Property="Background" Value="#7024252B" /><Setter Property="BorderBrush" Value="#50473F55" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        </Style>
+        <Style x:Key="AudioIconButton" TargetType="Button" BasedOn="{StaticResource CompactAudioButton}">
+            <Setter Property="Background" Value="Transparent" /><Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Width" Value="28" /><Setter Property="Height" Value="28" /><Setter Property="Padding" Value="0" />
+        </Style>
+        <Style x:Key="PanelLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Foreground" Value="#9998A4" /><Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style x:Key="PanelInput" TargetType="TextBox">
+            <Setter Property="Background" Value="#12FFFFFF" /><Setter Property="Foreground" Value="#F4F2F4" /><Setter Property="CaretBrush" Value="#B9A5FD" />
+            <Setter Property="BorderBrush" Value="#24FFFFFF" /><Setter Property="BorderThickness" Value="1" /><Setter Property="Padding" Value="14,11" /><Setter Property="FontSize" Value="15" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
+                <Border x:Name="InputSurface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="12"><ScrollViewer x:Name="PART_ContentHost" /></Border>
+                <ControlTemplate.Triggers><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="InputSurface" Property="BorderBrush" Value="#B9A5FD" /></Trigger></ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="VolumeTrackButton" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RepeatButton"><Border Height="6" CornerRadius="3" Background="{TemplateBinding Background}" VerticalAlignment="Center" /></ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="PaletteAudioSlider" TargetType="Slider">
+            <Setter Property="Height" Value="36" /><Setter Property="Minimum" Value="0" /><Setter Property="Maximum" Value="100" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="SmallChange" Value="1" /><Setter Property="LargeChange" Value="10" /><Setter Property="TickFrequency" Value="1" /><Setter Property="IsSnapToTickEnabled" Value="True" /><Setter Property="IsMoveToPointEnabled" Value="True" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Slider">
+                <Grid Background="Transparent">
+                    <Border x:Name="SliderFocus" BorderThickness="1" CornerRadius="8" BorderBrush="Transparent" Margin="-5,0" />
+                    <Track x:Name="PART_Track">
+                        <Track.DecreaseRepeatButton><RepeatButton Style="{StaticResource VolumeTrackButton}" Background="#B9A5FD" Command="Slider.DecreaseLarge" /></Track.DecreaseRepeatButton>
+                        <Track.IncreaseRepeatButton><RepeatButton Style="{StaticResource VolumeTrackButton}" Background="#49434F" Command="Slider.IncreaseLarge" /></Track.IncreaseRepeatButton>
+                        <Track.Thumb><Thumb Width="16" Height="16" Cursor="Hand"><Thumb.Template><ControlTemplate TargetType="Thumb"><Ellipse x:Name="VolumeThumb" Fill="#F1F4FA" Stroke="#CCD3E0" StrokeThickness="1" /><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="VolumeThumb" Property="Fill" Value="#B9A5FD" /></Trigger></ControlTemplate.Triggers></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+                    </Track>
+                </Grid>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4" /></Trigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="SliderFocus" Property="BorderBrush" Value="#B9A5FD" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="RepeatChoice" TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="#C1BDC9" /><Setter Property="Padding" Value="14,10" /><Setter Property="Margin" Value="0,0,7,0" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+                <Border x:Name="ChoiceSurface" CornerRadius="10" Background="#12FFFFFF" BorderBrush="#20FFFFFF" BorderThickness="1" Padding="{TemplateBinding Padding}"><ContentPresenter /></Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsSelected" Value="True"><Setter TargetName="ChoiceSurface" Property="Background" Value="#98362F42" /><Setter TargetName="ChoiceSurface" Property="BorderBrush" Value="#B9A5FD" /><Setter Property="Foreground" Value="#F4F2F4" /></Trigger>
+                    <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="ChoiceSurface" Property="BorderBrush" Value="#E4DCF8" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+
         <!-- The item container renders the whole row so selected/hover can recolour every part. -->
         <Style x:Key="SuggestionItemStyle" TargetType="ListBoxItem">
             <Setter Property="Focusable" Value="False" />
             <Setter Property="Padding" Value="10,9" />
             <Setter Property="Margin" Value="0,1" />
-            <Setter Property="Foreground" Value="#F7FAFF" />
+            <Setter Property="Foreground" Value="#F4F2F4" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
@@ -40,24 +117,25 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="28" /></Grid.ColumnDefinitions>
                                 <Border x:Name="IconTile" Width="36" Height="36" CornerRadius="11"
                                         Background="#16FFFFFF" VerticalAlignment="Center" Margin="0,0,12,0">
                                     <TextBlock x:Name="GlyphText" Text="{Binding Glyph}"
                                                FontFamily="Segoe Fluent Icons" FontSize="15"
-                                               Foreground="#C8D1DE" VerticalAlignment="Center"
+                                               Foreground="#C1BDC9" VerticalAlignment="Center"
                                                HorizontalAlignment="Center" />
                                 </Border>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock x:Name="NameText" Text="{Binding Name}" FontWeight="SemiBold"
-                                               FontSize="14.5" Foreground="#F7FAFF" />
-                                    <TextBlock x:Name="DescText" Text="{Binding Description}" FontSize="12.5"
-                                               Foreground="#AAB5C6" Margin="0,1,0,0" />
+                                    <TextBlock x:Name="NameText" Text="{Binding Name}" ToolTip="{Binding Name}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"
+                                               FontSize="14.5" Foreground="#F4F2F4" />
+                                    <TextBlock x:Name="DescText" Text="{Binding Description}" ToolTip="{Binding Description}" TextTrimming="CharacterEllipsis" FontSize="12.5"
+                                               Foreground="#C1BDC9" Margin="0,1,0,0" />
                                 </StackPanel>
+                                <Button Grid.Column="3" Content="{Binding FavoriteGlyph}" Visibility="{Binding CanFavorite, Converter={StaticResource PaletteBooleanToVisibility}}" Click="Favorite_Click" ToolTip="Favorite (Ctrl+D)" Background="Transparent" BorderThickness="0" Foreground="#B9A5FD" Padding="2" AutomationProperties.Name="Toggle favorite" />
                                 <Border Grid.Column="2" Style="{StaticResource Keycap}"
                                         Background="#12FFFFFF" VerticalAlignment="Center">
-                                    <TextBlock x:Name="ExampleText" Text="{Binding Example}" FontSize="11.5"
-                                               Foreground="#AAB5C6" />
+                                    <TextBlock x:Name="ExampleText" Text="{Binding Example}" MaxWidth="155" TextTrimming="CharacterEllipsis" FontSize="11.5"
+                                               Foreground="#C1BDC9" />
                                 </Border>
                             </Grid>
                         </Border>
@@ -67,28 +145,56 @@
                                 <Setter TargetName="IconTile" Property="Background" Value="#22FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#2E5AA7FF" />
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="#335AA7FF" />
-                                <Setter TargetName="IconTile" Property="Background" Value="#3D5AA7FF" />
+                                <Setter TargetName="Bd" Property="Background" Value="#98362F42" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#705E527A" />
+                                <Setter TargetName="IconTile" Property="Background" Value="#705E527A" />
                                 <Setter TargetName="GlyphText" Property="Foreground" Value="#FFFFFFFF" />
                                 <Setter TargetName="NameText" Property="Foreground" Value="#FFFFFFFF" />
-                                <Setter TargetName="DescText" Property="Foreground" Value="#D6E4FF" />
-                                <Setter TargetName="ExampleText" Property="Foreground" Value="#D6E4FF" />
+                                <Setter TargetName="DescText" Property="Foreground" Value="#E4DCF8" />
+                                <Setter TargetName="ExampleText" Property="Foreground" Value="#E4DCF8" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-    </Window.Resources>
+    <Style TargetType="ScrollBar">
+        <Setter Property="Width" Value="5" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Track x:Name="PART_Track" IsDirectionReversed="True" Orientation="Vertical">
+                        <Track.DecreaseRepeatButton>
+                            <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Opacity="0" Focusable="False" />
+                        </Track.DecreaseRepeatButton>
+                        <Track.Thumb>
+                            <Thumb MinHeight="38">
+                                <Thumb.Template>
+                                    <ControlTemplate TargetType="Thumb">
+                                        <Border Background="#FF665E75" CornerRadius="4" Margin="6,0" />
+                                    </ControlTemplate>
+                                </Thumb.Template>
+                            </Thumb>
+                        </Track.Thumb>
+                        <Track.IncreaseRepeatButton>
+                            <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Opacity="0" Focusable="False" />
+                        </Track.IncreaseRepeatButton>
+                    </Track>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style></Window.Resources>
 
-    <Border Margin="14" CornerRadius="26" Background="{StaticResource CardWash}"
-            BorderBrush="#1EFFFFFF" BorderThickness="1">
+    <views:NotificationMorphHost x:Name="PaletteMorph" Margin="14" RevealProgress="1" ReleaseClipWhenSettled="True" BlendSurfaceWithContent="True">
+    <Border x:Name="PaletteSurface" CornerRadius="25" Background="{DynamicResource CardWash}"
+            BorderBrush="{StaticResource GlassRimBrush}" BorderThickness="1">
         <DockPanel Margin="12,12,12,10">
 
             <!-- Search field: large type, inset well, SF-style keycaps. -->
-            <Border DockPanel.Dock="Top" CornerRadius="16" Background="#14FFFFFF"
-                    BorderBrush="#14FFFFFF" BorderThickness="1" Padding="16,12">
+            <Border DockPanel.Dock="Top" CornerRadius="16" Background="#5024252B"
+                    BorderBrush="#403F3949" BorderThickness="1" Padding="16,12"
+                    Visibility="{Binding ShowSuggestions, Converter={StaticResource PaletteBooleanToVisibility}}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -98,29 +204,36 @@
                     <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="17"
                                Foreground="#8A93A3" VerticalAlignment="Center" Margin="0,0,12,0" />
                     <TextBox x:Name="QueryBox" Grid.Column="1" BorderThickness="0" Background="Transparent"
-                             Foreground="#F7FAFF" CaretBrush="#5AA7FF" FontSize="18" FontWeight="Medium"
+                             Foreground="#F4F2F4" CaretBrush="#B9A5FD" FontSize="16" FontWeight="Medium"
                              Padding="0" VerticalContentAlignment="Center" AcceptsReturn="False"
                              Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
                              AutomationProperties.Name="Command" />
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                         <Border Style="{StaticResource Keycap}" Margin="4,0,0,0">
-                            <TextBlock Text="&#x2191;&#x2193;" FontSize="11" Foreground="#AAB5C6" />
+                            <TextBlock Text="&#x2191;&#x2193;" FontSize="11" Foreground="#C1BDC9" />
                         </Border>
                         <Border Style="{StaticResource Keycap}" Margin="4,0,0,0">
-                            <TextBlock Text="Esc" FontSize="11" Foreground="#AAB5C6" />
+                            <TextBlock Text="Esc" FontSize="11" Foreground="#C1BDC9" />
                         </Border>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <Rectangle DockPanel.Dock="Top" Height="1" Fill="#12FFFFFF" Margin="14,10,14,6" />
+            <Grid DockPanel.Dock="Top" Margin="4,2,4,4" Visibility="{Binding ShowPanelHeader, Converter={StaticResource PaletteBooleanToVisibility}}">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <Button Content="&#xE72B;" FontFamily="Segoe Fluent Icons" Style="{StaticResource PanelButton}" Padding="12" Margin="0,0,14,0" Click="Back_Click" ToolTip="Back to commands (Esc)" AutomationProperties.Name="Back to commands" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding PanelTitle}" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="{Binding PanelSubtitle}" Foreground="#8E9DB1" FontSize="12" Margin="0,3,0,0" /></StackPanel>
+                <Border Grid.Column="2" Style="{StaticResource Keycap}"><TextBlock Text="Esc" Foreground="#8E9DB1" FontSize="11" /></Border>
+            </Grid>
+
+            <Rectangle DockPanel.Dock="Top" Height="1" Fill="#12FFFFFF" Margin="14,10,14,6" Visibility="{Binding ShowPaletteFooter, Converter={StaticResource PaletteBooleanToVisibility}}" />
 
             <TextBlock x:Name="StatusText" DockPanel.Dock="Bottom" TextWrapping="Wrap" FontSize="12.5"
                        Margin="6,8,6,0" Text="{Binding StatusMessage}"
                        Visibility="{Binding HasStatus, Converter={StaticResource PaletteBooleanToVisibility}}">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock">
-                        <Setter Property="Foreground" Value="#AAB5C6" />
+                        <Setter Property="Foreground" Value="#C1BDC9" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsStatusError}" Value="True">
                                 <Setter Property="Foreground" Value="#FF6B6B" />
@@ -130,22 +243,76 @@
                 </TextBlock.Style>
             </TextBlock>
 
-            <Border DockPanel.Dock="Bottom" Margin="6,8,6,0">
+            <Border DockPanel.Dock="Bottom" Margin="6,8,6,0" Visibility="{Binding ShowPaletteFooter, Converter={StaticResource PaletteBooleanToVisibility}}">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock FontSize="11.5" Foreground="#6F7B8C">
-                        <Run Text="&#x21B5;" /> <Run Text="run" />
-                        <Run Text="   " />
-                        <Run Text="&#x2191;&#x2193;" /> <Run Text="navigate" />
-                        <Run Text="   " />
-                        <Run Text="Esc" /> <Run Text="dismiss" />
-                    </TextBlock>
-                    <TextBlock FontSize="11.5" Foreground="#4A5566" Margin="12,0,0,0"
+                    <TextBlock FontSize="11.5" Foreground="#6F7B8C" Text="{Binding FooterHint}" />
+                    <Border Width="16" Height="16" CornerRadius="5" Background="{StaticResource SutraIslandBrandBrush}" Margin="12,0,0,0" />
+                    <TextBlock FontSize="11.5" Foreground="#4A5566" Margin="5,0,0,0"
                                Text="Sutra Island" VerticalAlignment="Center" />
                 </StackPanel>
             </Border>
 
+            <views:CommandToolsView x:Name="ToolsView" DockPanel.Dock="Top" Visibility="{Binding IsToolPanel, Converter={StaticResource PaletteBooleanToVisibility}}" /><StackPanel DockPanel.Dock="Top" x:Name="VolumePanel" Margin="8,4,8,8" Visibility="{Binding IsVolumePanel, Converter={StaticResource PaletteBooleanToVisibility}}">
+                <Grid Margin="-4,0,-4,18"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <Button Content="&#xE72B;" FontFamily="Segoe Fluent Icons" Style="{StaticResource AudioIconButton}" Click="Back_Click" ToolTip="Back to commands" AutomationProperties.Name="Back to commands" />
+                    <TextBlock Grid.Column="1" Text="Volume" FontSize="15" FontWeight="SemiBold" Margin="7,0,0,0" VerticalAlignment="Center" />
+                    <Button Grid.Column="2" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10" Foreground="#8E96A5" Style="{StaticResource AudioIconButton}" Click="PanelSubmit_Click" ToolTip="Close" AutomationProperties.Name="Close volume controls" />
+                </Grid>
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <Border Width="36" Height="36" CornerRadius="12" Background="#7024252B" Margin="0,0,11,0"><TextBlock Text="{Binding PanelVolumeGlyph}" FontFamily="Segoe Fluent Icons" Foreground="#C1BDC9" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,10,0"><TextBlock Text="{Binding VolumeDeviceText}" Foreground="#E1E5EE" FontSize="12.5" TextTrimming="CharacterEllipsis" ToolTip="{Binding VolumeDeviceText}" /><TextBlock Text="Output device" Foreground="#9998A4" FontSize="11" Margin="0,3,0,0" /></StackPanel>
+                    <TextBlock Grid.Column="2" Text="{Binding VolumeValueText}" FontSize="25" FontWeight="Medium" VerticalAlignment="Center" />
+                </Grid>
+                <Slider x:Name="VolumeSlider" Style="{StaticResource PaletteAudioSlider}" Margin="0,13,0,9" Value="{Binding VolumePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding AudioAvailable}" AutomationProperties.Name="System volume" />
+                <Grid IsEnabled="{Binding AudioAvailable}"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <Button x:Name="VolumePreset25" Content="25%" Tag="25" Click="VolumePreset_Click" Style="{StaticResource CompactAudioButton}" Margin="0,0,6,0" />
+                    <Button Grid.Column="1" Content="50%" Tag="50" Click="VolumePreset_Click" Style="{StaticResource CompactAudioButton}" Margin="0,0,6,0" />
+                    <Button Grid.Column="2" Content="75%" Tag="75" Click="VolumePreset_Click" Style="{StaticResource CompactAudioButton}" Margin="0,0,12,0" />
+                    <Button x:Name="VolumeMuteButton" Grid.Column="3" Content="{Binding VolumeMuteText}" Click="Mute_Click" Style="{StaticResource CompactAudioButton}" MinWidth="68" />
+                </Grid>
+                <TextBlock Text="{Binding VolumeStateText}" TextWrapping="Wrap" Foreground="#C1BDC9" FontSize="11" Margin="0,12,0,0" Visibility="{Binding ShowVolumeStatus, Converter={StaticResource PaletteBooleanToVisibility}}" />
+                <Grid Margin="0,17,0,0"><TextBlock Text="← → adjust" FontSize="10.5" Foreground="#9998A4" /><TextBlock Text="Esc back" FontSize="10.5" Foreground="#9998A4" HorizontalAlignment="Right" /></Grid>
+            </StackPanel>
+
+            <StackPanel DockPanel.Dock="Top" x:Name="SeekPanel" Margin="8,4,8,8" Visibility="{Binding IsSeekPanel, Converter={StaticResource PaletteBooleanToVisibility}}">
+                <Grid Margin="-4,0,-4,18"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <Button Content="&#xE72B;" FontFamily="Segoe Fluent Icons" Style="{StaticResource AudioIconButton}" Click="Back_Click" ToolTip="Back to commands" AutomationProperties.Name="Back to commands" />
+                    <TextBlock Grid.Column="1" Text="Seek" FontSize="15" FontWeight="SemiBold" Margin="7,0,0,0" VerticalAlignment="Center" />
+                    <Button Grid.Column="2" Content="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10" Foreground="#8E96A5" Style="{StaticResource AudioIconButton}" Click="PanelSubmit_Click" ToolTip="Close" AutomationProperties.Name="Close seek controls" />
+                </Grid>
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Border Width="36" Height="36" CornerRadius="12" Background="#7024252B" Margin="0,0,11,0"><TextBlock Text="&#xE8D6;" FontFamily="Segoe Fluent Icons" Foreground="#C1BDC9" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding SeekTrackTitle}" Foreground="#E1E5EE" FontSize="13" FontWeight="Medium" TextTrimming="CharacterEllipsis" ToolTip="{Binding SeekTrackTitle}" /><TextBlock Text="{Binding SeekTrackSubtitle}" Foreground="#9998A4" FontSize="11" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" /></StackPanel>
+                </Grid>
+                <Slider x:Name="SeekSlider" Style="{StaticResource PaletteAudioSlider}" Margin="0,13,0,0" Maximum="{Binding SeekDurationSeconds}" Value="{Binding SeekPositionSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanSeekTrack}" PreviewMouseLeftButtonDown="SeekSlider_MouseDown" PreviewMouseLeftButtonUp="SeekSlider_MouseUp" LostMouseCapture="SeekSlider_LostCapture" AutomationProperties.Name="Playback position in seconds" />
+                <Grid Margin="0,1,0,15"><TextBlock Text="{Binding SeekElapsedText}" Foreground="#C1BDC9" FontSize="11" /><TextBlock Text="{Binding SeekDurationText}" Foreground="#C1BDC9" FontSize="11" HorizontalAlignment="Right" /></Grid>
+                <UniformGrid Columns="2" IsEnabled="{Binding CanSeekTrack}">
+                    <Button x:Name="SeekBackButton" Content="−10 seconds" Tag="-10" Click="SeekSkip_Click" Style="{StaticResource CompactAudioButton}" Margin="0,0,6,0" />
+                    <Button x:Name="SeekForwardButton" Content="+10 seconds" Tag="10" Click="SeekSkip_Click" Style="{StaticResource CompactAudioButton}" />
+                </UniformGrid>
+                <TextBlock Text="{Binding SeekStatus}" TextWrapping="Wrap" Foreground="#C1BDC9" FontSize="11" Margin="0,12,0,0" Visibility="{Binding ShowSeekStatus, Converter={StaticResource PaletteBooleanToVisibility}}" />
+                <Grid Margin="0,17,0,0"><TextBlock Text="← → fine seek · drag to scrub" FontSize="10.5" Foreground="#9998A4" /><TextBlock Text="Esc back" FontSize="10.5" Foreground="#9998A4" HorizontalAlignment="Right" /></Grid>
+            </StackPanel>
+
+            <StackPanel DockPanel.Dock="Top" x:Name="TimerPanel" Margin="16,16,16,12" Visibility="{Binding IsTimerPanel, Converter={StaticResource PaletteBooleanToVisibility}}">
+                <TextBlock Text="DURATION" Style="{StaticResource PanelLabel}" />
+                <StackPanel Orientation="Horizontal"><TextBox x:Name="TimerMinutesBox" Text="{Binding TimerMinutes, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PanelInput}" FontSize="48" Width="156" MaxLength="8" TextAlignment="Center" AutomationProperties.Name="Timer duration in minutes" /><TextBlock Text="minutes" Foreground="#A9B8CD" FontSize="18" VerticalAlignment="Center" Margin="16,0,0,0" /></StackPanel>
+                <UniformGrid Columns="4" Margin="0,16,0,22"><Button Content="5 min" Tag="5" Click="TimerPreset_Click" Style="{StaticResource PanelButton}" Margin="0,0,8,0" /><Button Content="10 min" Tag="10" Click="TimerPreset_Click" Style="{StaticResource PanelButton}" Margin="0,0,8,0" /><Button Content="25 min" Tag="25" Click="TimerPreset_Click" Style="{StaticResource PanelButton}" Margin="0,0,8,0" /><Button Content="60 min" Tag="60" Click="TimerPreset_Click" Style="{StaticResource PanelButton}" /></UniformGrid>
+                <TextBlock Text="LABEL · OPTIONAL" Style="{StaticResource PanelLabel}" /><TextBox x:Name="TimerLabelBox" Text="{Binding TimerLabel, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PanelInput}" MaxLength="120" AutomationProperties.Name="Timer label" />
+                <Grid Margin="0,22,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Button Content="All timers" Click="PanelList_Click" Style="{StaticResource PanelButton}" Margin="0,0,12,0" /><Button x:Name="TimerStartButton" Grid.Column="1" Content="Start timer" Click="PanelSubmit_Click" Style="{StaticResource PrimaryPanelButton}" /></Grid>
+            </StackPanel>
+
+            <StackPanel DockPanel.Dock="Top" x:Name="AlarmPanel" Margin="16,16,16,12" Visibility="{Binding IsAlarmPanel, Converter={StaticResource PaletteBooleanToVisibility}}">
+                <TextBlock Text="ALARM TIME" Style="{StaticResource PanelLabel}" /><TextBox x:Name="AlarmTimeBox" Text="{Binding AlarmTime, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PanelInput}" FontSize="42" MaxLength="16" AutomationProperties.Name="Alarm time" />
+                <TextBlock Text="Use 7:30 AM or 19:30 · local time" Foreground="#9998A4" FontSize="12" Margin="0,9,0,24" />
+                <TextBlock Text="REPEAT" Style="{StaticResource PanelLabel}" />
+                <ListBox ItemsSource="{Binding AlarmRepeatOptions}" SelectedItem="{Binding AlarmRepeat, Mode=TwoWay}" ItemContainerStyle="{StaticResource RepeatChoice}" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Alarm repeat"><ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ListBox.ItemsPanel></ListBox>
+                <Grid Margin="0,28,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Button Content="All alarms" Click="PanelList_Click" Style="{StaticResource PanelButton}" Margin="0,0,12,0" /><Button x:Name="AlarmSaveButton" Grid.Column="1" Content="Set alarm" Click="PanelSubmit_Click" Style="{StaticResource PrimaryPanelButton}" /></Grid>
+            </StackPanel>
+
             <!-- Row visuals live in the item container template; empty template keeps ItemTemplate present. -->
             <ListBox x:Name="SuggestionList" BorderThickness="0" Background="Transparent"
+                     Visibility="{Binding ShowSuggestions, Converter={StaticResource PaletteBooleanToVisibility}}"
                      Focusable="False" IsSynchronizedWithCurrentItem="False"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -159,4 +326,5 @@
             </ListBox>
         </DockPanel>
     </Border>
+    </views:NotificationMorphHost>
 </Window>

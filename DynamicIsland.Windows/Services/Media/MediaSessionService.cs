@@ -4,13 +4,21 @@ using Windows.Storage.Streams;
 
 namespace DynamicIsland.Windows.Services;
 
-public sealed class MediaSessionService(LoggingService log) : IDisposable
+public sealed class MediaSessionService : IDisposable, Infrastructure.CommandPalette.IPaletteSeekControl
 {
+    private readonly LoggingService log;
+    private readonly Infrastructure.CoalescingSeekQueue _seekQueue;
+    public MediaSessionService(LoggingService log)
+    {
+        this.log = log;
+        _seekQueue = new(ReadSeekContext, WriteQueuedSeekAsync, _shutdown.Token);
+    }
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Dictionary<string, DateTimeOffset> _recentActivity = new(StringComparer.OrdinalIgnoreCase);
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
     private GlobalSystemMediaTransportControlsSession? _selectedSession;
     private Task? _pollTask;
+    private int _pollIntervalMilliseconds = 500;
     private string _preferredApp = "Automatic";
     private string _lastIdentity = string.Empty;
     private string[] _availableApps = [];
@@ -28,6 +36,9 @@ public sealed class MediaSessionService(LoggingService log) : IDisposable
     public event EventHandler<MediaInfo>? Changed;
     public event EventHandler<IReadOnlyList<string>>? AvailableAppsChanged;
     public MediaInfo Current { get; private set; } = MediaInfo.Empty;
+
+    public void ConfigurePolling(int intervalMilliseconds) =>
+        Interlocked.Exchange(ref _pollIntervalMilliseconds, Math.Clamp(intervalMilliseconds, 100, 3000));
 
     public async Task StartAsync()
     {
@@ -104,6 +115,36 @@ public sealed class MediaSessionService(LoggingService log) : IDisposable
     public Task NextAsync() => RunCommandAsync("Next", async session =>
         { await session.TrySkipNextAsync(); });
 
+    public async Task<string> ApplyAssistantMediaAsync(string command, TimeSpan? offset, CancellationToken token)
+    {
+        if (command == "Seek")
+        {
+            if (offset is null || !await _seekQueue.RelativeAsync(offset.Value, token))
+                throw new InvalidOperationException("The media app did not accept that seek request. Check that the current track supports seeking.");
+            return "The media app accepted the seek request.";
+        }
+        var session = _selectedSession ?? throw new InvalidOperationException("No media app is active.");
+        await _commandGate.WaitAsync(token);
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(session, _selectedSession)) throw new InvalidOperationException("The media source changed. Try again.");
+            if (command == "Play" && Current.PlaybackState == MediaPlaybackState.Playing) return "Media is already playing.";
+            if (command == "Pause" && Current.PlaybackState == MediaPlaybackState.Paused) return "Media is already paused.";
+            var accepted = command switch
+            {
+                "Play" => await session.TryPlayAsync().AsTask(token),
+                "Pause" => await session.TryPauseAsync().AsTask(token),
+                "Next" => await session.TrySkipNextAsync().AsTask(token),
+                "Previous" => await session.TrySkipPreviousAsync().AsTask(token),
+                _ => false
+            };
+            if (!accepted) throw new InvalidOperationException("The media app did not accept that control request.");
+            return command switch { "Play" => "The media app accepted play.", "Pause" => "The media app accepted pause.", "Next" => "Requested the next track.", "Previous" => "Requested the previous track.", _ => "The media app accepted the seek request." };
+        }
+        finally { _commandGate.Release(); }
+    }
+
     private async Task RunCommandAsync(string name, Func<GlobalSystemMediaTransportControlsSession, Task> action)
     {
         var session = _selectedSession;
@@ -122,35 +163,44 @@ public sealed class MediaSessionService(LoggingService log) : IDisposable
         finally { if (entered) _commandGate.Release(); }
     }
 
-    public Task SeekFractionAsync(double fraction) => RunCommandAsync("Seek", async session =>
-        {
-            var duration = Current.Duration;
-            if (duration.Ticks <= 0) return;
-            await ChangePositionAsync(session, TimeSpan.FromTicks((long)(Math.Clamp(fraction, 0, 1) * duration.Ticks)));
-        });
+    public Task SeekFractionAsync(double fraction) => ObserveSeekAsync(() => _seekQueue.FractionAsync(fraction));
 
     // Seek a fixed amount relative to the current position (used by the 10s rewind/forward controls).
     // The target is clamped to [0, duration] so a near-start rewind lands exactly on 0 and a near-end
     // forward lands exactly on the track length — never overshooting either end. Seeking is relative to
     // the latest accepted seek target while the source's timeline is catching up, so rapid taps stack.
-    public Task SeekByAsync(TimeSpan offset) => RunCommandAsync("Relative seek", async session =>
-        {
-            if (!Current.CanSeek) return;
-            var duration = Current.Duration;
-            if (duration.Ticks <= 0) return;
-            var position = ResolvePendingSeek(Current.Position, _lastIdentity, Current.PlaybackState);
-            var target = Infrastructure.SeekMath.ClampSeek(position, offset, duration);
-            await ChangePositionAsync(session, target);
-        });
+    public Task SeekByAsync(TimeSpan offset) => ObserveSeekAsync(() => _seekQueue.RelativeAsync(offset));
 
-    private async Task ChangePositionAsync(GlobalSystemMediaTransportControlsSession session, TimeSpan target)
+    private async Task ObserveSeekAsync(Func<Task<bool>> request)
+    {
+        try { await request(); }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { }
+        catch (Exception ex) { log.Error("Seek command failed", ex); }
+    }
+
+    private Infrastructure.SeekContext ReadSeekContext() => new(_selectedSession, _lastIdentity,
+        ResolvePendingSeek(Current.Position, _lastIdentity, Current.PlaybackState), Current.Duration, Current.CanSeek);
+
+    private async Task<bool> WriteQueuedSeekAsync(Infrastructure.SeekContext context, TimeSpan target, CancellationToken token)
+    {
+        await _commandGate.WaitAsync(token);
+        try
+        {
+            if (!context.SameTrack(ReadSeekContext()) || !Current.CanSeek || context.Source is not GlobalSystemMediaTransportControlsSession session) return false;
+            return await ChangePositionAsync(session, target, token);
+        }
+        finally { _commandGate.Release(); }
+    }
+
+    private async Task<bool> ChangePositionAsync(GlobalSystemMediaTransportControlsSession session, TimeSpan target, CancellationToken token)
     {
         var identity = _lastIdentity;
-        if (!await session.TryChangePlaybackPositionAsync(target.Ticks)) return;
-        if (!ReferenceEquals(session, _selectedSession) || identity != _lastIdentity) return;
+        if (!await session.TryChangePlaybackPositionAsync(target.Ticks).AsTask(token)) return false;
+        if (!ReferenceEquals(session, _selectedSession) || identity != _lastIdentity) return false;
         var now = DateTimeOffset.Now;
         _pendingSeek = (identity, target, now);
         Publish(Current with { Position = target, UpdatedAt = now });
+        return true;
     }
 
     private TimeSpan ResolvePendingSeek(TimeSpan reported, string identity, MediaPlaybackState state, bool fromSource = false)
@@ -195,7 +245,9 @@ public sealed class MediaSessionService(LoggingService log) : IDisposable
             catch (Exception ex) { log.Error("Media session refresh failed", ex); }
             // Position needs frequent updates while playing. When nothing is playing,
             // polling less often avoids repeatedly querying media properties in the background.
-            try { await Task.Delay(isPlaying ? 500 : 1500, token); }
+            var activeInterval = Volatile.Read(ref _pollIntervalMilliseconds);
+            var idleInterval = Math.Max(1000, activeInterval * 3);
+            try { await Task.Delay(isPlaying ? activeInterval : idleInterval, token); }
             catch (OperationCanceledException) { break; }
         }
     }

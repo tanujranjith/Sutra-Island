@@ -19,6 +19,46 @@ internal static partial class UpgradeVerification
             }
         }
 
+        var nativeRead = new TaskCompletionSource<IReadOnlyList<NotificationInfo>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var nativeReadCount = 0;
+        var reader = new NotificationSnapshotReader(() => { nativeReadCount++; return nativeRead.Task; });
+        using (var timedOutWait = new CancellationTokenSource())
+        {
+            var firstWait = reader.ReadAsync(timedOutWait.Token);
+            timedOutWait.Cancel();
+            try { await firstWait; check(false, "Notifications: timed-out snapshot wait cancels"); }
+            catch (OperationCanceledException) { }
+            var retry = reader.ReadAsync(CancellationToken.None);
+            check(nativeReadCount == 1 && !retry.IsCompleted,
+                "Notifications: timeout retries reuse the pending Windows read instead of overlapping or restarting it");
+            nativeRead.SetResult([Note(800)]);
+            check((await retry).Single().Id == 800,
+                "Notifications: a Windows read slower than the timeout still delivers its result on retry");
+        }
+        nativeRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using (var timedOutWait = new CancellationTokenSource())
+        {
+            var wait = reader.ReadAsync(timedOutWait.Token);
+            timedOutWait.Cancel();
+            try { await wait; } catch (OperationCanceledException) { }
+            nativeRead.SetResult([Note(801)]);
+            check((await reader.ReadAsync(CancellationToken.None)).Single().Id == 801 && nativeReadCount == 2,
+                "Notifications: a snapshot completed between timeout and retry is delivered without starting another read");
+        }
+        nativeRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var followingRead = reader.ReadAsync(CancellationToken.None);
+        check(nativeReadCount == 3, "Notifications: consuming a snapshot allows the next fresh Windows read");
+        nativeRead.SetResult([Note(802)]);
+        await followingRead;
+
+        var failedReadCount = 0;
+        var failedReader = new NotificationSnapshotReader(() => ++failedReadCount == 1
+            ? Task.FromException<IReadOnlyList<NotificationInfo>>(new InvalidOperationException("Synthetic failed read"))
+            : Task.FromResult<IReadOnlyList<NotificationInfo>>([Note(803)]));
+        try { await failedReader.ReadAsync(CancellationToken.None); } catch (InvalidOperationException) { }
+        check((await failedReader.ReadAsync(CancellationToken.None)).Single().Id == 803 && failedReadCount == 2,
+            "Notifications: failed Windows operations are released so subsequent polls can recover");
+
         var dismissSource = new NotificationSourceFixture();
         using (var service = new NotificationListenerService(log, dismissSource))
         {

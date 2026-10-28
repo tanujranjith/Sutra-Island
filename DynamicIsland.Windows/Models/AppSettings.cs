@@ -1,6 +1,6 @@
 namespace DynamicIsland.Windows.Models;
 
-public enum ThemeMode { System, Light, Dark, Custom }
+public enum ThemeMode { System, Light, Dark, Custom, Graphite }
 public enum NotificationFilter { All, Allowlist, Blocklist }
 public enum IslandSize { Compact, Normal, Large }
 public enum IslandVisualMode { Apple, Stats }
@@ -12,7 +12,7 @@ public enum QCaptureMode { ActiveWindow, ActiveMonitor }
 
 public sealed class AppSettings
 {
-    public int SchemaVersion { get; set; } = 12;
+    public int SchemaVersion { get; set; } = 16;
     public bool LaunchOnStartup { get; set; }
     public bool AlwaysOnTop { get; set; } = true;
     public bool LockPosition { get; set; }
@@ -31,14 +31,24 @@ public sealed class AppSettings
     public bool ShowBattery { get; set; } = true;
     public bool ShowClock { get; set; } = true;
     public bool ShowDate { get; set; } = true;
+    public bool ShowCompactDate { get; set; }
+    public bool CapsLockNotifications { get; set; } = true;
+    public bool NumLockNotifications { get; set; } = true;
+    public bool WakeListeningEnabled { get; set; }
+    public bool VoiceReadAloud { get; set; } = true;
+    public string VoiceName { get; set; } = "";
+    public List<string> PaletteFavorites { get; set; } = [];
+    public List<string> PaletteRecents { get; set; } = [];
     public bool ShowTimerAlarm { get; set; } = true;
     public bool FocusModeEnabled { get; set; }
+    public DateTimeOffset? FocusSessionEndsAt { get; set; }
+    public bool FocusSessionRestoreEnabled { get; set; }
     public IslandActivity PinnedActivity { get; set; } = IslandActivity.None;
     public Guid? PinnedTimerId { get; set; }
     public bool NotificationHistoryEnabled { get; set; } = true;
     public bool Use24HourClock { get; set; }
     public bool ShowSeconds { get; set; }
-    public ThemeMode Theme { get; set; } = ThemeMode.System;
+    public ThemeMode Theme { get; set; } = ThemeMode.Graphite;
     public string CustomThemeColorHex { get; set; } = "#241C3C";
     public IslandSize IslandSize { get; set; } = IslandSize.Normal;
     public IslandVisualMode IslandVisualMode { get; set; } = IslandVisualMode.Apple;
@@ -136,7 +146,23 @@ public sealed class AppSettings
     // ===== Clipboard / notifications / calendar (Windows APIs; may be limited unpackaged) =====
     public bool ShowClipboard { get; set; }
     public bool ShowNotifications { get; set; }
-    public int NotificationPollSeconds { get; set; } = 4;
+    public double NotificationPollSeconds { get; set; } = 1;
+    // Background refresh cadences. These stay independent so faster local state updates do not
+    // force expensive network integrations to refresh at the same rate.
+    public int MediaPollMilliseconds { get; set; } = 500;
+    public int AudioPollMilliseconds { get; set; } = 400;
+    public int SystemMonitorPollMilliseconds { get; set; } = 700;
+    public int TimerPollMilliseconds { get; set; } = 500;
+    public int ClockPollSeconds { get; set; } = 1;
+    public int WindowPollSeconds { get; set; } = 1;
+    public int ConnectivityPollSeconds { get; set; } = 2;
+    public int BatteryPollSeconds { get; set; } = 2;
+    public int PrivacyPollSeconds { get; set; } = 3;
+    public int ThemePollSeconds { get; set; } = 5;
+    public int AirPodsPollSeconds { get; set; } = 15;
+    public int CalendarPollMinutes { get; set; } = 2;
+    public int StocksPollMinutes { get; set; } = 3;
+    public int WeatherPollMinutes { get; set; } = 30;
     public bool ShowNextMeeting { get; set; }
     // Notification mirroring filter: All shows every toast; Allowlist shows only listed apps; Blocklist hides them.
     public NotificationFilter NotificationFilterMode { get; set; } = NotificationFilter.All;

@@ -34,6 +34,11 @@ public sealed partial class CalendarService : IDisposable
     public MeetingInfo? Current { get; private set; }
     public DynamicIsland.Windows.Models.IntegrationStatus Status { get; private set; } = DynamicIsland.Windows.Models.IntegrationStatus.Disabled;
     public CalendarService(LoggingService log) { _log = log; _timer.Tick += async (_, _) => await RefreshAsync(); }
+    public void ConfigurePolling(TimeSpan interval)
+    {
+        var normalized = TimeSpan.FromMinutes(Math.Clamp(interval.TotalMinutes, 1, 60));
+        if (_timer.Interval != normalized) _timer.Interval = normalized;
+    }
     private void SetStatus(DynamicIsland.Windows.Models.IntegrationState state, string message, string? uri = null)
     { var value = new Models.IntegrationStatus(state, message, uri); if (Status == value) return; Status = value; StatusChanged?.Invoke(this, EventArgs.Empty); }
     public async Task StartAsync(bool requestPermission = false)

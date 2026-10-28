@@ -10,9 +10,16 @@ public static class CalculatorParser
         if (string.IsNullOrWhiteSpace(expression) || !expression.Any(char.IsAsciiDigit))
             return false;
 
-        return expression.All(character =>
-            char.IsWhiteSpace(character) || char.IsAsciiDigit(character) ||
-            character is '.' or '+' or '-' or '*' or '/' or '%' or '(' or ')' or '×' or '÷');
+        for (var index = 0; index < expression.Length; index++)
+        {
+            var character = expression[index];
+            if (char.IsWhiteSpace(character) || char.IsAsciiDigit(character) ||
+                character is '.' or '+' or '-' or '*' or '/' or '%' or '(' or ')' or '×' or '÷') continue;
+            if (expression.AsSpan(index).StartsWith("mod", StringComparison.OrdinalIgnoreCase)) index += 2;
+            else if (expression.AsSpan(index).StartsWith("of", StringComparison.OrdinalIgnoreCase)) index++;
+            else return false;
+        }
+        return true;
     }
 
     public static bool TryEvaluate(string expression, out decimal result, out string? error)
@@ -52,6 +59,7 @@ public static class CalculatorParser
 
     private sealed class Parser(string input)
     {
+        private readonly record struct Operand(decimal Value, bool IsPercentage = false);
         private int _position;
 
         public decimal Evaluate()
@@ -60,43 +68,60 @@ public static class CalculatorParser
             SkipWhitespace();
             if (_position != input.Length)
                 throw new FormatException();
-            return result;
+            return result.Value;
         }
 
-        private decimal ParseExpression()
+        private Operand ParseExpression()
         {
             var value = ParseTerm();
             while (true)
             {
                 SkipWhitespace();
-                if (Take('+')) value += ParseTerm();
-                else if (Take('-')) value -= ParseTerm();
+                if (Take('+'))
+                {
+                    var right = ParseTerm();
+                    value = new(value.Value + (right.IsPercentage ? value.Value * right.Value : right.Value));
+                }
+                else if (Take('-'))
+                {
+                    var right = ParseTerm();
+                    value = new(value.Value - (right.IsPercentage ? value.Value * right.Value : right.Value));
+                }
                 else return value;
             }
         }
 
-        private decimal ParseTerm()
+        private Operand ParseTerm()
         {
             var value = ParseUnary();
             while (true)
             {
                 SkipWhitespace();
-                if (Take('*') || Take('×')) value *= ParseUnary();
-                else if (Take('/') || Take('÷')) value /= ParseUnary();
-                else if (Take('%')) value %= ParseUnary();
+                if (Take('*') || Take('×')) value = new(value.Value * ParseUnary().Value);
+                else if (Take('/') || Take('÷')) value = new(value.Value / ParseUnary().Value);
+                else if (TakeWord("mod")) value = new(value.Value % ParseUnary().Value);
                 else return value;
             }
         }
 
-        private decimal ParseUnary()
+        private Operand ParseUnary()
         {
             SkipWhitespace();
             if (Take('+')) return ParseUnary();
-            if (Take('-')) return -ParseUnary();
-            return ParsePrimary();
+            if (Take('-')) { var value = ParseUnary(); return value with { Value = -value.Value }; }
+            var primary = ParsePrimary();
+            SkipWhitespace();
+            if (!Take('%')) return primary;
+            var fraction = primary.Value / 100m;
+            SkipWhitespace();
+            // A following amount means "percent of"; otherwise this is a postfix percentage.
+            if (TakeWord("of") || _position < input.Length &&
+                (char.IsAsciiDigit(input[_position]) || input[_position] is '.' or '('))
+                return new(fraction * ParseUnary().Value);
+            return new(fraction, true);
         }
 
-        private decimal ParsePrimary()
+        private Operand ParsePrimary()
         {
             SkipWhitespace();
             if (Take('('))
@@ -129,7 +154,7 @@ public static class CalculatorParser
             if (!sawDigit || !decimal.TryParse(input.AsSpan(start, _position - start),
                     NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var number))
                 throw new FormatException();
-            return number;
+            return new(number);
         }
 
         private void SkipWhitespace()
@@ -143,6 +168,15 @@ public static class CalculatorParser
             if (_position >= input.Length || input[_position] != expected)
                 return false;
             _position++;
+            return true;
+        }
+
+        private bool TakeWord(string expected)
+        {
+            if (!input.AsSpan(_position).StartsWith(expected, StringComparison.OrdinalIgnoreCase)) return false;
+            var end = _position + expected.Length;
+            if (end < input.Length && char.IsAsciiLetter(input[end])) return false;
+            _position = end;
             return true;
         }
     }

@@ -14,7 +14,7 @@ public partial class TimerListPanel : System.Windows.Controls.UserControl
         var narrow = ActualWidth > 0 && ActualWidth < 680;
         TimerLayout.ColumnDefinitions[0].Width = narrow
             ? new System.Windows.GridLength(1, System.Windows.GridUnitType.Star)
-            : new System.Windows.GridLength(320);
+            : new System.Windows.GridLength(360);
         TimerLayout.ColumnDefinitions[1].Width = narrow
             ? new System.Windows.GridLength(0)
             : new System.Windows.GridLength(1, System.Windows.GridUnitType.Star);

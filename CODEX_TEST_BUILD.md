@@ -4,14 +4,14 @@ This ZIP is the test distribution that includes a pinned official Codex runtime.
 Extract the entire folder before launching the included app executable; do not run it
 from inside the ZIP.
 
-In **Settings > Q Assistant**, choose **Codex · Sign in** and select **Sign in with
+In **Settings > Sutra Assistant**, choose **Codex · Sign in** and select **Sign in with
 ChatGPT**. The browser/device-code flow and OAuth token lifecycle are handled by
 the official Codex app-server. Sutra Island never receives or stores the token.
 
 Important behavior:
 
 - Signing out in Sutra Island also signs out official Codex apps for this Windows user.
-- Q sends prompts, OCR text, and an enabled screen image to OpenAI through Codex.
+- Prompts are sent to OpenAI through Codex. Screen context is used for the selected next question or an explicitly started screen-help session, including its follow-ups; image inclusion also depends on settings.
 - Q requests read-only/no-approval operation, declines tool approvals, and deletes
   only the Codex threads it created after each request.
 - ChatGPT subscription access applies only to the Codex service and its limits. It

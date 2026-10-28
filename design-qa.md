@@ -1,11 +1,12 @@
 # Q Compare design verification
 
+> Historical design verification. Local-only mockups and captures are not included in the repository; the current interface may differ.
+
 final result: passed
 
 ## Visual targets
 
-- Expanded: `C:/Users/tanuj/.codex/generated_images/01a0938f-4117-7060-a2b0-01e27cab1b0a/exec-9a7befd8-7146-4c52-a881-c90f567c14cc.png`
-- Selected collapsed: `C:/Users/tanuj/.codex/generated_images/01a0938f-4117-7060-a2b0-01e27cab1b0a/exec-92b57a49-2544-4c6f-b688-c3bbce45904e.png`
+- Expanded and collapsed concept mockups were local development references.
 - Final native implementation: `artifacts/compare-verification-v5/captures/compare-expanded-100.png`, `compare-collapsed-detail.png`, `compare-narrow-100.png`, and `compare-narrow-scrolled-100.png`.
 
 ## First inspection
