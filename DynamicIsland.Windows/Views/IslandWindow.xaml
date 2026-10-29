@@ -647,7 +647,7 @@
 <MenuItem Header="Pin selected timer" Command="{Binding PinTimerCommand}" />
 <MenuItem Header="Automatic activity" Command="{Binding UnpinActivityCommand}" />
 <Separator />
-                                        <MenuItem Header="Settings" Click="SettingsButton_Click" />
+                                        <MenuItem Header="Screenshot" Click="ScreenshotButton_Click" /><MenuItem Header="Settings" Click="SettingsButton_Click" />
                                         <MenuItem Header="Ask Sutra Assistant" Click="QButton_Click" />
                                         <MenuItem Header="Timer" Click="TimerButton_Click" />
                                         <Separator />

@@ -195,6 +195,7 @@ public sealed class AppSettings
     public string QActivationHotkey { get; set; } = "Ctrl+Alt+Q";
     // Global shortcut that opens the command palette. Customisable in Settings → Advanced.
     public string CommandPaletteHotkey { get; set; } = "Ctrl+Alt+K";
+    public string ScreenshotHotkey { get; set; } = "Ctrl+Alt+S";
     // Null migrates the former single choice; zero intentionally disables every shortcut.
     public QActivationShortcuts? QActivationKeys { get; set; }
     public List<QShortcut> QShortcuts { get; set; } = [];

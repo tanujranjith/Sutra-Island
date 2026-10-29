@@ -77,6 +77,7 @@ public sealed class CommandPaletteSuggestion
         PaletteCommand.OpenMedia => "\uE8D6",
         PaletteCommand.Recenter => "\uE81D",
         PaletteCommand.Clipboard => "\uE77F",
+        PaletteCommand.Screenshot => "\uE722",
         PaletteCommand.NotificationHistory or PaletteCommand.NotificationsOn or PaletteCommand.NotificationsOff => "\uE7F4",
         PaletteCommand.RetryNotifications => "\uE72C",
         PaletteCommand.DismissBanner => "\uE711",

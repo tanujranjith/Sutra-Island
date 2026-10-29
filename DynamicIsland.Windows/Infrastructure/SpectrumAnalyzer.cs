@@ -23,6 +23,10 @@ public static class SpectrumAnalyzer
     // by windowing before estimating each band's RMS amplitude.
     private const double HannPowerGain = 0.375;
 
+    // Analyze runs at the audio hop cadence. Build the identical coefficients once instead of
+    // evaluating 4,096 cosine calls for every captured frame.
+    private static readonly double[] HannWindow = CreateHannWindow();
+
     private static readonly (double Low, double High)[] Bands =
     [
         (20, 120),
@@ -56,8 +60,7 @@ public static class SpectrumAnalyzer
         for (var n = 0; n < WindowSize; n++)
         {
             sumSquares += samples[n] * samples[n];
-            var window = 0.5 - (0.5 * Math.Cos((2 * Math.PI * n) / (WindowSize - 1)));
-            real[n] = samples[n] * window;
+            real[n] = samples[n] * HannWindow[n];
         }
 
         ForwardTransform(real, imaginary);
@@ -94,6 +97,19 @@ public static class SpectrumAnalyzer
 
         var decibels = 20 * Math.Log10(amplitude);
         return Math.Clamp((decibels - FloorDecibels) / RangeDecibels, 0, 1);
+    }
+
+    // The test project links this source file, so it can verify every cached coefficient against
+    // the original expression without exposing a mutable array to production callers.
+    internal static ReadOnlySpan<double> HannCoefficients => HannWindow;
+
+    private static double[] CreateHannWindow()
+    {
+        var coefficients = new double[WindowSize];
+        for (var n = 0; n < coefficients.Length; n++)
+            coefficients[n] = 0.5 - (0.5 * Math.Cos((2 * Math.PI * n) / (WindowSize - 1)));
+
+        return coefficients;
     }
 
     private static int BandIndex(double frequency)

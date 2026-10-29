@@ -10,6 +10,7 @@ namespace DynamicIsland.Windows.Infrastructure.CommandPalette;
 public interface ICommandPaletteHost
 {
     void ShowSettings();
+    void ShowScreenshotTool() { }
     void ShowTimerPanel();
     void ShowAlarmPanel();
     void ShowStopwatchPanel();
@@ -71,6 +72,9 @@ public sealed class CommandRunner(
         var argument = match.Argument;
         switch (match.Command.Id)
         {
+            case PaletteCommand.Screenshot:
+                host.ShowScreenshotTool();
+                return Ok();
             case PaletteCommand.Pause:
             {
                 var state = island.Media;

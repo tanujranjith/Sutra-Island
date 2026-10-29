@@ -9,6 +9,7 @@ public partial class GraphiteIslandView : System.Windows.Controls.UserControl
     public event RoutedEventHandler? SettingsRequested, TimerRequested, AssistantRequested, RecenterRequested, OutputRequested, MenuOpened, MenuClosed;
     public GraphiteIslandView() => InitializeComponent();
     private void Settings_Click(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke(sender, e);
+    private void Screenshot_Click(object sender, RoutedEventArgs e) => (Window.GetWindow(this) as IslandWindow)?.RequestScreenshot();
     private void Timer_Click(object sender, RoutedEventArgs e) => TimerRequested?.Invoke(sender, e);
     private void Assistant_Click(object sender, RoutedEventArgs e) => AssistantRequested?.Invoke(sender, e);
     private void Recenter_Click(object sender, RoutedEventArgs e) => RecenterRequested?.Invoke(sender, e);

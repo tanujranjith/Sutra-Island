@@ -9,7 +9,7 @@ public enum PaletteCommand
     StartStopwatch, PauseStopwatch, ResumeStopwatch, ResetStopwatch,
     FocusOn, FocusOff, Expand, Collapse, OpenSettings,
     Help, Convert, Volume, OpenMedia, Recenter, Clipboard, NotificationHistory, NotificationsOn, NotificationsOff, RetryNotifications, DismissBanner, Chat, VoiceInput, StopAssistant, ReadReply, WakeOn, WakeOff, AskScreen, SearchSettings,
-    Stopwatch, Focus, AudioOutput
+    Stopwatch, Focus, AudioOutput, Screenshot
 }
 
 public sealed record CommandDefinition(
@@ -25,7 +25,7 @@ public sealed record CommandDefinition(
         PaletteCommand.Ask or PaletteCommand.Say or PaletteCommand.Compare or PaletteCommand.Chat or PaletteCommand.VoiceInput or PaletteCommand.StopAssistant or PaletteCommand.ReadReply or PaletteCommand.WakeOn or PaletteCommand.WakeOff or PaletteCommand.AskScreen => "Assistant",
         PaletteCommand.NotificationsOn or PaletteCommand.NotificationsOff or PaletteCommand.RetryNotifications or PaletteCommand.DismissBanner or PaletteCommand.NotificationHistory => "Notifications",
         PaletteCommand.SearchSettings or PaletteCommand.OpenSettings => "Settings",
-        PaletteCommand.Convert or PaletteCommand.Stopwatch or PaletteCommand.Clipboard => "Tools",
+        PaletteCommand.Convert or PaletteCommand.Stopwatch or PaletteCommand.Clipboard or PaletteCommand.Screenshot => "Tools",
         PaletteCommand.AudioOutput => "Audio",
         _ => "Island"
     };
@@ -73,6 +73,7 @@ public static class CommandCatalog
         new(PaletteCommand.OpenMedia, "open media", [], "Open the current media app", "open media"),
         new(PaletteCommand.Recenter, "recenter", [], "Recenter the island", "recenter"),
         new(PaletteCommand.Clipboard, "clipboard", [], "Open clipboard history", "clipboard"),
+        new(PaletteCommand.Screenshot, "screenshot", ["capture", "snip", "screen shot"], "Capture a region, active window, or all screens locally", "Enter to choose capture mode"),
         new(PaletteCommand.NotificationHistory, "notifications", ["notification history", "history"], "Review notifications and mirroring controls", "Enter to review"),
         new(PaletteCommand.NotificationsOn, "notifications on", [], "Enable Windows notification mirroring", "notifications on"),
         new(PaletteCommand.NotificationsOff, "notifications off", [], "Disable Windows notification mirroring", "notifications off"),
@@ -101,6 +102,7 @@ public static class CommandCatalog
         ById(PaletteCommand.Stopwatch),
         ById(PaletteCommand.Focus),
         ById(PaletteCommand.Clipboard),
+        ById(PaletteCommand.Screenshot),
         ById(PaletteCommand.AudioOutput),
         ById(PaletteCommand.NotificationHistory),
         ById(PaletteCommand.Timer),

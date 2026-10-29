@@ -107,8 +107,9 @@ public sealed class QSessionController(IQProviderRegistry providers) : IQSession
                         break;
                     case QStreamEvent.Text text:
                         response.Append(text.Value);
-                        if (controls is null || !AssistantControlProtocol.MustBuffer(response.ToString()))
-                            Emit(Snapshot with { State = QRunState.Streaming, Response = response.ToString(), Status = "Sutra Assistant is responding…" });
+                        var currentResponse = response.ToString();
+                        if (controls is null || !AssistantControlProtocol.MustBuffer(currentResponse))
+                            Emit(Snapshot with { State = QRunState.Streaming, Response = currentResponse, Status = "Sutra Assistant is responding…" });
                         break;
                     case QStreamEvent.Failed failed:
                         throw failed.Exception ?? new InvalidOperationException(failed.Message);

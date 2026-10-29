@@ -23,11 +23,14 @@ public sealed class SystemMonitorService : IDisposable
     private long _lastTicks;
     private long _networkInterfacesRefreshedAt;
     private NetworkInterface[] _networkInterfaces = [];
+    private int _networkInterfacesDirty = 1;
+    private void NetworkChanged(object? sender, EventArgs e) => Interlocked.Exchange(ref _networkInterfacesDirty, 1);
     private double _cpuEma = -1;
 
     public SystemMonitorService()
     {
         _powerInfo = new NativeMethods.ProcessorPowerInformation[_cores];
+        NetworkChange.NetworkAddressChanged += NetworkChanged;
     }
 
     public event EventHandler<SystemStats>? Changed;
@@ -156,7 +159,7 @@ public sealed class SystemMonitorService : IDisposable
     private long TotalBytes()
     {
         var now = Environment.TickCount64;
-        if (_networkInterfaces.Length == 0 || now - _networkInterfacesRefreshedAt >= 60_000)
+        if (Interlocked.Exchange(ref _networkInterfacesDirty, 0) != 0 || now - _networkInterfacesRefreshedAt >= 60_000)
         {
             _networkInterfaces = NetworkInterface.GetAllNetworkInterfaces()
                 .Where(IsPhysicalDataInterface)
@@ -192,6 +195,7 @@ public sealed class SystemMonitorService : IDisposable
 
     public void Dispose()
     {
+        NetworkChange.NetworkAddressChanged -= NetworkChanged;
         Stop();
     }
 }

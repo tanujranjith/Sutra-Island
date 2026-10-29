@@ -121,7 +121,7 @@ public sealed partial class IslandViewModel
     private static string OneLine(string value) => System.Text.RegularExpressions.Regex.Replace(value, @"\s+", " ").Trim();
     private static string AnswerStatus(QSessionSnapshot s) => s.State switch
     { QRunState.Capturing => "Reading…", QRunState.Thinking => "Thinking…", QRunState.Streaming => "Responding…", QRunState.Complete => "Complete", QRunState.Error => "Failed", QRunState.Cancelled => "Stopped", _ => "Ready" };
-    private static string AnswerText(QSessionSnapshot s) => !string.IsNullOrWhiteSpace(s.Response) ? CleanQResponseText(s.Response)
+    private string AnswerText(QSessionSnapshot s) => !string.IsNullOrWhiteSpace(s.Response) ? CleanQResponseText(s.Response)
         : s.State == QRunState.Error ? s.Error ?? "Provider could not respond."
         : s.State is QRunState.Idle or QRunState.Ready ? "Waiting for your question…" : AnswerStatus(s);
     private void OnQComparisonChanged(QComparisonSnapshot snapshot) => OnUi(() =>

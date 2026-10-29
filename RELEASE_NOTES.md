@@ -1,3 +1,42 @@
+# Sutra Island v1.2.4
+
+- Add local region, active-window, and all-screen screenshots from Ctrl+Alt+S, the expanded menu, or the command palette. Choose a mode before capture; copy automatically, then optionally save PNG, draw, undo, or pin the result.
+- Match screenshot controls and preview motion to the graphite island. Keep captures local and move the fixed Settings shortcut to Ctrl+Alt+Shift+S.
+- Reuse exact FFT window coefficients, immutable frost materials, and bounded assistant reply formatting.
+- Stop the high-frequency visualizer timer when idle or hidden, preserving its existing visible playback cadence and animation settings.
+- Copy local screenshot pixels directly into a detached full-resolution preview, avoiding PNG encoding/decoding before Save.
+- Persist notification batches with one history snapshot, retaining ordering, deduplication, retention, and reliable shutdown flushing.
+- Suspend disabled weather, stock, and connectivity polling; serialize widget refreshes and discard obsolete results after configuration changes.
+- Reuse settings search text while preserving search matches and ordering.
+- Replace the lifetime-blocked Settings activation worker with a registered wait, and show requested Settings before media discovery completes.
+- Fix Codex subprocess ownership during reconnect/shutdown and clean up temporary images when turn preparation is cancelled or fails.
+
+---
+# Sutra Island v1.2.3
+
+- Open the screenshot mode chooser from Ctrl+Alt+S before capturing, matching the island menu and command palette.
+- Suppress hotkey auto-repeat and keep an in-progress selection undisturbed.
+
+---
+# Sutra Island v1.2.2
+
+- Replace screenshot controls with rounded graphite buttons, a segmented capture-mode strip, lavender Copy action, and a visible active Draw state.
+- Add keyboard focus styling and labeled action icons without changing screenshot resolution or capture behavior.
+
+---
+# Sutra Island v1.2.1
+
+- Fix the screenshot hotkey collision by moving Settings to Ctrl+Alt+Shift+S.
+- Add screenshot, capture, and snip commands to the palette, with the local capture-mode chooser.
+
+---
+# Sutra Island v1.2.0
+
+- Add local region, active-window, and all-screen screenshots, automatic clipboard copy, optional PNG saving, annotation and bounded pinning.
+- Reuse the notification/palette morph for the screenshot preview and add a customizable capture shortcut.
+- Reduce duplicate assistant streaming allocations and repeated empty adapter discovery; move screenshot image work off the UI thread.
+
+---
 # Sutra Island v1.1.9
 
 This release brings the recent native app updates to GitHub, including:

@@ -62,6 +62,9 @@ public partial class IslandWindow : Window
     private const double LiveTimerExtraHeight = 86d;
 
     public event EventHandler? OpenSettingsRequested;
+    public event EventHandler? ScreenshotRequested;
+    public void RequestScreenshot() => ScreenshotRequested?.Invoke(this,EventArgs.Empty);
+    private void ScreenshotButton_Click(object sender,RoutedEventArgs e)=>RequestScreenshot();
     public event EventHandler? OpenQSettingsRequested;
     public event EventHandler? OpenClipboardRequested;
     public event EventHandler? RecenterRequested;

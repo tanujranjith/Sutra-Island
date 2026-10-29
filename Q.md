@@ -194,7 +194,9 @@ send to that provider.
 For Codex, Q creates a temporary isolated workspace under the app's local-data
 folder, requests read-only operation with approvals disabled, rejects any tool or
 interactive approval request, and deletes only the app-owned Codex thread after
-the request. Temporary image files are deleted after the turn. Diagnostics are
+the request. Temporary image files are deleted after the turn, including cancellation
+or image-preparation failures. If the service is unavailable, the local thread ledger
+allows owned-thread cleanup to be retried on a later start. Diagnostics are
 local and sanitized: they can include runtime source/version, model, effort, and
 failure category, but not prompts, screenshots, device codes, OAuth tokens, or
 raw account credentials. These controls reduce risk; they do not make hosted

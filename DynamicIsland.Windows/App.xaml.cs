@@ -16,6 +16,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     private static string ShowSettingsSignalName => "Local\\DynamicIsland.Windows.ShowSettings" + Infrastructure.AppDataPaths.InstanceSuffix;
     private Mutex? _singleInstance;
     private EventWaitHandle? _showSettingsSignal;
+    private RegisteredWaitHandle? _showSettingsRegistration;
     private LoggingService? _log;
     private SettingsService? _settingsService;
     private StartupService? _startupService;
@@ -45,7 +46,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     private TimerAlarmViewModel? _timerViewModel;
     private TrayService? _tray;
     private AppSettings? _settings;
-    private bool _isShuttingDown;
+    private volatile bool _isShuttingDown;
     private ScreenContextService? _qScreen;
     private SpeechInputService? _qSpeech;
     private AssistantVoiceController? _voice;
@@ -59,11 +60,21 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     private CommandRunner? _paletteRunner;
     private CommandPaletteViewModel? _paletteViewModel;
     private int _paletteHotkeyId;
+    private int _screenshotHotkeyId;
+    private string _registeredScreenshotHotkey="";
+    private ScreenshotTool? _screenshots;
     private string _registeredPaletteHotkey = "";
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if(e.Args.Contains("--verify-screenshots"))
+        {
+            if(!Infrastructure.AppDataPaths.IsPreview){Shutdown(2);return;}
+            try{await Infrastructure.ScreenshotVerification.RunAsync();Shutdown(0);}
+            catch(Exception ex){Directory.CreateDirectory(Infrastructure.AppDataPaths.Root);File.WriteAllText(Path.Combine(Infrastructure.AppDataPaths.Root,"verification-error.txt"),ex.ToString());Shutdown(1);}
+            return;
+        }
         Infrastructure.GraphiteMenuSupport.Initialize();
         if (e.Args.Contains("--verify-notification-motion") || e.Args.Contains("--verify-graphite") || e.Args.Contains("--verify-mascot-bulb") || e.Args.Contains("--verify-composer-keys") || e.Args.Contains("--verify-command-panels") || e.Args.Contains("--verify-sutra-update") || e.Args.Contains("--verify-upgrades") || e.Args.Contains("--verify-q-providers") || e.Args.Contains("--verify-q-compare") || e.Args.Contains("--verify-notification-click"))
         {
@@ -94,14 +105,13 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             return;
         }
         _showSettingsSignal = new EventWaitHandle(false, EventResetMode.AutoReset, ShowSettingsSignalName);
-        _ = Task.Run(() =>
+        _showSettingsRegistration = ThreadPool.RegisterWaitForSingleObject(_showSettingsSignal, (_, _) =>
         {
-            while (!_isShuttingDown && _showSettingsSignal.WaitOne())
+            if (!_isShuttingDown && !Dispatcher.HasShutdownStarted)
             {
-                if (!_isShuttingDown)
-                    Dispatcher.BeginInvoke(ShowSettings);
+                Dispatcher.BeginInvoke(() => { if (!_isShuttingDown) ShowSettings(); });
             }
-        });
+        }, null, Timeout.Infinite, executeOnlyOnce: false);
 
         _settingsService = new SettingsService(_log);
         _log.Info("Loading application settings.");
@@ -183,6 +193,8 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _timerViewModel = new TimerAlarmViewModel(_timerAlarm, _settings.Use24HourClock);
         _islandWindow = new IslandWindow(_islandViewModel, _timerViewModel, _position, _settingsService, _log, _qScreen);
         _islandWindow.OpenSettingsRequested += (_, _) => ShowSettings();
+        _screenshots=new ScreenshotTool(_islandWindow,_qScreen,()=>_islandViewModel.IsReducedMotion);
+        _islandWindow.ScreenshotRequested+=(_,_)=>_screenshots.Open();
         _islandWindow.OpenQSettingsRequested += (_, _) => { ShowSettings(); _settingsWindow?.OpenQSettings(); };
         _islandWindow.OpenClipboardRequested += (_, _) => _ = ShowClipboardAsync();
         _islandWindow.RecenterRequested += (_, _) => Recenter();
@@ -215,7 +227,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             ToggleDefaultTimer);
         _hotkeys.Register("Focus mode", Interop.NativeMethods.HotkeyModifierControl | Interop.NativeMethods.HotkeyModifierAlt, (uint)'F',
             ToggleFocus);
-        _hotkeys.Register("Open settings", Interop.NativeMethods.HotkeyModifierControl | Interop.NativeMethods.HotkeyModifierAlt, (uint)'S',
+        _hotkeys.Register("Open settings", GlobalHotkeyService.SettingsModifiers, GlobalHotkeyService.SettingsKey,
             ShowSettings);
         RegisterQHotkey();
         _ = Dispatcher.BeginInvoke(async () =>
@@ -223,6 +235,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             PrepareCommandPalette();
             await _paletteWindow!.PrimePresentationAsync();
             RegisterCommandPaletteHotkey();
+            RegisterScreenshotHotkey();
         }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         _clock.Start();
         _battery.Start();
@@ -233,7 +246,6 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _weather.Start();
         _stocks.Start();
         ApplyLiveActivitySettings();
-        await _media.StartAsync();
         // First-run onboarding: open the (new) settings so people can explore what's customisable.
         if (!_settings.HasOnboarded || openSettingsFromCommandLine)
         {
@@ -244,6 +256,8 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             }
             ShowSettings();
         }
+        // WinRT media discovery is independent of the requested Settings window.
+        if (!_isShuttingDown) await _media.StartAsync();
     }
 
     private void ShowSettings()
@@ -299,6 +313,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _log?.SetDebugEnabled(_settings.DebugLogging);
         RegisterQHotkey();
         RegisterCommandPaletteHotkeyIfChanged();
+        RegisterScreenshotHotkey();
         ApplyGlobalTheme();
         _islandViewModel?.ApplySettings();
         if (_islandViewModel is not null) _ = _islandViewModel.ConfigureVoiceAsync();
@@ -316,6 +331,19 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             string.Equals(_registeredPaletteHotkey, _settings.CommandPaletteHotkey, StringComparison.OrdinalIgnoreCase))
             return;
         RegisterCommandPaletteHotkey();
+    }
+
+    private void RegisterScreenshotHotkey()
+    {
+        if(_settings is null || _settingsViewModel is null || _hotkeys is null)return;
+        var text=_settings.ScreenshotHotkey;
+        if(_screenshotHotkeyId!=0 && _registeredScreenshotHotkey==text)return;
+        if(!Infrastructure.HotkeyParser.TryParse(text,out var modifiers,out var key,out var canonical,out var error))
+        { _settingsViewModel.SetScreenshotStatus(error??"Invalid shortcut.");return; }
+        if(_screenshotHotkeyId!=0)_hotkeys.Unregister(_screenshotHotkeyId);
+        _screenshotHotkeyId=_hotkeys.Register("Screenshot",modifiers | 0x4000,key,()=>_screenshots?.Open());
+        _registeredScreenshotHotkey=canonical;
+        _settingsViewModel.SetScreenshotStatus(_screenshotHotkeyId==0?"Shortcut unavailable; choose another combination. Screenshot is also in the island menu.":"Choose Region, Active window, or All screens · Esc closes");
     }
 
     private void RegisterCommandPaletteHotkey()
@@ -416,6 +444,12 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     async Task ICommandPaletteHost.SetNotificationsAsync(bool enabled)
     { _settings!.ShowNotifications = enabled; await SaveAndApplyAsync(); }
     void ICommandPaletteHost.ShowSettings() => Dispatcher.BeginInvoke(ShowSettings);
+    void ICommandPaletteHost.ShowScreenshotTool() => Dispatcher.BeginInvoke(async () =>
+    {
+        // Let the palette finish its existing dismissal morph before opening the capture UI.
+        await Task.Delay(200);
+        if (!_isShuttingDown) _screenshots?.Open();
+    });
 
     void ICommandPaletteHost.ShowTimerPanel() => Dispatcher.BeginInvoke(() =>
     {
@@ -470,8 +504,10 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _timerAlarm?.ConfigurePolling(_settings.TimerPollMilliseconds);
         _clock?.ConfigurePolling(_settings.ClockPollSeconds);
         _weather?.Configure(_settings.WeatherLocation, _settings.WeatherFahrenheit);
+        _weather?.SetEnabled(_settings.ShowWeather);
         _weather?.ConfigurePolling(TimeSpan.FromMinutes(_settings.WeatherPollMinutes));
         _stocks?.Configure(_settings.StockSymbols);
+        _stocks?.SetEnabled(_settings.ShowStocks);
         _stocks?.ConfigurePolling(TimeSpan.FromMinutes(_settings.StocksPollMinutes));
         if (_battery is not null)
         {
@@ -543,6 +579,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _isShuttingDown = true;
         _log?.Info("Application shutting down");
         _paletteWindow?.Close();
+        _screenshots?.Dispose();
         _tray?.Dispose();
         _timerViewModel?.Dispose();
         _settingsWindow?.Close();
@@ -561,7 +598,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _notificationHistory?.FlushAsync().GetAwaiter().GetResult();
         _qShortcuts?.Dispose();
         _hotkeys?.Dispose();
-        _showSettingsSignal?.Set();
+        _showSettingsRegistration?.Unregister(null);
         _showSettingsSignal?.Dispose();
         _airPods?.Dispose();
         _privacy?.Dispose();

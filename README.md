@@ -2,7 +2,7 @@
 
 Sutra Island is a Windows desktop companion: a compact, always-on-top island that expands into media controls, system information, timers, and other live activities. It also includes Sutra Assistant and a searchable command palette.
 
-Built with C#, WPF, and .NET 10. The current source version is **1.1.9**. See [release notes](RELEASE_NOTES.md) for changes and [Sutra Assistant](Q.md) for provider setup and privacy details.
+Built with C#, WPF, and .NET 10. The current source version is **1.2.4**. See [release notes](RELEASE_NOTES.md) for changes and [Sutra Assistant](Q.md) for provider setup and privacy details.
 
 ![Current graphite island with fixture media](media/graphite-island.png)
 
@@ -41,6 +41,14 @@ The screenshots show the current native interface with illustrative verification
 | [<img src="media/command-clipboard.png" width="430" alt="Clipboard history panel with search, recent text clips, and refresh controls">](media/command-clipboard.png) | [<img src="media/command-convert.png" width="430" alt="Unit converter displaying 72 degrees Fahrenheit converted to Celsius">](media/command-convert.png) |
 | Search recent clips and select an item to copy it. | Choose units, enter a value, and copy the live result. |
 
+## Screenshot tool
+
+Use **Ctrl+Alt+S**, or choose **Screenshot** in the island menu, to pick Region, Active window, or All screens before capturing. Images copy automatically; the preview offers local PNG saving, drawing, undo, and pinning. See [SCREENSHOTS.md](SCREENSHOTS.md) and [performance notes](PERFORMANCE_NOTES.md).
+
+[<img src="media/screenshot-preview.png" width="580" alt="Local screenshot preview with capture modes and Copy, Save PNG, Draw, Undo, and Pin controls">](media/screenshot-preview.png)
+
+The preview above uses a synthetic annotation example.
+
 ## Command examples
 
 Open the palette with `Ctrl+Alt+K`, type a command, and press Enter. Calculator, conversion, and equation results are copied when selected.
@@ -52,6 +60,7 @@ Open the palette with `Ctrl+Alt+K`, type a command, and press Enter. Calculator,
 | `2(x+3)=14` | `x = 4` |
 | `forward 30 seconds` | Seek forward in the active media app |
 | `back 30 seconds` | Seek backward in the active media app |
+| `screenshot` | Open local screenshot controls |
 | `chat` | Open an assistant conversation |
 
 In assistant chat, Enter sends the prompt and Shift+Enter inserts a new line.

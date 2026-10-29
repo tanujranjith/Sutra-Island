@@ -6,6 +6,20 @@ namespace DynamicIsland.Windows.Tests;
 public sealed class CommandHubTests
 {
     [Theory]
+    [InlineData("screenshot")]
+    [InlineData("capture")]
+    [InlineData("snip")]
+    [InlineData("screen shot")]
+    public void ScreenshotCommandsAreDiscoverableAndResolveToCaptureTool(string query)
+    {
+        var match=CommandCatalog.Match(query);
+        Assert.NotNull(match);
+        Assert.Equal(PaletteCommand.Screenshot,match.Command.Id);
+        Assert.Contains(CommandCatalog.Filter(query),x=>x.Id==PaletteCommand.Screenshot);
+        Assert.Equal("Tools",match.Command.Category);
+        Assert.Contains(CommandCatalog.DefaultSuggestions,x=>x.Id==PaletteCommand.Screenshot);
+    }
+    [Theory]
     [InlineData("volume", PalettePanel.Volume)]
     [InlineData("vol", PalettePanel.Volume)]
     [InlineData("seek", PalettePanel.Seek)]

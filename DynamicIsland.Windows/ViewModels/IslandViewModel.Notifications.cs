@@ -58,7 +58,8 @@ public sealed partial class IslandViewModel
     private void OnNotificationBatch(object? sender, IReadOnlyList<NotificationInfo> batch) => OnUi(() =>
     {
         if (!Settings.ShowNotifications) return;
-        var accepted = new List<NotificationHistoryItem>();
+        var acceptedNotifications = new List<NotificationInfo>();
+        var savedHistory = _notificationHistoryService.Items;
         var now = DateTimeOffset.UtcNow;
         _recentAcceptedNotifications.RemoveAll(item => now - item.AcceptedAt > NotificationRepeatWindow);
         _deliveredNotificationSources.RemoveAll(item => now - item.AcceptedAt > NotificationIdentityRetention);
@@ -79,24 +80,28 @@ public sealed partial class IslandViewModel
             // The listener can be restarted while Windows still holds a toast, and some
             // publishers replace a toast with a new system ID. History is the durable
             // record of what we have already presented, including across app restarts.
-            if (_notificationHistoryService.Items.Any(item => NotificationContent.WasRecentlyPresented(item, n)))
+            if (savedHistory.Any(item => NotificationContent.WasRecentlyPresented(item, n)))
                 continue;
-            if (accepted.Any(item => NotificationContent.SameMessage(item.AppId, item.App, item.Title,
+            if (acceptedNotifications.Any(item => NotificationContent.SameMessage(item.AppId, item.App, item.Title,
                     item.Body, n.AppId, n.App, n.Title, n.Body)))
                 continue;
-            var historyItem = Settings.NotificationHistoryEnabled
-                ? _notificationHistoryService.Add(n.App, n.Title, n.Body, n.CreatedAt, n.AppId)
-                : new NotificationHistoryItem(Guid.NewGuid(), n.App, n.Title, n.Body,
-                    n.CreatedAt ?? DateTimeOffset.Now, AppId: n.AppId);
-            accepted.Add(historyItem);
-            if (sourceIdentity is not null)
-                _deliveredNotificationSources.Add(new(historyItem.Id, sourceIdentity, n, now));
+            acceptedNotifications.Add(n);
             _recentAcceptedNotifications.Add((n, now));
+        }
+        if (acceptedNotifications.Count == 0) return;
+        IReadOnlyList<NotificationHistoryItem> accepted = Settings.NotificationHistoryEnabled
+            ? _notificationHistoryService.AddRange(acceptedNotifications)
+            : acceptedNotifications.Select(n => new NotificationHistoryItem(Guid.NewGuid(), n.App, n.Title,
+                n.Body, n.CreatedAt ?? DateTimeOffset.Now, AppId: n.AppId)).ToArray();
+        for (var index = 0; index < accepted.Count; index++)
+        {
+            var sourceIdentity = GetNotificationSourceIdentity(acceptedNotifications[index]);
+            if (sourceIdentity is not null)
+                _deliveredNotificationSources.Add(new(accepted[index].Id, sourceIdentity, acceptedNotifications[index], now));
         }
         if (_deliveredNotificationSources.Count > MaxRememberedNotificationIdentities)
             _deliveredNotificationSources.RemoveRange(0,
                 _deliveredNotificationSources.Count - MaxRememberedNotificationIdentities);
-        if (accepted.Count == 0) return;
         _notificationService.TraceAdmission(accepted.Count);
         _bannerAcceptedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         _pendingNotifications.Enqueue(accepted);

@@ -6,6 +6,11 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/TextPresentationCache.cs" Link="TextPresentationCache.cs" />
+    <Compile Include="../DynamicIsland.Windows/Services/Core/NotificationHistoryService.cs" Link="NotificationHistoryService.cs" />
+    <Compile Include="../DynamicIsland.Windows/Services/System/LoggingService.cs" Link="LoggingService.cs" />
+    <Compile Include="../DynamicIsland.Windows/Services/Q/CodexAppServerClient.cs" Link="CodexAppServerClient.cs" />
+    <Compile Include="../DynamicIsland.Windows/Services/Q/CodexTurnResources.cs" Link="CodexTurnResources.cs" />
     <Compile Include="../DynamicIsland.Windows/Infrastructure/CommandPalette/PaletteCommandHistory.cs" Link="PaletteCommandHistory.cs" />
     <Compile Include="../DynamicIsland.Windows/Infrastructure/CoalescingSeekQueue.cs" Link="CoalescingSeekQueue.cs" />
     <Compile Include="../DynamicIsland.Windows/Infrastructure/CommandPalette/CommandParsers.cs" Link="CommandParsers.cs" />

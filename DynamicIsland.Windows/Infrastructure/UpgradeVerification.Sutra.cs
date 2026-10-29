@@ -53,6 +53,7 @@ internal static partial class UpgradeVerification
         try
         {
             if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_BACKDROP")=="1") { await VerifyDesktopFrostAsync(vm,window,output); return; }
+            if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_PERFORMANCE")=="1") { await VerifyPerformanceAsync(vm,Check,output); return; }
             if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_TIMER_ONLY")=="1")
             {
                 timers.StartTimer(TimeSpan.FromMinutes(5),"Fixture");
@@ -102,6 +103,10 @@ internal static partial class UpgradeVerification
                     await VerifyDelayedOutputLayoutAsync(panelVm, panelWindow, panelOutputs, Check, output);
                     await VerifyInstalledCodexVersionAsync(window, log, Check);
                     await VerifyPercentageCalculatorAsync(panelVm, panelWindow, Check, output);
+                    panelVm.Query="screenshot";
+                    Check(panelVm.SelectedSuggestion?.Command?.Id==PaletteCommand.Screenshot,"Screenshot appears in command palette search");
+                    await panelVm.ExecuteAsync();
+                    Check(panelHost.OpenedScreenshot,"Screenshot command routes to the local capture tool");
                     await VerifyAssistantIslandControlsAsync(vm, panelRunner, panelAudio, panelOutputs, panelHost, persistence, Check);
                     await VerifyAssistantActionMotionAsync(Check, output);
                     await VerifyAssistantReplyMotionAsync(Check, output);
@@ -337,6 +342,8 @@ internal static partial class UpgradeVerification
     {
         public string LastPanel = "", LastSetting = "";
         public bool OpenedChat { get; private set; }
+        public bool OpenedScreenshot { get; private set; }
+        public void ShowScreenshotTool() => OpenedScreenshot=true;
         public void ShowSettings() { }
         public void ShowTimerPanel() { }
         public void ShowAlarmPanel() { }

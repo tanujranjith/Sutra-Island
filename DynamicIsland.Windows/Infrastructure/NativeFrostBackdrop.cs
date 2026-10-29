@@ -40,7 +40,7 @@ internal sealed class NativeFrostBackdrop : IDisposable
     private void Changed(object? sender,EventArgs e)=>Update();
     private void Activated(object? sender,EventArgs e){_last=Rect.Empty;Update();}
     private void Closed(object? sender,EventArgs e)=>Dispose();
-    private void Update() { if(_updating)return;_updating=true;try{UpdateCore();}finally{_updating=false;} }
+    private void Update() { if(_updating || _suspended || _settingsSuppressed)return;_updating=true;try{UpdateCore();}finally{_updating=false;} }
     private void UpdateCore()
     {
         if(_disposed || _unavailable) return;
@@ -86,7 +86,7 @@ internal sealed class NativeFrostBackdrop : IDisposable
     }
     private static nint Hook(nint hwnd,int message,nint wParam,nint lParam,ref bool handled)
     {if(message==0x0084){handled=true;return -1;}return 0;}
-    private void Hide(){if(_source is not null)ShowWindow(_source.Handle,0);_last=Rect.Empty;if(_active){_active=false;_setActive(false,0);}}
+    private void Hide(){if(_source is not null && _active)ShowWindow(_source.Handle,0);_last=Rect.Empty;if(_active){_active=false;_setActive(false,0);}}
     private void DisposeSource(){Hide();_source?.Dispose();_source=null;}
     public void Dispose()
     {

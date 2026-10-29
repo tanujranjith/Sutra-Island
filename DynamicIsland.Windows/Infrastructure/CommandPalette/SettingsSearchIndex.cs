@@ -129,10 +129,36 @@ public static class SettingsSearchIndex
         new("ShowIslandInScreenshots", "Show Island in screenshots", "Turn on only when you want the Island included in screenshots; off excludes it where Windows supports capture affinity."),
         new("ShowInAltTab", "Show island in Alt-Tab", "Open this island preference"),
     ];
+
+    // Settings entries are immutable and reused for every palette query. Keep the combined
+    // search corpus once so typing does not rebuild a string for every entry and word.
+    private static readonly Dictionary<SettingSearchEntry, string> SearchTextByEntry = BuildSearchTextByEntry();
+
+    private static Dictionary<SettingSearchEntry, string> BuildSearchTextByEntry()
+    {
+        var searchTextByEntry = new Dictionary<SettingSearchEntry, string>(ReferenceEqualityComparer.Instance);
+        foreach (var entry in All)
+            searchTextByEntry[entry] = $"{entry.Name} {entry.Description} {entry.Property}";
+        return searchTextByEntry;
+    }
+
+    private static string SearchTextFor(SettingSearchEntry entry) =>
+        SearchTextByEntry.TryGetValue(entry, out var cached)
+            ? cached
+            : $"{entry.Name} {entry.Description} {entry.Property}";
+
     public static IEnumerable<SettingSearchEntry> Search(string query)
     {
         var words = query.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return All.Where(x => words.Length > 0 && words.All(word =>
-            $"{x.Name} {x.Description} {x.Property}".Contains(word, StringComparison.OrdinalIgnoreCase))).Take(8);
+        return All.Where(entry =>
+        {
+            if (words.Length == 0) return false;
+
+            var searchText = SearchTextFor(entry);
+            foreach (var word in words)
+                if (!searchText.Contains(word, StringComparison.OrdinalIgnoreCase)) return false;
+
+            return true;
+        }).Take(8);
     }
 }

@@ -11,7 +11,8 @@ public sealed class CodexAppServerClient : IAsyncDisposable
     private readonly object _gate = new();
     private readonly SemaphoreSlim _startGate = new(1, 1);
     private readonly SemaphoreSlim _writeGate = new(1, 1);
-    private readonly ConcurrentDictionary<int, TaskCompletionSource<JsonElement>> _pending = new();
+    private sealed record PendingRequest(Process Owner, TaskCompletionSource<JsonElement> Completion);
+    private readonly ConcurrentDictionary<int, PendingRequest> _pending = new();
     private readonly string _clientVersion;
     private readonly CodexRuntimeResolver _runtimeResolver;
     private readonly CodexThreadLedger _threadLedger;
@@ -20,8 +21,8 @@ public sealed class CodexAppServerClient : IAsyncDisposable
     private StreamWriter? _writer;
     private Task? _readerTask;
     private int _nextId;
-    private bool _initialized;
-    private bool _disposed;
+    private volatile bool _initialized;
+    private volatile bool _disposed;
     private Action<JsonElement>? _notification;
 
     public CodexAppServerClient(string clientVersion = "1.0.6", CodexRuntimeResolver? runtimeResolver = null,
@@ -33,7 +34,7 @@ public sealed class CodexAppServerClient : IAsyncDisposable
         _log = log;
     }
 
-    public bool IsRunning => _process is { HasExited: false };
+    public bool IsRunning { get { lock (_gate) return _process is { HasExited: false }; } }
     public CodexRuntimeInfo? RuntimeInfo { get; private set; }
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
@@ -44,9 +45,11 @@ public sealed class CodexAppServerClient : IAsyncDisposable
         await _startGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             if (_initialized && IsRunning) return;
             StopProcess();
             var runtime = await ValidateRuntimeAsync(_runtimeResolver.Resolve(), cancellationToken).ConfigureAwait(false);
+            ObjectDisposedException.ThrowIf(_disposed, this);
             RuntimeInfo = runtime;
             var process = new Process
             {
@@ -63,13 +66,25 @@ public sealed class CodexAppServerClient : IAsyncDisposable
                 },
                 EnableRaisingEvents = true
             };
-            if (!process.Start()) throw new CodexAppServerException(CodexFailureKind.ServerExited, "Unable to start the Codex service.");
-            process.Exited += (_, _) => OnProcessExited();
-            lock (_gate)
+            try
             {
-                _process = process;
-                _writer = process.StandardInput;
-                _readerTask = ReadLoopAsync(process.StandardOutput, process.StandardError);
+                if (!process.Start()) throw new CodexAppServerException(CodexFailureKind.ServerExited, "Unable to start the Codex service.");
+                process.Exited += (_, _) => OnProcessExited(process);
+                lock (_gate)
+                {
+                    ObjectDisposedException.ThrowIf(_disposed, this);
+                    _process = process;
+                    _writer = process.StandardInput;
+                    _readerTask = ReadLoopAsync(process, process.StandardOutput, process.StandardError);
+                }
+            }
+            catch
+            {
+                lock (_gate)
+                    if (ReferenceEquals(_process, process)) { _process = null; _writer = null; _initialized = false; }
+                try { if (!process.HasExited) process.Kill(true); } catch { }
+                process.Dispose();
+                throw;
             }
             try
             {
@@ -78,7 +93,12 @@ public sealed class CodexAppServerClient : IAsyncDisposable
                     clientInfo = new { name = "sutra_island", title = "Sutra Island", version = _clientVersion }
                 }, cancellationToken).ConfigureAwait(false);
                 await SendNotificationAsync("initialized", new { }, cancellationToken).ConfigureAwait(false);
-                _initialized = true;
+                lock (_gate)
+                {
+                    if (!ReferenceEquals(_process, process) || process.HasExited)
+                        throw new CodexAppServerException(CodexFailureKind.ServerExited, "The Codex service stopped during initialization.");
+                    _initialized = true;
+                }
                 _log?.Info($"Codex service started: source={runtime.Source}, version={runtime.Version ?? "unknown"}");
                 await CleanupOwnedThreadsAsync(cancellationToken).ConfigureAwait(false);
             }
@@ -169,12 +189,13 @@ public sealed class CodexAppServerClient : IAsyncDisposable
             CodexTurnStartRequest.CreateThread(model, workspace), cancellationToken).ConfigureAwait(false);
         var threadId = String(thread.GetProperty("thread"), "id")
             ?? throw new CodexAppServerException(CodexFailureKind.Protocol, "Codex did not return a thread id.");
+        await using var resources = new CodexTurnResources(() => TryDeleteThreadAsync(threadId));
         _threadLedger.Add(threadId);
         var input = new List<object> { new { type = "text", text = prompt } };
         string? tempImage = null;
         if (image is { Length: > 0 })
         {
-            tempImage = Path.Combine(Path.GetTempPath(), $"dynamic-island-codex-{Guid.NewGuid():N}.png");
+            tempImage = resources.CreateImagePath();
             await File.WriteAllBytesAsync(tempImage, image, cancellationToken).ConfigureAwait(false);
             input.Add(new { type = "localImage", path = tempImage });
         }
@@ -221,8 +242,6 @@ public sealed class CodexAppServerClient : IAsyncDisposable
             if (cancellationToken.IsCancellationRequested)
                 _log?.Info($"Codex turn completed: model={model}, effort={reasoningEffort ?? "auto"}, outcome=cancelled");
             RemoveNotificationHandler(handler);
-            if (tempImage is not null) try { File.Delete(tempImage); } catch { }
-            await TryDeleteThreadAsync(threadId).ConfigureAwait(false);
         }
     }
 
@@ -271,12 +290,20 @@ public sealed class CodexAppServerClient : IAsyncDisposable
     {
         var id = Interlocked.Increment(ref _nextId);
         var completion = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _pending[id] = completion;
+        Process owner;
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            owner = _process ?? throw new CodexAppServerException(CodexFailureKind.ServerExited, "The Codex service is not running.");
+            if (method != "initialize" && !_initialized)
+                throw new CodexAppServerException(CodexFailureKind.ServerExited, "The Codex service is reconnecting. Try again.");
+            _pending[id] = new PendingRequest(owner, completion);
+        }
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(RequestTimeout);
         try
         {
-            await WriteAsync(JsonSerializer.Serialize(new { method, id, @params = parameters }), timeout.Token).ConfigureAwait(false);
+            await WriteAsync(JsonSerializer.Serialize(new { method, id, @params = parameters }), timeout.Token, owner).ConfigureAwait(false);
             using var registration = timeout.Token.Register(() => completion.TrySetCanceled(timeout.Token));
             var response = await completion.Task.ConfigureAwait(false);
             if (response.TryGetProperty("error", out var error)) throw CodexErrorClassifier.FromProtocol(method, error);
@@ -292,48 +319,77 @@ public sealed class CodexAppServerClient : IAsyncDisposable
     private Task SendNotificationAsync(string method, object parameters, CancellationToken cancellationToken) =>
         WriteAsync(JsonSerializer.Serialize(new { method, @params = parameters }), cancellationToken);
 
-    private async Task WriteAsync(string line, CancellationToken cancellationToken)
+    private async Task WriteAsync(string line, CancellationToken cancellationToken, Process? expectedProcess = null)
     {
+        Process owner;
         StreamWriter writer;
-        lock (_gate) writer = _writer ?? throw new CodexAppServerException(CodexFailureKind.ServerExited, "The Codex service is not running.");
+        lock (_gate)
+        {
+            owner = _process ?? throw new CodexAppServerException(CodexFailureKind.ServerExited, "The Codex service is not running.");
+            if (expectedProcess is not null && !ReferenceEquals(owner, expectedProcess))
+                throw new CodexAppServerException(CodexFailureKind.ServerExited, "The Codex connection was replaced. Try again.");
+            writer = _writer ?? throw new CodexAppServerException(CodexFailureKind.ServerExited, "The Codex service is not running.");
+        }
         await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try { await writer.WriteLineAsync(line.AsMemory(), cancellationToken).ConfigureAwait(false); await writer.FlushAsync(cancellationToken).ConfigureAwait(false); }
+        try
+        {
+            lock (_gate)
+                if (!ReferenceEquals(_process, owner) || !ReferenceEquals(_writer, writer))
+                    throw new CodexAppServerException(CodexFailureKind.ServerExited, "The Codex connection was replaced. Try again.");
+            await writer.WriteLineAsync(line.AsMemory(), cancellationToken).ConfigureAwait(false);
+            await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
         finally { _writeGate.Release(); }
     }
 
-    private async Task ReadLoopAsync(StreamReader output, StreamReader error)
+    private async Task ReadLoopAsync(Process owner, StreamReader output, StreamReader error)
     {
-        _ = Task.Run(async () => { while (await error.ReadLineAsync().ConfigureAwait(false) is not null) { } });
+        _ = DrainErrorAsync(error);
         try
         {
             while (await output.ReadLineAsync().ConfigureAwait(false) is { } line)
             {
+                lock (_gate) if (!ReferenceEquals(_process, owner)) return;
                 using var document = JsonDocument.Parse(line);
                 var root = document.RootElement.Clone();
                 if (root.TryGetProperty("method", out _) && root.TryGetProperty("id", out var serverRequestId))
                 {
-                    await DeclineServerRequestAsync(serverRequestId, String(root, "method") ?? string.Empty).ConfigureAwait(false);
+                    await DeclineServerRequestAsync(owner, serverRequestId, String(root, "method") ?? string.Empty).ConfigureAwait(false);
                     continue;
                 }
-                if (root.TryGetProperty("id", out var id) && id.TryGetInt32(out var requestId) && _pending.TryRemove(requestId, out var completion)) completion.TrySetResult(root);
-                else _notification?.Invoke(root);
+                Action<JsonElement>? notification = null;
+                lock (_gate)
+                {
+                    if (!ReferenceEquals(_process, owner)) return;
+                    if (root.TryGetProperty("id", out var id) && id.TryGetInt32(out var requestId)
+                        && _pending.TryGetValue(requestId, out var pending) && ReferenceEquals(pending.Owner, owner)
+                        && _pending.TryRemove(requestId, out _)) pending.Completion.TrySetResult(root);
+                    else notification = _notification;
+                }
+                notification?.Invoke(root);
             }
             throw new CodexAppServerException(CodexFailureKind.ServerExited, "The Codex service stopped unexpectedly.");
         }
         catch (Exception ex)
         {
             var failure = ex as CodexAppServerException ?? new CodexAppServerException(CodexFailureKind.ServerExited, "The Codex service stopped unexpectedly.", innerException: ex);
-            foreach (var pending in _pending.Values) pending.TrySetException(failure);
+            FailProcessRequests(owner, failure);
         }
     }
 
-    private Task DeclineServerRequestAsync(JsonElement id, string method)
+    private static async Task DrainErrorAsync(StreamReader error)
+    {
+        try { while (await error.ReadLineAsync().ConfigureAwait(false) is not null) { } }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException) { }
+    }
+
+    private Task DeclineServerRequestAsync(Process owner, JsonElement id, string method)
     {
         object response = method.EndsWith("requestApproval", StringComparison.Ordinal)
             ? new { id, result = new { decision = "decline" } }
             : new { id, error = new { code = -32601, message = "Sutra Assistant does not enable tools or interactive requests." } };
         _log?.Info($"Codex server request declined: method={method}");
-        return WriteAsync(JsonSerializer.Serialize(response), CancellationToken.None);
+        return WriteAsync(JsonSerializer.Serialize(response), CancellationToken.None, owner);
     }
 
     internal async Task<CodexRuntimeInfo> ValidateRuntimeAsync(CodexRuntimeInfo runtime, CancellationToken cancellationToken)
@@ -374,12 +430,22 @@ public sealed class CodexAppServerClient : IAsyncDisposable
         finally { try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { } }
     }
 
-    private void OnProcessExited()
+    private bool FailProcessRequests(Process owner, Exception failure)
     {
-        _initialized = false;
+        lock (_gate)
+        {
+            if (!ReferenceEquals(_process, owner)) return false;
+            _initialized = false;
+            foreach (var pending in _pending.Values)
+                if (ReferenceEquals(pending.Owner, owner)) pending.Completion.TrySetException(failure);
+            return true;
+        }
+    }
+
+    private void OnProcessExited(Process owner)
+    {
         var failure = new CodexAppServerException(CodexFailureKind.ServerExited, "The Codex service stopped unexpectedly.");
-        foreach (var pending in _pending.Values) pending.TrySetException(failure);
-        _log?.Error("Codex service exited: category=ServerExited");
+        if (FailProcessRequests(owner, failure)) _log?.Error("Codex service exited: category=ServerExited");
     }
 
     private void AddNotificationHandler(Action<JsonElement> handler) { lock (_gate) _notification += handler; }
@@ -389,8 +455,14 @@ public sealed class CodexAppServerClient : IAsyncDisposable
     private void StopProcess()
     {
         Process? process;
-        lock (_gate) { process = _process; _process = null; _writer = null; _initialized = false; }
-        if (process is not null && !process.HasExited) try { process.Kill(true); } catch { }
+        lock (_gate)
+        {
+            process = _process;
+            if (process is not null)
+                FailProcessRequests(process, new CodexAppServerException(CodexFailureKind.ServerExited, "The Codex connection was closed."));
+            _process = null; _writer = null; _initialized = false;
+        }
+        if (process is not null) try { if (!process.HasExited) process.Kill(true); } catch { }
         process?.Dispose();
     }
 
@@ -400,7 +472,8 @@ public sealed class CodexAppServerClient : IAsyncDisposable
         _disposed = true;
         StopProcess();
         if (_readerTask is not null) try { await _readerTask.WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false); } catch { }
-        _startGate.Dispose();
-        _writeGate.Dispose();
+        // In-flight calls can still unwind their finally blocks after the pipe is
+        // closed. These async-only managed gates are collected with the client;
+        // disposing them here can make a pending Release throw during shutdown.
     }
 }

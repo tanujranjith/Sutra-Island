@@ -7,6 +7,8 @@ namespace DynamicIsland.Windows.Services;
 /// <summary>Fixed, documented global shortcuts for the small always-on-top island.</summary>
 public sealed class GlobalHotkeyService(LoggingService log) : IDisposable
 {
+    internal const uint SettingsModifiers = NativeMethods.HotkeyModifierControl | NativeMethods.HotkeyModifierAlt | NativeMethods.HotkeyModifierShift;
+    internal const uint SettingsKey = (uint)'S';
     private readonly Dictionary<int, Action> _actions = [];
     private HwndSource? _source;
     private int _nextId = 0x5100;

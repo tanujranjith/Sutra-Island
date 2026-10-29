@@ -563,6 +563,10 @@ public sealed class SettingsViewModel : ObservableObject
         get => _settings.CommandPaletteHotkey;
         set { Set(v => _settings.CommandPaletteHotkey = v ?? "", value); _apply(); }
     }
+    public string ScreenshotShortcut { get=>_settings.ScreenshotHotkey; set { Set(v=>_settings.ScreenshotHotkey=v??"",value);_apply(); } }
+    private string _screenshotStatus="";
+    public string ScreenshotStatus => _screenshotStatus;
+    public void SetScreenshotStatus(string text) { _screenshotStatus=text;RaisePropertyChanged(nameof(ScreenshotStatus)); }
     public string QConnectionStatus { get => _qConnectionStatus; private set => SetProperty(ref _qConnectionStatus, value); }
     public ICommand TestQCommand { get; }
     public ICommand SignInCodexCommand { get; }

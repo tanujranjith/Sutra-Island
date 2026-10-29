@@ -33,6 +33,21 @@ public class VisualizerTests
     }
 
     [Fact]
+    public void CachedHannWindow_MatchesOriginalCoefficientsExactly()
+    {
+        var coefficients = SpectrumAnalyzer.HannCoefficients;
+
+        Assert.Equal(SpectrumAnalyzer.WindowSize, coefficients.Length);
+        for (var n = 0; n < coefficients.Length; n++)
+        {
+            var originalCoefficient = 0.5 - (0.5 * Math.Cos((2 * Math.PI * n) / (SpectrumAnalyzer.WindowSize - 1)));
+            var originalBits = BitConverter.DoubleToInt64Bits(originalCoefficient);
+            var cachedBits = BitConverter.DoubleToInt64Bits(coefficients[n]);
+            Assert.Equal(originalBits, cachedBits);
+        }
+    }
+
+    [Fact]
     public void Silence_ProducesNoLevels()
     {
         var levels = Analyze(new float[SpectrumAnalyzer.WindowSize]);

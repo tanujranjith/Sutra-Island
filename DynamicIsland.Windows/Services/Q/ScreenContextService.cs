@@ -59,14 +59,26 @@ public sealed class ScreenContextService(LoggingService log) : IQScreenContextSe
         }
     }
 
-    private static byte[]? CapturePixels(NativeMethods.Rect rect)
+    internal static byte[]? CapturePixels(NativeMethods.Rect rect)
     {
-        using var bitmap = new Bitmap(rect.Width, rect.Height, PixelFormat.Format32bppArgb);
-        using (var graphics = Graphics.FromImage(bitmap))
-            graphics.CopyFromScreen(rect.Left, rect.Top, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
+        using var bitmap = CaptureBitmap(rect);
         using var output = new MemoryStream();
         bitmap.Save(output, ImageFormat.Png);
         return output.ToArray();
+    }
+
+    // The caller owns the pixels. Local screenshots can use them directly without
+    // encoding a full desktop PNG only to decode it again for selection/preview.
+    internal static Bitmap CaptureBitmap(NativeMethods.Rect rect)
+    {
+        var bitmap = new Bitmap(rect.Width, rect.Height, PixelFormat.Format32bppArgb);
+        try
+        {
+            using var graphics = Graphics.FromImage(bitmap);
+            graphics.CopyFromScreen(rect.Left, rect.Top, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
+            return bitmap;
+        }
+        catch { bitmap.Dispose(); throw; }
     }
 
     private static async Task<string> RecognizeAsync(byte[] png, CancellationToken cancellationToken)

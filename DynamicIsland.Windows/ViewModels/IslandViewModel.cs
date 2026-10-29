@@ -61,12 +61,13 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private readonly System.Windows.Threading.DispatcherTimer _quoteTimer = new();
     private readonly System.Windows.Threading.DispatcherTimer _visualizerTimer = new() { Interval = TimeSpan.FromMilliseconds(33) };
     private readonly System.Windows.Threading.DispatcherTimer _connectivityTimer = new() { Interval = TimeSpan.FromSeconds(2) };
-    private bool _wifiConnected, _wifiRefreshInProgress, _disposed;
+    private bool _wifiConnected, _wifiRefreshInProgress, _wifiRefreshRequested, _disposed;
     private readonly System.Windows.Threading.DispatcherTimer _qAutoCloseTimer = new();
     private readonly System.Windows.Threading.DispatcherTimer _timerUiTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private double _visualizerPhase;
     private readonly VisualizerMotion _visualizerMotion = new();
-    private readonly System.Diagnostics.Stopwatch _visualizerClock = System.Diagnostics.Stopwatch.StartNew();
+    private readonly TextPresentationCache _responsePresentation = new(CleanQResponseCore);
+    private readonly System.Diagnostics.Stopwatch _visualizerClock = new();
     private (string Label, TimeZoneInfo Zone)[] _worldClockZones = [];
     private string _worldClockConfig = string.Empty;
     private string[] _expandedOrder = ["media", "volume", "status"];
@@ -184,17 +185,17 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         _visualizerTimer.Tick += (_, _) => OnUi(() =>
         {
             if (!IsAudioActive || !VisualizerSurfaceVisible || !(IsExpanded ? ShowMusicVisualizer : ShowCompactEqualizer))
+            {
+                SyncVisualizerTicker();
                 return;
+            }
 
             var elapsed = _visualizerClock.Elapsed;
             _visualizerClock.Restart();
             UpdateVisualizerMotion(elapsed.TotalSeconds, !IsReducedMotion);
             RaiseVisualizerProperties();
         });
-        _visualizerTimer.Start();
         _connectivityTimer.Tick += async (_, _) => await RefreshWifiAsync();
-        _ = RefreshWifiAsync();
-        _connectivityTimer.Start();
         _qAutoCloseTimer.Tick += (_, _) =>
         {
             _qAutoCloseTimer.Stop();
@@ -411,7 +412,8 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public bool ShowCompactArtSurface => !IsQActive && ((ShowMedia && !IsHolePunchMode) || (IsHolePunchMode && HasArtwork));
     public bool ShowCompactStatusContent => !IsHolePunchMode && !QShowCompactComparison;
 
-    private static string CleanQResponseText(string response)
+    private string CleanQResponseText(string response) => _responsePresentation.Format(response);
+    private static string CleanQResponseCore(string response)
     {
         if (string.IsNullOrWhiteSpace(response)) return string.Empty;
         response = TextEncodingRepair.RepairUtf8ReadAsWindows1252(response);
@@ -523,7 +525,12 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public bool IsReducedMotion => Settings.AnimationIntensity == AnimationIntensity.Reduced;
     public bool IsPlaying => Media.IsPlaying;
     public bool IsMuted => Audio.SystemMuted;
-    public bool VisualizerSurfaceVisible { get; set; } = true;
+    private bool _visualizerSurfaceVisible = true;
+    public bool VisualizerSurfaceVisible
+    {
+        get => _visualizerSurfaceVisible;
+        set { if (_visualizerSurfaceVisible == value) return; _visualizerSurfaceVisible = value; SyncVisualizerTicker(); }
+    }
     public bool IsAudioActive => Audio.Availability == AudioAvailability.Available && Audio.ActiveAudioOutput && !Audio.SystemMuted;
     public bool ShowAudioStatusText => !IsAudioActive;
     public bool ShowDate => Settings.ShowDate;
@@ -847,21 +854,31 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public MediaBrush BluetoothStatusBrush => FrozenBrush(BluetoothAvailable ? "#FF30D158" : "#FFFF9F0A");
     private async Task RefreshWifiAsync()
     {
-        if (_disposed || _wifiRefreshInProgress) return;
+        if (_disposed || !Settings.ShowConnectivity) return;
+        if (_wifiRefreshInProgress) { _wifiRefreshRequested = true; return; }
         _wifiRefreshInProgress = true;
         try
         {
             var connected = await Task.Run(IsWifiConnected);
             await OnUiAsync(() =>
             {
-                if (!_disposed && _wifiConnected != connected)
+                if (!_disposed && Settings.ShowConnectivity && _wifiConnected != connected)
                 {
                     _wifiConnected = connected;
                     RaiseMany(nameof(WifiConnected), nameof(WifiStatusText), nameof(WifiStatusBrush));
                 }
             });
         }
-        finally { await OnUiAsync(() => _wifiRefreshInProgress = false); }
+        finally
+        {
+            await OnUiAsync(() =>
+            {
+                _wifiRefreshInProgress = false;
+                if (!_wifiRefreshRequested) return;
+                _wifiRefreshRequested = false;
+                if (!_disposed && Settings.ShowConnectivity) _ = RefreshWifiAsync();
+            });
+        }
     }
     private static bool IsWifiConnected()
     {
@@ -1016,6 +1033,23 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         nameof(VisualizerBar0Height), nameof(VisualizerBar1Height), nameof(VisualizerBar2Height),
         nameof(VisualizerBar3Height), nameof(VisualizerBar4Height), nameof(VisualizerBar5Height),
         nameof(VisualizerBar6Height));
+    private void SyncVisualizerTicker()
+    {
+        var animate = !_disposed && VisualizerSurfaceVisible && IsAudioActive &&
+            (IsExpanded ? ShowMusicVisualizer : ShowCompactEqualizer);
+        if (animate == _visualizerTimer.IsEnabled) return;
+        if (animate)
+        {
+            // Resume from a fresh frame interval, never integrate the hidden/idle time.
+            _visualizerClock.Restart();
+            _visualizerTimer.Start();
+        }
+        else
+        {
+            _visualizerTimer.Stop();
+            _visualizerClock.Reset();
+        }
+    }
     public double SpectrumBand0 => Band(0);
     public double SpectrumBand1 => Band(1);
     public double SpectrumBand2 => Band(2);
@@ -1207,6 +1241,12 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     {
         var connectivityInterval = TimeSpan.FromSeconds(Math.Clamp(Settings.ConnectivityPollSeconds, 1, 60));
         if (_connectivityTimer.Interval != connectivityInterval) _connectivityTimer.Interval = connectivityInterval;
+        if (!Settings.ShowConnectivity) { _connectivityTimer.Stop(); _wifiRefreshRequested = false; }
+        else if (!_disposed && !_connectivityTimer.IsEnabled)
+        {
+            _ = RefreshWifiAsync();
+            _connectivityTimer.Start();
+        }
         EnsureCompareProvider();
         if (QCompareEnabled && _qComparison.Snapshot.Left.State != QRunState.Idle
             && (_qComparison.Snapshot.Left.ProviderId != QSelectedProvider || _qComparison.Snapshot.Left.Model != QSelectedModel)) ResetComparisonAnswers();
@@ -1358,7 +1398,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         CancelQActivation(); _qAutoCloseTimer.Stop(); _qComparison.Cancel(); _qSession.Cancel();
         if (capturing) { _qSnapshot = _qSnapshot with { State = QRunState.Cancelled, Status = "Capture stopped", Error = null }; RaiseQProperties(); }
     }
-    public void ClearQ() { _voice?.Stop(); _qScreenSession = false; QUseScreenNext = false; CancelQActivation(); _qAutoCloseTimer.Stop(); _qComparison.Clear(); _qSession.Clear(); IsExpanded = false; }
+    public void ClearQ() { _voice?.Stop(); _qScreenSession = false; QUseScreenNext = false; CancelQActivation(); _qAutoCloseTimer.Stop(); _qComparison.Clear(); _qSession.Clear(); _responsePresentation.Clear(); IsExpanded = false; }
     public void CopyQResponse() { if (!string.IsNullOrWhiteSpace(QResponse)) System.Windows.Clipboard.SetText(QResponse); }
 
     private async Task RefreshCodexModelsAsync(bool force = false)
@@ -1515,6 +1555,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private void OnQChanged(QSessionSnapshot snapshot) => OnUi(() =>
     {
         if (snapshot != _qSession.Snapshot) return;
+        if (snapshot.State == QRunState.Idle) _responsePresentation.Clear();
         _qSnapshot = snapshot;
         RaiseQProperties();
         PumpNotifications();
@@ -1522,6 +1563,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     private void RaiseQProperties()
     {
+        SyncVisualizerTicker();
         RaiseMany(nameof(QActionFeedback), nameof(QHasActionFeedback));
         RaiseComparisonProperties();
         RaisePropertyChanged(nameof(QCanChangeProvider));
@@ -1753,6 +1795,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     private void RaiseAudioProperties()
     {
+        SyncVisualizerTicker();
         RaiseMany(nameof(VolumeText), nameof(VolumeGlyph), nameof(OutputDeviceText), nameof(AudioStatusText),
             nameof(IsMuted), nameof(IsAudioActive), nameof(ShowAudioStatusText), nameof(ShowVolume),
             nameof(ShowMedia), nameof(PrimaryActivity), nameof(CompactGlyph), nameof(CompactPrimaryText), nameof(CompactSecondaryText),
@@ -1780,6 +1823,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     private void RaiseExpansionProperties()
     {
+        SyncVisualizerTicker();
         RaiseMany(nameof(IslandBaseSurfaceBrush), nameof(IsCompact), nameof(ShowTimerOrb), nameof(ShowQuoteInCompact), nameof(ShowQuoteInExpanded));
     }
 
@@ -1881,6 +1925,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     private void RaiseSettingsChanged()
     {
+        SyncVisualizerTicker();
         // Settings affect many subsystems — raise grouped notifications but keep structural
         // visual-mode notifications precise (handled via layout/theme groups).
         // Recompute from the current artwork when AdaptiveAccent is toggled live; otherwise
@@ -2087,6 +2132,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _disposed = true;
+        _responsePresentation.Clear();
         _mediaService.Changed -= OnMediaChanged;
         _audioService.Changed -= OnAudioChanged;
         _weatherService.Changed -= OnWeatherChanged;
