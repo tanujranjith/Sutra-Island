@@ -64,6 +64,20 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\THIRD_PARTY_NOTICES.md') -De
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\Q.md') -Destination $stagePath
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\README.md') -Destination $stagePath
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\RELEASE_NOTES.md') -Destination $stagePath
+foreach ($guide in @('SCREENSHOTS.md', 'PERFORMANCE_NOTES.md')) {
+    $guidePath = Join-Path $PSScriptRoot ('..\' + $guide)
+    if (Test-Path -LiteralPath $guidePath) { Copy-Item -LiteralPath $guidePath -Destination $stagePath }
+}
+# Include the current gallery without copying older, unreferenced media.
+$readmePath = Join-Path $PSScriptRoot '..\README.md'
+$readmeImages = @([regex]::Matches((Get-Content -LiteralPath $readmePath -Raw), 'media/[A-Za-z0-9_-]+\.png') |
+    ForEach-Object { $_.Value } | Sort-Object -Unique)
+if ($readmeImages.Count -gt 0) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $stagePath 'media') | Out-Null
+    foreach ($image in $readmeImages) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot ('..\' + $image)) -Destination (Join-Path $stagePath $image)
+    }
+}
 
 $runtimeFiles = @('codex.exe', 'codex-code-mode-host.exe') | ForEach-Object {
     $file = Join-Path $codexStage.FullName $_
