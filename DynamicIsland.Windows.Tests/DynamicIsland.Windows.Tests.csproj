@@ -42,6 +42,7 @@
     <Compile Include="..\DynamicIsland.Windows\Infrastructure\MediaPresentation.cs" Link="MediaPresentation.cs" />
     <Compile Include="..\DynamicIsland.Windows\Infrastructure\TextEncodingRepair.cs" Link="TextEncodingRepair.cs" />
     <Compile Include="..\DynamicIsland.Windows\Infrastructure\WindowSizingPolicy.cs" Link="WindowSizingPolicy.cs" />
+    <Compile Include="..\DynamicIsland.Windows\Services\System\CaptureOverlayGeometry.cs" Link="CaptureOverlayGeometry.cs" />
     <Compile Include="..\DynamicIsland.Windows\Models\MediaInfo.cs" Link="MediaInfo.cs" />
     <Compile Include="..\DynamicIsland.Windows\Models\AirPodsState.cs" Link="AirPodsState.cs" />
     <Compile Include="..\DynamicIsland.Windows\Models\AirPodsConnectionPolicy.cs" Link="AirPodsConnectionPolicy.cs" />

@@ -1,0 +1,181 @@
+<Window x:Class="DynamicIsland.Windows.Views.CaptureToolbarWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:DynamicIsland.Windows.Views"
+        SizeToContent="WidthAndHeight" WindowStyle="None" ResizeMode="NoResize"
+        Title="Capture toolbar"
+        AllowsTransparency="True" Background="Transparent" ShowInTaskbar="False"
+        Topmost="True" ShowActivated="True" WindowStartupLocation="Manual"
+        FontFamily="Segoe UI Variable Text" Foreground="#F4F2F4"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        AutomationProperties.Name="Capture toolbar">
+    <Window.Resources>
+        <!-- Same graphite wash as the command palette and notifications. -->
+        <LinearGradientBrush x:Key="ToolbarWash" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Offset="0" Color="#FF23242B" />
+            <GradientStop Offset="1" Color="#FF16171C" />
+        </LinearGradientBrush>
+
+        <Style x:Key="CaptureModeOption" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="#C1BDC9" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="Margin" Value="1,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="ModeSurface" CornerRadius="10"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ModeSurface" Property="Background" Value="#16FFFFFF" />
+                                <Setter Property="Foreground" Value="#F4F2F4" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ModeSurface" Property="Background" Value="#B9A5FD" />
+                                <Setter TargetName="ModeSurface" Property="BorderBrush" Value="#D8CCFF" />
+                                <Setter Property="Foreground" Value="#211A32" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="ModeSurface" Property="BorderBrush" Value="#FFF4F2F4" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ModeSurface" Property="Opacity" Value="0.82" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ToolbarCancel" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#9998A4" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,7" />
+            <Setter Property="Margin" Value="1,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="CancelSurface" CornerRadius="10"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CancelSurface" Property="Background" Value="#16FFFFFF" />
+                                <Setter TargetName="CancelSurface" Property="BorderBrush" Value="#24FFFFFF" />
+                                <Setter Property="Foreground" Value="#F4F2F4" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="CancelSurface" Property="BorderBrush" Value="#FFB9A5FD" />
+                                <Setter Property="Foreground" Value="#F4F2F4" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="CancelSurface" Property="Opacity" Value="0.7" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <views:NotificationMorphHost x:Name="ToolbarMorph" Margin="14" RevealProgress="1"
+                                 ReleaseClipWhenSettled="True" BlendSurfaceWithContent="True">
+        <Border x:Name="ToolbarSurface" CornerRadius="18" Background="{DynamicResource ToolbarWash}"
+                BorderBrush="{StaticResource GlassRimBrush}" BorderThickness="1" Padding="7">
+            <StackPanel Orientation="Horizontal" KeyboardNavigation.TabNavigation="Cycle">
+                <!-- Small identity mark so the floating toolbar reads as part of the Island. -->
+                <Border Width="6" Height="6" CornerRadius="3" Background="#B9A5FD"
+                        VerticalAlignment="Center" Margin="5,0,8,0" />
+                <TextBlock Text="Capture" FontSize="12" FontWeight="SemiBold" Foreground="#F4F2F4"
+                           VerticalAlignment="Center" Margin="0,0,8,0" />
+
+                <Rectangle Width="1" Height="20" Fill="#1FFFFFFF" Margin="0,0,6,0" VerticalAlignment="Center" />
+
+                <RadioButton x:Name="RegionButton" GroupName="CaptureMode" IsChecked="True"
+                             Style="{StaticResource CaptureModeOption}" Checked="Mode_Checked"
+                             ToolTip="Rectangular region · R"
+                             AutomationProperties.Name="Region mode"
+                             AutomationProperties.HelpText="Capture a rectangular region. Press R to switch to region mode.">
+                    <StackPanel Orientation="Horizontal">
+                        <Viewbox Width="14" Height="14" Margin="0,0,7,0" VerticalAlignment="Center">
+                            <Canvas Width="16" Height="16">
+                                <Rectangle Canvas.Left="2" Canvas.Top="2" Width="12" Height="12" RadiusX="1.5" RadiusY="1.5"
+                                           Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                           StrokeThickness="1.4" StrokeDashArray="2 1.4" />
+                            </Canvas>
+                        </Viewbox>
+                        <TextBlock Text="Region" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton x:Name="WindowButton" GroupName="CaptureMode"
+                             Style="{StaticResource CaptureModeOption}" Checked="Mode_Checked"
+                             ToolTip="Active window · W"
+                             AutomationProperties.Name="Window mode"
+                             AutomationProperties.HelpText="Capture a window. Press W to switch to window mode.">
+                    <StackPanel Orientation="Horizontal">
+                        <Viewbox Width="14" Height="14" Margin="0,0,7,0" VerticalAlignment="Center">
+                            <Canvas Width="16" Height="16">
+                                <Rectangle Canvas.Left="2" Canvas.Top="3" Width="12" Height="10" RadiusX="1.5" RadiusY="1.5"
+                                           Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                           StrokeThickness="1.4" />
+                                <Line X1="2.8" Y1="6" X2="13.2" Y2="6"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      StrokeThickness="1.4" />
+                            </Canvas>
+                        </Viewbox>
+                        <TextBlock Text="Window" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton x:Name="ScreenButton" GroupName="CaptureMode"
+                             Style="{StaticResource CaptureModeOption}" Checked="Mode_Checked" Click="Screen_Click"
+                             ToolTip="Full screen · F · press again to capture"
+                             AutomationProperties.Name="Full screen mode"
+                             AutomationProperties.HelpText="Capture all screens. Press F to switch, then Enter or click the desktop to capture.">
+                    <StackPanel Orientation="Horizontal">
+                        <Viewbox Width="14" Height="14" Margin="0,0,7,0" VerticalAlignment="Center">
+                            <Canvas Width="16" Height="16">
+                                <Path Data="M2,6 L2,2 L6,2 M10,2 L14,2 L14,6 M14,10 L14,14 L10,14 M6,14 L2,14 L2,10"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                      StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                            </Canvas>
+                        </Viewbox>
+                        <TextBlock Text="Full screen" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                </RadioButton>
+
+                <Rectangle Width="1" Height="20" Fill="#1FFFFFFF" Margin="6,0" VerticalAlignment="Center" />
+
+                <Button x:Name="CancelButton" Style="{StaticResource ToolbarCancel}" Click="Cancel_Click"
+                        ToolTip="Cancel capture · Esc"
+                        AutomationProperties.Name="Cancel capture"
+                        AutomationProperties.HelpText="Close the capture overlay without saving or copying. Press Escape.">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="10"
+                                   VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBlock Text="Esc" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+    </views:NotificationMorphHost>
+</Window>

@@ -343,7 +343,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         if(_screenshotHotkeyId!=0)_hotkeys.Unregister(_screenshotHotkeyId);
         _screenshotHotkeyId=_hotkeys.Register("Screenshot",modifiers | 0x4000,key,()=>_screenshots?.Open());
         _registeredScreenshotHotkey=canonical;
-        _settingsViewModel.SetScreenshotStatus(_screenshotHotkeyId==0?"Shortcut unavailable; choose another combination. Screenshot is also in the island menu.":"Choose Region, Active window, or All screens · Esc closes");
+        _settingsViewModel.SetScreenshotStatus(_screenshotHotkeyId==0?"Shortcut unavailable; choose another combination. Screenshot is also in the island menu.":"Opens the capture overlay · Region by default · Esc cancels");
     }
 
     private void RegisterCommandPaletteHotkey()

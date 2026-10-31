@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using DynamicIsland.Windows.Services;
+using DynamicIsland.Windows.Views;
 
 namespace DynamicIsland.Windows.Infrastructure;
 
@@ -16,14 +17,14 @@ internal static class ScreenshotVerification
         Check(HotkeyParser.TryParse(new Models.AppSettings().ScreenshotHotkey,out var screenshotModifiers,out var screenshotKey,out _,out _) && (screenshotModifiers!=GlobalHotkeyService.SettingsModifiers || screenshotKey!=GlobalHotkeyService.SettingsKey),"The default Screenshot shortcut cannot collide with the registered Settings shortcut");
         var pixels=Enumerable.Repeat((byte)255,96*64*4).ToArray();
         var image=BitmapSource.Create(96,64,96,96,PixelFormats.Bgra32,null,pixels,96*4);image.Freeze();
-        var attempts=0;var captureRequests=0;BitmapSource? copied=null;
-        var preview=new ScreenshotPreview(_=>{captureRequests++;return Task.CompletedTask;},_=>{},bitmap=>{attempts++;if(attempts<3)throw new System.Runtime.InteropServices.COMException("fixture busy clipboard");copied=bitmap;}) {Opacity=0,ShowActivated=false};
+        var attempts=0;BitmapSource? copied=null;
+        var preview=new ScreenshotPreview(_=>{},bitmap=>{attempts++;if(attempts<3)throw new System.Runtime.InteropServices.COMException("fixture busy clipboard");copied=bitmap;}) {Opacity=0,ShowActivated=false};
         try
         {
             preview.Present(new Rect(100,10,180,40),new Rect(0,0,1200,800),true);
-            Check(captureRequests==0&&attempts==0&&preview.ActualHeight<250,"The initial chooser is compact and does not capture or copy before a mode is chosen");
+            Check(attempts==0&&preview.ActualHeight<250,"The post-capture preview is compact and does not copy before an image arrives");
             preview.SetImage(image);
-            preview.SetMode("region");
+            preview.SetMode(CaptureOverlay.RegionMode);
             var clipboard=ScreenshotPreview.ClipboardData(image);
             Check(clipboard.GetImage() is not null && clipboard.GetData("CanUploadToCloudClipboard") is System.IO.MemoryStream { Length:4 } && clipboard.GetData("CanIncludeInClipboardHistory") is System.IO.MemoryStream { Length:4 },"Screenshot clipboard data includes image pixels and excludes Windows cloud sync/history");
             preview.Present(new Rect(100,10,180,40),new Rect(0,0,1200,800),false);
@@ -47,13 +48,37 @@ internal static class ScreenshotVerification
             Check(preview.Left>=-600&&preview.Left+preview.Width<=0,"Preview placement supports a negative-coordinate monitor");
         }
         finally{preview.Close();}
-        using(var background=new System.Drawing.Bitmap(100,80))
-        using(var overlay=new RegionOverlay(new System.Drawing.Rectangle(-100,0,100,80),background) {Opacity=0})
+        var toolbar=new CaptureToolbarWindow {Opacity=0,ShowActivated=false,Topmost=false};
+        try
         {
+            toolbar.PresentFromIsland(new Rect(-1800,20,180,40),new Rect(-1920,0,1920,1080),false);
+            var toolbarDeadline=DateTime.UtcNow.AddSeconds(4);
+            while(toolbar.RevealProgress<1 && DateTime.UtcNow<toolbarDeadline)await Task.Delay(20);
+            Check(toolbar.ActiveMode==CaptureOverlay.RegionMode,"The capture toolbar starts with Region selected");
+            Check(toolbar.RevealProgress==1,"The capture toolbar settles after the notification-style reveal");
+            toolbar.SetMode(CaptureOverlay.ScreenMode);
+            Check(toolbar.ActiveMode==CaptureOverlay.ScreenMode,"Toolbar mode synchronization clearly switches the active capture mode");
+            toolbar.SetMode(CaptureOverlay.WindowMode);
+            Check(toolbar.ActiveMode==CaptureOverlay.WindowMode,"Toolbar synchronization returns to window mode without raising a second request");
+            toolbar.SetMode(CaptureOverlay.RegionMode);
+        }
+        finally{toolbar.Close();}
+        using(var background=new System.Drawing.Bitmap(100,80))
+        using(var overlay=new CaptureOverlay(new System.Drawing.Rectangle(-100,0,100,80),background,null) {Opacity=0})
+        {
+            Check(overlay.ActiveMode==CaptureOverlay.RegionMode,"The capture overlay starts in region mode without another click");
             var selection=overlay.SelectAsync();
             void Mouse(string name,int x,int y)=>typeof(System.Windows.Forms.Form).GetMethod(name,System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance)!.Invoke(overlay,[new System.Windows.Forms.MouseEventArgs(System.Windows.Forms.MouseButtons.Left,1,x,y,0)]);
             Mouse("OnMouseDown",80,60);Mouse("OnMouseMove",-20,-10);Mouse("OnMouseUp",-20,-10);
-            Check(await selection==new System.Drawing.Rectangle(0,0,80,60),"Region selection supports reverse dragging and clamps outside-monitor coordinates");
+            var request=await selection;
+            Check(request is { Mode:CaptureOverlay.RegionMode } && request.Value.Region==new System.Drawing.Rectangle(0,0,80,60),"Region selection supports reverse dragging and clamps outside-monitor coordinates");
+        }
+        using(var background=new System.Drawing.Bitmap(40,30))
+        using(var overlay=new CaptureOverlay(new System.Drawing.Rectangle(0,0,40,30),background,null) {Opacity=0})
+        {
+            var selection=overlay.SelectAsync();
+            overlay.Cancel();
+            Check(await selection is null,"Escape-style cancellation resolves without a capture request");
         }
         var directory=System.IO.Path.Combine(AppDataPaths.Root,"captures");System.IO.Directory.CreateDirectory(directory);System.IO.File.WriteAllLines(System.IO.Path.Combine(directory,"screenshot-checks.txt"),report);
     }

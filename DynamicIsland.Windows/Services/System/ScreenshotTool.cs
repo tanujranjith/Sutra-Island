@@ -24,83 +24,171 @@ namespace DynamicIsland.Windows.Services;
 internal sealed class ScreenshotTool(IslandWindow island, ScreenContextService screen, Func<bool> reduced) : IDisposable
 {
     private ScreenshotPreview? _preview;
+    private CaptureOverlay? _overlay;
+    private CaptureToolbarWindow? _toolbar;
     private bool _busy, _disposed;
-    private RegionOverlay? _selection;
     private readonly List<Window> _pins = [];
 
+    /// <summary>
+    /// Opens the full-desktop capture overlay immediately. Region selection is armed
+    /// by default; nothing is copied or saved until the user chooses a region/window
+    /// or confirms full-screen capture.
+    /// </summary>
     public void Open()
     {
-        if (_disposed || _busy) return;
-        screen.RememberForeground(new System.Windows.Interop.WindowInteropHelper(island).Handle);
-        _preview?.Close();
-        Preview().Present(island.PaletteAnchorBounds, island.PaletteWorkArea, reduced());
+        if (_disposed || _busy || _overlay is not null) return;
+        _ = OpenOverlayAsync();
     }
-    private ScreenshotPreview Preview()
+
+    private async Task OpenOverlayAsync()
     {
-        if (_preview is null)
-        {
-            _preview = new ScreenshotPreview(CaptureAsync, Pin);
-            _preview.Closed += (_, _) => _preview = null;
-        }
-        return _preview;
-    }
-    public async Task CaptureAsync(string mode)
-    {
-        if (_busy || _disposed) return;
         _busy = true;
         var wasVisible = island.IsVisible;
+        var previousForeground = NativeMethods.GetForegroundWindow();
+        var restoreFocus = false;
+        var fallbackFocus = nint.Zero;
+        // Capture the anchor before hiding the Island; the toolbar grows from the
+        // same neck point used by notifications and the command palette.
+        var anchor = island.PaletteAnchorBounds;
+        var workArea = island.PaletteWorkArea;
+        _preview?.Close();
+        CaptureToolbarWindow? toolbar = null;
         try
         {
             screen.RememberForeground(new System.Windows.Interop.WindowInteropHelper(island).Handle);
-            var target = screen.LastForegroundTarget;
-            _preview?.Close(); // Release the previous full-resolution image before another capture.
-            // Hide our own surfaces before acquiring pixels, regardless of capture-affinity settings.
+            fallbackFocus = screen.LastForegroundTarget;
+            // Hide our own surfaces before acquiring pixels. The overlay is created from
+            // this frozen snapshot, so neither the Island nor the toolbar can appear in it.
+            island.SetCaptureHidden(true);
             island.Hide();
             foreach (var pin in _pins) pin.Hide();
             await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Render);
             await Task.Delay(60);
+
             var bounds = Forms.SystemInformation.VirtualScreen;
-            if (mode == "window")
-            {
-                if (target == nint.Zero || !NativeMethods.IsWindow(target) || !NativeMethods.GetWindowRect(target, out var rect))
-                    throw new InvalidOperationException("No active window is available. Focus the window first, then try again.");
-                bounds = Drawing.Rectangle.Intersect(bounds, new Drawing.Rectangle(rect.Left, rect.Top, rect.Width, rect.Height));
-            }
             if (bounds.Width <= 0 || bounds.Height <= 0 || (long)bounds.Width * bounds.Height > 100_000_000)
-                throw new InvalidOperationException("This capture is too large or outside the desktop. Try a smaller region.");
-            BitmapSource bitmap;
-            using (var background = await Task.Run(() => ScreenContextService.CaptureBitmap(new NativeMethods.Rect { Left=bounds.Left, Top=bounds.Top, Right=bounds.Right, Bottom=bounds.Bottom })))
+                throw new InvalidOperationException("This desktop is too large to capture. Try a smaller region after changing display scaling.");
+
+            BitmapSource? bitmap = null;
+            var mode = CaptureOverlay.RegionMode;
+            using (var background = await Task.Run(() => ScreenContextService.CaptureBitmap(new NativeMethods.Rect
+                   {
+                       Left = bounds.Left, Top = bounds.Top, Right = bounds.Right, Bottom = bounds.Bottom
+                   })))
             {
                 if (_disposed) return;
-                if (mode == "region")
+
+                var windows = CaptureWindowEnumerator.Enumerate(bounds);
+                using var overlay = new CaptureOverlay(bounds, background, windows);
+                _overlay = overlay;
+                CaptureRequest? selection;
+                try
                 {
-                    using var overlay = new RegionOverlay(bounds, background);
-                    _selection = overlay;
-                    var selected = await overlay.SelectAsync();
-                    _selection = null;
-                    if (selected is not { Width: > 1, Height: > 1 } region || _disposed) return;
-                    // Copy only the selected pixels; a small crop must not retain the
-                    // full multi-monitor desktop through a CroppedBitmap.Source.
-                    bitmap = await Task.Run(() => CopyPixels(background, region));
+                    toolbar = new CaptureToolbarWindow();
+                    _toolbar = toolbar;
+                    toolbar.ModeRequested += overlay.SetMode;
+                    toolbar.ConfirmRequested += overlay.Confirm;
+                    toolbar.CancelRequested += overlay.Cancel;
+                    overlay.ModeChanged += toolbar.SetMode;
+                    overlay.FocusToolbarRequested += toolbar.FocusToolbar;
+
+                    var selectionTask = overlay.SelectAsync();
+                    // The owner relationship keeps the WPF toolbar above the topmost
+                    // WinForms capture surface even after the overlay is clicked.
+                    new System.Windows.Interop.WindowInteropHelper(toolbar).Owner = overlay.Handle;
+                    toolbar.PresentFromIsland(anchor, workArea, reduced());
+                    selection = await selectionTask;
                 }
-                else bitmap=await Task.Run(()=>CopyPixels(background));
+                finally
+                {
+                    _overlay = null;
+                    if (toolbar is not null)
+                    {
+                        await toolbar.DismissAsync();
+                        toolbar.Close();
+                        if (ReferenceEquals(_toolbar, toolbar)) _toolbar = null;
+                    }
+                    overlay.Hide();
+                }
+                if (_disposed) return;
+                if (selection is not { } request)
+                {
+                    // Escape, right-click, or closing the overlay: save and copy nothing.
+                    restoreFocus = true;
+                    return;
+                }
+
+                var crop = Drawing.Rectangle.Intersect(request.Region,
+                    new Drawing.Rectangle(0, 0, background.Width, background.Height));
+                if (crop.Width <= 1 || crop.Height <= 1)
+                    throw new InvalidOperationException("That area is too small to capture. Drag a larger region.");
+
+                mode = request.Mode;
+                bitmap = await Task.Run(() => CopyPixels(background, crop));
+                if (_disposed) return;
             }
-            if (_disposed) return;
-            var preview = Preview(); preview.SetImage(bitmap); preview.SetMode(mode);
-            await preview.CopyAsync();
-            preview.Present(island.PaletteAnchorBounds, island.PaletteWorkArea, reduced());
+
+            if (bitmap is null || _disposed) return;
+            var preview = Preview();
+            preview.SetImage(bitmap);
+            preview.SetMode(mode);
+            var copied = await preview.CopyAsync();
+            preview.Present(anchor, workArea, reduced());
+            if (copied) preview.ShowCopiedToast();
         }
         catch (Exception ex)
         {
-            if (!_disposed) { var preview=Preview();preview.SetStatus(ex is InvalidOperationException ? ex.Message : "Capture failed. Try again or choose a smaller region.");preview.Present(island.PaletteAnchorBounds,island.PaletteWorkArea,reduced()); }
+            if (!_disposed)
+            {
+                var preview = Preview();
+                preview.SetStatus(ex is InvalidOperationException
+                    ? ex.Message
+                    : "Capture failed. Try again or choose a smaller region.");
+                preview.Present(anchor, workArea, reduced());
+            }
         }
         finally
         {
-            _selection = null;
-            if (!_disposed) { if (wasVisible) island.Show(); foreach (var pin in _pins) pin.Show(); }
+            _overlay = null;
+            if (toolbar is not null)
+            {
+                try { toolbar.Close(); } catch { /* already closed with its owner */ }
+                if (ReferenceEquals(_toolbar, toolbar)) _toolbar = null;
+            }
+            if (!_disposed)
+            {
+                island.SetCaptureHidden(false);
+                var preview = _preview;
+                if (preview is { IsVisible: true }) preview.BeginSurfaceRestore();
+                if (wasVisible) island.Show();
+                foreach (var pin in _pins) pin.Show();
+                if (preview is { IsVisible: true }) preview.EndSurfaceRestore();
+                if (restoreFocus) RestoreForeground(previousForeground, fallbackFocus);
+            }
+            else island.SetCaptureHidden(false);
             _busy = false;
         }
     }
+
+    private static void RestoreForeground(nint previous, nint fallback)
+    {
+        var target = NativeMethods.IsWindow(previous) && NativeMethods.IsWindowVisible(previous)
+            ? previous
+            : fallback;
+        if (target != nint.Zero && NativeMethods.IsWindow(target))
+            NativeMethods.SetForegroundWindow(target);
+    }
+
+    private ScreenshotPreview Preview()
+    {
+        if (_preview is null)
+        {
+            _preview = new ScreenshotPreview(Pin);
+            _preview.Closed += (_, _) => _preview = null;
+        }
+        return _preview;
+    }
+
     internal static BitmapSource Decode(byte[] png)
     {
         using var stream = new MemoryStream(png);
@@ -147,50 +235,13 @@ internal sealed class ScreenshotTool(IslandWindow island, ScreenContextService s
         pin.MouseLeftButtonDown+=(_,e)=>{if(e.ClickCount==2)pin.Close();else pin.DragMove();};
         pin.Closed+=(_,_)=>{image.Source=null;_pins.Remove(pin);};_pins.Add(pin);pin.Show();
     }
-    public void Dispose() { _disposed=true;_selection?.Cancel();_preview?.Close();foreach(var pin in _pins.ToArray())pin.Close(); }
-}
-
-internal sealed class RegionOverlay : Forms.Form
-{
-    private readonly TaskCompletionSource<Drawing.Rectangle?> _result=new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private Drawing.Point? _start;
-    private Drawing.Rectangle _region;
-    public RegionOverlay(Drawing.Rectangle bounds, Drawing.Bitmap background)
+    public void Dispose()
     {
-        FormBorderStyle=Forms.FormBorderStyle.None;StartPosition=Forms.FormStartPosition.Manual;AutoScaleMode=Forms.AutoScaleMode.None;
-        Bounds=bounds;TopMost=true;ShowInTaskbar=false;KeyPreview=true;DoubleBuffered=true;Cursor=Forms.Cursors.Cross;
-        BackgroundImage=background;BackgroundImageLayout=Forms.ImageLayout.None;
-        MouseDown+=(_,e)=>{if(e.Button==Forms.MouseButtons.Right){Cancel();return;}if(e.Button==Forms.MouseButtons.Left){_start=e.Location;Capture=true;}};
-        MouseMove+=(_,e)=>UpdateSelection(e.Location);
-        MouseUp+=(_,e)=>{if(e.Button==Forms.MouseButtons.Left && _start is not null){UpdateSelection(e.Location);_result.TrySetResult(_region.Width>1&&_region.Height>1?_region:null);Hide();}};
-        KeyDown+=(_,e)=>{if(e.KeyCode==Forms.Keys.Escape){e.Handled=true;Cancel();}};
-        FormClosed+=(_,_)=>_result.TrySetResult(null);
-    }
-    public Task<Drawing.Rectangle?> SelectAsync(){Show();Activate();return _result.Task;}
-    public void Cancel(){_result.TrySetResult(null);Hide();}
-    private void UpdateSelection(Drawing.Point point)
-    {
-        if(_start is not {} start)return;
-        var next=Drawing.Rectangle.Intersect(ClientRectangle,Drawing.Rectangle.FromLTRB(Math.Min(start.X,point.X),Math.Min(start.Y,point.Y),Math.Max(start.X,point.X),Math.Max(start.Y,point.Y)));
-        if(next==_region)return;
-        using var dirty=new Drawing.Region(_region);dirty.Xor(next);
-        foreach(var rect in new[]{_region,next})
-        {
-            if(rect.Width<=0||rect.Height<=0)continue;
-            dirty.Union(new Drawing.Rectangle(rect.Left-2,rect.Top-2,rect.Width+4,4));
-            dirty.Union(new Drawing.Rectangle(rect.Left-2,rect.Bottom-2,rect.Width+4,4));
-            dirty.Union(new Drawing.Rectangle(rect.Left-2,rect.Top-2,4,rect.Height+4));
-            dirty.Union(new Drawing.Rectangle(rect.Right-2,rect.Top-2,4,rect.Height+4));
-        }
-        _region=next;Invalidate(dirty);
-    }
-    protected override void OnPaint(Forms.PaintEventArgs e)
-    {
-        base.OnPaint(e);
-        using var shade=new Drawing.SolidBrush(Drawing.Color.FromArgb(95,0,0,0));
-        using var outside=new Drawing.Region(ClientRectangle);if(_region.Width>0)outside.Exclude(_region);e.Graphics.FillRegion(shade,outside);
-        using var outline=new Drawing.Pen(Drawing.Color.FromArgb(190,166,255),2);if(_region.Width>0)e.Graphics.DrawRectangle(outline,_region);
-        e.Graphics.DrawString("Drag to capture · Esc / right-click to cancel",Drawing.SystemFonts.MessageBoxFont!,Drawing.Brushes.White,20,20);
+        _disposed = true;
+        _overlay?.Cancel();
+        _toolbar?.Close();
+        _preview?.Close();
+        foreach (var pin in _pins.ToArray()) pin.Close();
     }
 }
 
@@ -199,15 +250,20 @@ internal sealed class ScreenshotPreview : Window
     private readonly NotificationMorphHost _morph=new() { Margin=new Thickness(14) };
     private readonly InkCanvas _ink=new() { EditingMode=InkCanvasEditingMode.None };
     private readonly TextBlock _status=new() { Foreground=Brushes.LightGray,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(8) };
+    private readonly TextBlock _title=new() { Text="Screenshot",Foreground=Brushes.White,FontSize=17,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(8) };
     private BitmapSource? _image;
     private readonly List<Button> _imageButtons=[];
-    private readonly Dictionary<string,Button> _modeButtons=[];
     private Button? _drawButton;
     private bool _copying;
+    private bool _suppressDismiss;
     private readonly Action<BitmapSource> _copy;
     private readonly Viewbox _imageView;
     private readonly WrapPanel _actions;
-    public ScreenshotPreview(Func<string,Task> capture,Action<BitmapSource> pin,Action<BitmapSource>? copy=null)
+    private readonly System.Windows.Threading.DispatcherTimer _autoClose = new() { Interval = TimeSpan.FromSeconds(10) };
+    private readonly System.Windows.Threading.DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromMilliseconds(2600) };
+    private Rect _presentationArea;
+    private Window? _copyToast;
+    public ScreenshotPreview(Action<BitmapSource> pin,Action<BitmapSource>? copy=null)
     {
         _copy=copy??CopyLocal;
         Resources.MergedDictionaries.Add(new ResourceDictionary { Source=new Uri("/DynamicIsland.Windows;component/Views/ScreenshotResources.xaml",UriKind.Relative) });
@@ -215,20 +271,21 @@ internal sealed class ScreenshotPreview : Window
         AllowsTransparency=true;Background=Brushes.Transparent;Topmost=true;ShowInTaskbar=false;
         var content=new StackPanel { Margin=new Thickness(16) };
         var header=new DockPanel();var close=Button("Close",()=>Close());close.Content=new TextBlock {Text="\uE711",FontFamily=new FontFamily("Segoe Fluent Icons"),FontSize=12};close.Width=36;close.MinHeight=36;close.Padding=new Thickness(8);close.Background=Brushes.Transparent;close.BorderBrush=Brushes.Transparent;close.ToolTip="Close screenshot · Esc";DockPanel.SetDock(close,Dock.Right);header.Children.Add(close);
-        header.Children.Add(new TextBlock { Text="Screenshot",Foreground=Brushes.White,FontSize=17,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(8) });content.Children.Add(header);
-        var modes=new System.Windows.Controls.Primitives.UniformGrid {Columns=3};foreach(var mode in new[]{("Region","region"),("Active window","window"),("All screens","screen")}){var button=Button(mode.Item1,()=>{_ = capture(mode.Item2);});button.Style=(Style)FindResource("ScreenshotModeButton");_modeButtons.Add(mode.Item2,button);modes.Children.Add(button);}
-        content.Children.Add(new Border { Background=new SolidColorBrush(Color.FromRgb(18,19,24)),CornerRadius=new CornerRadius(14),Padding=new Thickness(3),Margin=new Thickness(4,12,4,0),Child=modes });
+        header.Children.Add(_title);content.Children.Add(header);
         var view=new Viewbox { Stretch=Stretch.Uniform,MaxHeight=280,MaxWidth=510,Margin=new Thickness(4,12,4,4),Child=_ink,Visibility=Visibility.Collapsed };_imageView=view;content.Children.Add(view);
         _ink.DefaultDrawingAttributes=new DrawingAttributes { Color=Colors.OrangeRed,Width=5,Height=5,FitToCurve=true };
         var actions=new WrapPanel {Visibility=Visibility.Collapsed};_actions=actions;
         void Action(string title,Action action){var button=Button(title,action);button.IsEnabled=false;if(title=="Copy")button.Tag="primary";if(title=="Draw")_drawButton=button;_imageButtons.Add(button);actions.Children.Add(button);}
         Action("Copy",()=>{_ = CopyAsync();});Action("Save PNG",Save);Action("Draw",()=>{_ink.EditingMode=_ink.EditingMode==InkCanvasEditingMode.Ink?InkCanvasEditingMode.None:InkCanvasEditingMode.Ink;if(_drawButton is not null)_drawButton.Tag=_ink.EditingMode==InkCanvasEditingMode.Ink?"active":null;SetStatus(_ink.EditingMode==InkCanvasEditingMode.Ink?"Draw enabled · Copy, Save, or Pin to use your annotations.":"Drawing off.");});
-        Action("Undo",()=>{if(_ink.Strokes.Count>0)_ink.Strokes.RemoveAt(_ink.Strokes.Count-1);});Action("Pin",()=>{try{pin(RenderImage());}catch(Exception){SetStatus("Could not pin this image. Try a smaller region.");}});content.Children.Add(actions);
-        content.Children.Add(_status);SetStatus("Choose a capture mode. Images stay local; nothing is saved until you choose Save PNG.");
+        Action("Undo",()=>{if(_ink.Strokes.Count>0)_ink.Strokes.RemoveAt(_ink.Strokes.Count-1);});Action("Pin",()=>{_suppressDismiss=true;try{pin(RenderImage());}catch(Exception){SetStatus("Could not pin this image. Try a smaller region.");}finally{Dispatcher.BeginInvoke(()=>_suppressDismiss=false,System.Windows.Threading.DispatcherPriority.Background);}});content.Children.Add(actions);
+        content.Children.Add(_status);SetStatus("No capture yet.");
         var card=new Border { Background=new SolidColorBrush(Color.FromRgb(25,26,32)),CornerRadius=new CornerRadius(20),Child=content };
         _morph.Children.Add(new ScrollViewer { Content=card,VerticalScrollBarVisibility=ScrollBarVisibility.Auto });Content=_morph;
         PreviewKeyDown+=(_,e)=>{if(e.Key==Key.Escape)Close();};
-        Closed+=(_,_)=>{_morph.BeginAnimation(NotificationMorphHost.RevealProgressProperty,null);_ink.Strokes.Clear();_ink.Background=null;_image=null;};
+        _autoClose.Tick+=(_,_)=>Close();
+        _toastTimer.Tick+=(_,_)=>CloseCopiedToast();
+        Deactivated+=(_,_)=>{if(!_suppressDismiss)Close();};
+        Closed+=(_,_)=>{_autoClose.Stop();CloseCopiedToast();_morph.BeginAnimation(NotificationMorphHost.RevealProgressProperty,null);_ink.Strokes.Clear();_ink.Background=null;_image=null;};
     }
     private Button Button(string text,Action click)
     {
@@ -240,7 +297,15 @@ internal sealed class ScreenshotPreview : Window
         System.Windows.Automation.AutomationProperties.SetName(button,text);
         button.Click+=(_,_)=>click();return button;
     }
-    public void SetMode(string mode){foreach(var entry in _modeButtons)entry.Value.Tag=entry.Key==mode?"active":null;}
+    public void SetMode(string mode)
+    {
+        _title.Text = mode switch
+        {
+            CaptureOverlay.WindowMode => "Screenshot · Window",
+            CaptureOverlay.ScreenMode => "Screenshot · Full screen",
+            _ => "Screenshot · Region"
+        };
+    }
     internal static System.Windows.DataObject ClipboardData(BitmapSource image)
     {
         var data=new System.Windows.DataObject();data.SetImage(image);
@@ -259,6 +324,12 @@ internal sealed class ScreenshotPreview : Window
     }
     internal InkCanvas AnnotationCanvas => _ink;
     internal double RevealProgress => _morph.RevealProgress;
+    internal void BeginSurfaceRestore() => _suppressDismiss = true;
+    internal void EndSurfaceRestore()
+    {
+        Activate();
+        Dispatcher.BeginInvoke(() => _suppressDismiss = false, System.Windows.Threading.DispatcherPriority.Background);
+    }
     internal BitmapSource RenderImage()
     {
         if(_image is null)throw new InvalidOperationException("Capture an image first.");
@@ -266,24 +337,54 @@ internal sealed class ScreenshotPreview : Window
         var visual=new DrawingVisual();using(var dc=visual.RenderOpen()){dc.DrawImage(_image,new Rect(0,0,_image.PixelWidth,_image.PixelHeight));_ink.Strokes.Draw(dc);}
         var image=new RenderTargetBitmap(_image.PixelWidth,_image.PixelHeight,96,96,PixelFormats.Pbgra32);image.Render(visual);image.Freeze();return image;
     }
-    public async Task CopyAsync()
+    public async Task<bool> CopyAsync()
     {
-        if(_image is null||_copying)return;_copying=true;
-        try { var image=RenderImage();for(var attempt=0;attempt<5;attempt++){try{_copy(image);SetStatus($"Copied · {image.PixelWidth} × {image.PixelHeight} · local only");return;}catch(System.Runtime.InteropServices.COMException){await Task.Delay(50);}}SetStatus("Clipboard is busy. Your image is still here; choose Copy to retry."); }
-        catch(Exception){SetStatus("Could not copy this image. Your preview is still available; try again or save it locally.");}
+        if(_image is null||_copying)return false;_copying=true;
+        try { var image=RenderImage();for(var attempt=0;attempt<5;attempt++){try{_copy(image);SetStatus($"Copied · {image.PixelWidth} × {image.PixelHeight} · local only");return true;}catch(System.Runtime.InteropServices.COMException){await Task.Delay(50);}}SetStatus("Clipboard is busy. Your image is still here; choose Copy to retry.");return false; }
+        catch(Exception){SetStatus("Could not copy this image. Your preview is still available; try again or save it locally.");return false;}
         finally {_copying=false;}
+    }
+    internal void ShowCopiedToast()
+    {
+        CloseCopiedToast();
+        var label=new TextBlock { Text="Screenshot copied to clipboard",Foreground=Brushes.White,FontSize=12.5,FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center };
+        var icon=new Border { Width=24,Height=24,CornerRadius=new CornerRadius(12),Background=new SolidColorBrush(Color.FromRgb(185,165,253)),Child=new TextBlock { Text="\uE73E",FontFamily=new FontFamily("Segoe Fluent Icons"),Foreground=new SolidColorBrush(Color.FromRgb(35,30,49)),FontSize=14,FontWeight=FontWeights.Bold,HorizontalAlignment=System.Windows.HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,TextAlignment=TextAlignment.Center } };
+        var toast=new Window { Owner=this,Title="Screenshot copied",WindowStyle=WindowStyle.None,ResizeMode=ResizeMode.NoResize,AllowsTransparency=true,Background=Brushes.Transparent,ShowInTaskbar=false,ShowActivated=false,Focusable=false,IsHitTestVisible=false,SizeToContent=SizeToContent.WidthAndHeight,Topmost=true,Content=new Border { Background=new SolidColorBrush(Color.FromRgb(35,36,43)),BorderBrush=new SolidColorBrush(Color.FromRgb(72,70,83)),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(15),Padding=new Thickness(14,10,16,10),Child=new StackPanel { Orientation=System.Windows.Controls.Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center,Children={icon,new Border { Width=10,Background=Brushes.Transparent },label} } } };
+        toast.Loaded+=(_,_)=>
+        {
+            var left=Left+ActualWidth-toast.ActualWidth-56;
+            var top=Top+8;
+            // Keep the toast in the preview header beside the title. On narrow
+            // cards, use the footer so it does not cover the close button or image.
+            if(left<Left+170){left=Left+12;top=Top+ActualHeight-toast.ActualHeight-8;}
+            toast.Left=Math.Clamp(left,_presentationArea.Left,Math.Max(_presentationArea.Left,_presentationArea.Right-toast.ActualWidth));
+            toast.Top=Math.Clamp(top,_presentationArea.Top,Math.Max(_presentationArea.Top,_presentationArea.Bottom-toast.ActualHeight));
+        };
+        _copyToast=toast;
+        toast.Show();
+        _toastTimer.Stop();_toastTimer.Start();
+    }
+    private void CloseCopiedToast()
+    {
+        _toastTimer.Stop();
+        var toast=_copyToast;_copyToast=null;
+        if(toast is not null)toast.Close();
     }
     private async void Save()
     {
+        _suppressDismiss=true;_autoClose.Stop();
         try{var dialog=new Microsoft.Win32.SaveFileDialog { Filter="PNG image|*.png",FileName="Sutra screenshot "+DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss")+".png" };if(dialog.ShowDialog(this)!=true)return;var image=RenderImage();await Task.Run(()=>{var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(image));using var file=File.Create(dialog.FileName);encoder.Save(file);});SetStatus("Saved locally.");}
         catch(Exception){SetStatus("Could not save that file. Choose another location and try again.");}
+        finally{_suppressDismiss=false;if(IsVisible)_autoClose.Start();}
     }
     public void Present(Rect anchor,Rect area,bool reduced)
     {
+        _presentationArea=area;
         Width=Math.Min(580,Math.Max(280,area.Width-16));MaxHeight=Math.Max(240,area.Height-16);
         Left=Math.Clamp(anchor.Left+anchor.Width/2-Width/2,area.Left,Math.Max(area.Left,area.Right-Width));Top=area.Top;
         _morph.BeginAnimation(NotificationMorphHost.RevealProgressProperty,null);_morph.RevealProgress=reduced?1:0;
         Show();UpdateLayout();Top=Math.Clamp(anchor.Bottom-2,area.Top,Math.Max(area.Top,area.Bottom-ActualHeight));
+        _autoClose.Stop();_autoClose.Start();
         if(!reduced){var animation=new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(380));animation.Completed+=(_,_)=>{_morph.BeginAnimation(NotificationMorphHost.RevealProgressProperty,null);_morph.RevealProgress=1;};_morph.BeginAnimation(NotificationMorphHost.RevealProgressProperty,animation);}
     }
 }

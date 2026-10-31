@@ -73,7 +73,7 @@ public static class CommandCatalog
         new(PaletteCommand.OpenMedia, "open media", [], "Open the current media app", "open media"),
         new(PaletteCommand.Recenter, "recenter", [], "Recenter the island", "recenter"),
         new(PaletteCommand.Clipboard, "clipboard", [], "Open clipboard history", "clipboard"),
-        new(PaletteCommand.Screenshot, "screenshot", ["capture", "snip", "screen shot"], "Capture a region, active window, or all screens locally", "Enter to choose capture mode"),
+        new(PaletteCommand.Screenshot, "screenshot", ["capture", "snip", "screen shot"], "Capture a region, a window, or all screens locally", "Enter to open the capture overlay"),
         new(PaletteCommand.NotificationHistory, "notifications", ["notification history", "history"], "Review notifications and mirroring controls", "Enter to review"),
         new(PaletteCommand.NotificationsOn, "notifications on", [], "Enable Windows notification mirroring", "notifications on"),
         new(PaletteCommand.NotificationsOff, "notifications off", [], "Disable Windows notification mirroring", "notifications off"),

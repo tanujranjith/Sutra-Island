@@ -33,6 +33,7 @@ public partial class IslandWindow : Window
     private bool _dragging;
     private bool _dimmed;
     private bool _hiddenForFullscreen;
+    private bool _hiddenForCapture;
     private bool _settingsWindowOpen;
     private bool _scrubbing;
     private bool _timerPanelOpen;
@@ -64,6 +65,7 @@ public partial class IslandWindow : Window
     public event EventHandler? OpenSettingsRequested;
     public event EventHandler? ScreenshotRequested;
     public void RequestScreenshot() => ScreenshotRequested?.Invoke(this,EventArgs.Empty);
+    internal void SetCaptureHidden(bool hidden) => _hiddenForCapture = hidden;
     private void ScreenshotButton_Click(object sender,RoutedEventArgs e)=>RequestScreenshot();
     public event EventHandler? OpenQSettingsRequested;
     public event EventHandler? OpenClipboardRequested;
@@ -1552,6 +1554,7 @@ public partial class IslandWindow : Window
     // Safety net: the island must never get stuck invisible/off-screen. Runs every second.
     private void EnsureHealthy()
     {
+        if (_hiddenForCapture) return;
         try
         {
             var legitimatelyHidden = _viewModel.Settings.AutoHideFullscreen && _hiddenForFullscreen;
@@ -1611,6 +1614,7 @@ public partial class IslandWindow : Window
     private int _fullscreenStreak;
     private void CheckFullscreen()
     {
+        if (_hiddenForCapture) return;
         if (!_viewModel.Settings.AutoHideFullscreen)
         {
             _fullscreenStreak = 0;

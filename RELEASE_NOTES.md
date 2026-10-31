@@ -1,3 +1,11 @@
+# Sutra Island v1.2.5
+
+- Open screenshot capture directly with Region selected, then switch to Window or Full screen from the floating toolbar.
+- Confirm successful clipboard copies with a compact in-preview toast; dismiss the preview after ten seconds or when clicking outside it.
+- Repaint the selection overlay during region dragging to prevent stale dimming blocks from trailing the selection.
+- Improve per-monitor capture bounds and window detection across mixed-DPI and multi-monitor desktops.
+
+---
 # Sutra Island v1.2.4
 
 - Add local region, active-window, and all-screen screenshots from Ctrl+Alt+S, the expanded menu, or the command palette. Choose a mode before capture; copy automatically, then optionally save PNG, draw, undo, or pin the result.
