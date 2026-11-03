@@ -46,11 +46,11 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
         target.ElementAtRelease = FocusedElementIdAsync();
     }
 
-    public Task<FlowPasteOutcome> PasteAsync(string text, FlowTarget? target, CancellationToken token) =>
+    public Task<FlowPasteResult> PasteAsync(string text, FlowTarget? target, CancellationToken token) =>
         ui.InvokeAsync(() => PasteOnUiAsync(text, target, token)).Task.Unwrap();
 
     // On every path except success, nothing is typed and the clipboard is left exactly as it was.
-    private async Task<FlowPasteOutcome> PasteOnUiAsync(string text, FlowTarget? target, CancellationToken token)
+    private async Task<FlowPasteResult> PasteOnUiAsync(string text, FlowTarget? target, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         if (target is null || !await StillFocusedAsync(target)) return FlowPasteOutcome.TargetChanged;
@@ -65,7 +65,7 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
         {
             if (text.Contains('\n') || text.Contains('\r')) return FlowPasteOutcome.MultilineNeedsClipboard;
             if (!await StillFocusedAsync(target)) return FlowPasteOutcome.TargetChanged;
-            return TypeText(text) ? FlowPasteOutcome.Pasted : FlowPasteOutcome.Blocked;
+            return TypeText(text);
         }
 
         if (!TrySetClipboard(Dictation(text))) return FlowPasteOutcome.ClipboardBusy;
@@ -140,28 +140,28 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
         return await Task.WhenAny(task, Task.Delay(400)).ConfigureAwait(true) == task ? task.Result : null;
     }
 
-    /// <summary>Types single-line text as Unicode keystrokes. True if Windows accepted every keystroke.</summary>
-    private bool TypeText(string text)
+    /// <summary>
+    /// Types single-line text as Unicode keystrokes in one SendInput call. If Windows accepts only
+    /// some of them, the result says which part didn't get typed.
+    /// </summary>
+    private FlowPasteResult TypeText(string text)
     {
-        var inputs = new List<Input>(text.Length * 2);
-        foreach (var ch in text)
+        var typable = FlowTyping.Typable(text); // never type Enter, Tab, or other control keys
+        if (typable.Length == 0) return FlowPasteOutcome.Pasted;
+        var inputs = new Input[typable.Length * 2];
+        for (var i = 0; i < typable.Length; i++)
         {
-            if (char.IsControl(ch)) continue; // never type Enter, Tab, or other control keys
-            inputs.Add(new Input { type = INPUT_KEYBOARD, u = new InputUnion { ki = new KeybdInput { wScan = ch, dwFlags = KEYEVENTF_UNICODE } } });
-            inputs.Add(new Input { type = INPUT_KEYBOARD, u = new InputUnion { ki = new KeybdInput { wScan = ch, dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP } } });
+            inputs[2 * i] = new Input { type = INPUT_KEYBOARD, u = new InputUnion { ki = new KeybdInput { wScan = typable[i], dwFlags = KEYEVENTF_UNICODE } } };
+            inputs[2 * i + 1] = new Input { type = INPUT_KEYBOARD, u = new InputUnion { ki = new KeybdInput { wScan = typable[i], dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP } } };
         }
         var size = Marshal.SizeOf<Input>();
-        for (var start = 0; start < inputs.Count; start += 200)
-        {
-            var chunk = inputs.Skip(start).Take(200).ToArray();
-            var sent = SendInput((uint)chunk.Length, chunk, size);
-            if (sent != chunk.Length)
-            {
-                log.Info($"Sutra Flow: typing stopped after {start + sent} of {inputs.Count} keystrokes (error {Marshal.GetLastWin32Error()}).");
-                return false;
-            }
-        }
-        return true;
+        var sent = (int)SendInput((uint)inputs.Length, inputs, size);
+        if (sent == inputs.Length) return FlowPasteOutcome.Pasted;
+
+        log.Info($"Sutra Flow: typing stopped after {sent} of {inputs.Length} keystrokes (error {Marshal.GetLastWin32Error()}).");
+        if (sent % 2 == 1) SendInput(1, [inputs[sent]], size); // release the last key that went down
+        if (sent == 0) return FlowPasteOutcome.Blocked;
+        return new FlowPasteResult(FlowPasteOutcome.PartlyTyped, FlowTyping.Remaining(typable, sent));
     }
 
     /// <summary>Copies text the user asked for (kept out of clipboard history). UI thread only.</summary>

@@ -59,8 +59,9 @@ public sealed record FlowRecording(float[] Samples, float Peak)
 public sealed class FlowException(string message) : Exception(message);
 
 /// <summary>
-/// What happened when Flow tried to put text into the target app. On anything but
-/// <see cref="Pasted"/>, nothing was typed and the user's clipboard was left as it was.
+/// What happened when Flow tried to put text into the target app. The user's clipboard is left as
+/// it was on every outcome but <see cref="Pasted"/>, and nothing was typed except with
+/// <see cref="PartlyTyped"/>.
 /// </summary>
 public enum FlowPasteOutcome
 {
@@ -74,8 +75,33 @@ public enum FlowPasteOutcome
     Blocked,
     /// <summary>Another app kept the clipboard locked.</summary>
     ClipboardBusy,
+    /// <summary>Windows accepted only part of the typed text; <see cref="FlowPasteResult.Remaining"/> holds the rest.</summary>
+    PartlyTyped,
     /// <summary>The clipboard couldn't be saved exactly, and the text has line breaks, which are unsafe to type (Enter can send or submit).</summary>
     MultilineNeedsClipboard,
+}
+
+/// <summary>The outcome of a paste and, after a partial typing, the text that didn't make it.</summary>
+public readonly record struct FlowPasteResult(FlowPasteOutcome Outcome, string? Remaining = null)
+{
+    public static implicit operator FlowPasteResult(FlowPasteOutcome outcome) => new(outcome);
+}
+
+/// <summary>Pure bookkeeping for typing text as Unicode keystrokes (one key-down and one key-up per character).</summary>
+public static class FlowTyping
+{
+    /// <summary>Characters that are typed: control characters (Enter, Tab) are never sent.</summary>
+    public static string Typable(string text) => new(text.Where(c => !char.IsControl(c)).ToArray());
+
+    /// <summary>
+    /// Given how many keystrokes Windows accepted, the part of <paramref name="typable"/> that was not
+    /// typed. A character whose key-down was accepted counts as typed (the app inserts it on key-down).
+    /// </summary>
+    public static string Remaining(string typable, int acceptedInputs)
+    {
+        var typed = Math.Clamp((acceptedInputs + 1) / 2, 0, typable.Length);
+        return typable[typed..];
+    }
 }
 
 /// <summary>The microphone side of a dictation.</summary>
@@ -139,5 +165,5 @@ public interface IFlowPaster
     /// <summary>Records the focused element again when the key comes up.</summary>
     void PinTarget(FlowTarget target);
     /// <summary>Pastes only if focus is still exactly where the dictation started.</summary>
-    Task<FlowPasteOutcome> PasteAsync(string text, FlowTarget? target, CancellationToken token);
+    Task<FlowPasteResult> PasteAsync(string text, FlowTarget? target, CancellationToken token);
 }

@@ -180,10 +180,13 @@ public sealed class FlowPipeline : IDisposable
             CheckStillWanted(token);
             if (text.Length == 0) throw new FlowException("Didn't catch that");
 
-            var outcome = await _paster.PasteAsync(text, target, token).ConfigureAwait(false);
-            // A dictation that couldn't be delivered is handed back (not put on the clipboard) so
-            // the user can choose to copy it.
-            if (outcome != FlowPasteOutcome.Pasted) _onUndelivered(text);
+            var result = await _paster.PasteAsync(text, target, token).ConfigureAwait(false);
+            var outcome = result.Outcome;
+            // Text that wasn't delivered is handed back (not put on the clipboard) so the user can
+            // choose to copy it. After a partial typing, only the part that didn't make it is held,
+            // so copying it never duplicates what is already in the field.
+            if (outcome == FlowPasteOutcome.PartlyTyped) { if (!string.IsNullOrEmpty(result.Remaining)) _onUndelivered(result.Remaining); }
+            else if (outcome != FlowPasteOutcome.Pasted) _onUndelivered(text);
             switch (outcome)
             {
                 case FlowPasteOutcome.Pasted:
@@ -197,6 +200,8 @@ public sealed class FlowPipeline : IDisposable
                     Fail("Can't paste into an admin window"); break;
                 case FlowPasteOutcome.Blocked:
                     Fail("Windows blocked the paste"); break;
+                case FlowPasteOutcome.PartlyTyped:
+                    Fail("Windows stopped the typing partway; only the rest is held"); break;
                 case FlowPasteOutcome.MultilineNeedsClipboard:
                     Fail("Your clipboard couldn't be saved, so multi-line text wasn't typed"); break;
                 default:

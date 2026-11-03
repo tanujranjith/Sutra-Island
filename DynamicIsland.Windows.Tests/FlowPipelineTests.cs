@@ -40,11 +40,11 @@ public sealed class FlowPipelineTests
     {
         public nint Window = 42;
         public int Pins;
-        public FlowPasteOutcome Outcome = FlowPasteOutcome.Pasted;
+        public FlowPasteResult Outcome = FlowPasteOutcome.Pasted;
         public List<(string Text, nint Target)> Pastes = [];
         public FlowTarget? CaptureTarget() => new() { AtPress = new FlowFocus(Window, 0, 0, 0, 0) };
         public void PinTarget(FlowTarget target) => Pins++;
-        public Task<FlowPasteOutcome> PasteAsync(string text, FlowTarget? target, CancellationToken token)
+        public Task<FlowPasteResult> PasteAsync(string text, FlowTarget? target, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
             Pastes.Add((text, target?.AtPress.Window ?? 0));
@@ -185,6 +185,31 @@ public sealed class FlowPipelineTests
         Assert.Equal(0, rig.Words);
         Assert.Equal(["hello world"], rig.Held); // handed back for the user to copy, not put on the clipboard
     }
+
+    [Fact]
+    public async Task PartialTypingHoldsOnlyTheRest()
+    {
+        var rig = new Rig();
+        rig.Paster.Outcome = new FlowPasteResult(FlowPasteOutcome.PartlyTyped, " world");
+        rig.Pipeline.Press();
+        await rig.Pipeline.Release();
+        Assert.DoesNotContain(rig.Statuses, s => s.State == FlowState.Pasted);
+        Assert.Contains("partway", rig.LastDetail);
+        Assert.Equal([" world"], rig.Held); // copying it can't duplicate "hello", already in the field
+    }
+
+    [Theory]
+    [InlineData(0, "hello")]
+    [InlineData(1, "ello")]   // key-down of 'h' accepted: 'h' was inserted
+    [InlineData(2, "ello")]
+    [InlineData(9, "")]
+    [InlineData(10, "")]
+    public void RemainingAfterPartialTyping(int accepted, string expected) =>
+        Assert.Equal(expected, FlowTyping.Remaining("hello", accepted));
+
+    [Fact]
+    public void TypableDropsEnterAndTab() =>
+        Assert.Equal("ab c", FlowTyping.Typable("a\tb\r\n c"));
 
     [Fact]
     public async Task ShortcutCancelDiscardsTheRecording()
