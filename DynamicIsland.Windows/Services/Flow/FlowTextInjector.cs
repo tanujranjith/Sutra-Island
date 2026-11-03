@@ -14,35 +14,54 @@ namespace DynamicIsland.Windows.Services.Flow;
 /// the text goes on the clipboard, Ctrl+V is sent, and the user's previous clipboard is put back.
 ///
 /// Safeguards:
-/// - Pastes only if the window that had focus at key-down still has focus. Otherwise the text is
+/// - Pastes only if focus is where it was: the same top-level window, the same focused child
+///   window, and, where UI Automation can tell, the same focused element (a browser tab's field). Otherwise the text is
 ///   left on the clipboard (out of clipboard history) and the user is told, so private dictation
 ///   never lands in a window they switched to.
 /// - Won't send keystrokes into an elevated (admin) window from a non-elevated Island, which
 ///   Windows would silently drop.
 /// - Checks that Windows accepted all four keystrokes.
-/// - Restores the previous clipboard only if nothing else has written to it since, and restores
-///   every format it could read (text, rich text, HTML, images, file lists), not just text.
+/// - Restores the previous clipboard only if nothing else has written to it since. If any format on
+///   the clipboard can't be saved and restored exactly, it leaves the clipboard alone and types the
+///   text as Unicode keystrokes instead.
 /// </summary>
 public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowPaster
 {
-    private const ushort VK_CONTROL = 0x11, VK_V = 0x56;
-    private const uint INPUT_KEYBOARD = 1, KEYEVENTF_KEYUP = 0x2;
+    private const ushort VK_CONTROL = 0x11, VK_V = 0x56, VK_RETURN = 0x0D;
+    private const uint INPUT_KEYBOARD = 1, KEYEVENTF_KEYUP = 0x2, KEYEVENTF_UNICODE = 0x4;
     private static readonly TimeSpan RestoreDelay = TimeSpan.FromMilliseconds(450);
 
-    public nint CaptureTarget() => RootOf(GetForegroundWindow());
+    public FlowTarget? CaptureTarget()
+    {
+        var (window, focus) = FocusNow();
+        return window == 0 ? null : new FlowTarget { Window = window, Focus = focus, ElementAtPress = FocusedElementIdAsync() };
+    }
 
-    public Task<FlowPasteOutcome> PasteAsync(string text, nint target, CancellationToken token) =>
+    public void PinTarget(FlowTarget target) => target.ElementAtRelease = FocusedElementIdAsync();
+
+    public Task<FlowPasteOutcome> PasteAsync(string text, FlowTarget? target, CancellationToken token) =>
         ui.InvokeAsync(() => PasteOnUiAsync(text, target, token)).Task.Unwrap();
 
-    private async Task<FlowPasteOutcome> PasteOnUiAsync(string text, nint target, CancellationToken token)
+    private async Task<FlowPasteOutcome> PasteOnUiAsync(string text, FlowTarget? target, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        if (target == 0 || RootOf(GetForegroundWindow()) != target)
+        if (target is null || !await StillFocusedAsync(target))
             return CopyOnly(text) ? FlowPasteOutcome.TargetChanged : FlowPasteOutcome.ClipboardBusy;
-        if (IsElevatedBeyondUs(target))
+        if (IsElevatedBeyondUs(target.Window))
             return CopyOnly(text) ? FlowPasteOutcome.Elevated : FlowPasteOutcome.ClipboardBusy;
+        token.ThrowIfCancellationRequested();
 
+        // If any part of the current clipboard can't be saved and put back exactly, don't touch
+        // the clipboard at all: type the text as Unicode keystrokes instead.
         var previous = ClipboardSnapshot.Capture(log);
+        if (!previous.Complete)
+        {
+            log.Debug("Sutra Flow: clipboard has formats that can't be restored; typing instead of pasting.");
+            if (!WindowsStillFocused(target)) return CopyOnly(text) ? FlowPasteOutcome.TargetChanged : FlowPasteOutcome.ClipboardBusy;
+            if (TypeText(text)) return FlowPasteOutcome.Pasted;
+            return CopyOnly(text) ? FlowPasteOutcome.Blocked : FlowPasteOutcome.ClipboardBusy;
+        }
+
         if (!TrySetClipboard(Dictation(text))) return FlowPasteOutcome.ClipboardBusy;
         var ours = GetClipboardSequenceNumber();
 
@@ -50,7 +69,7 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
         catch (OperationCanceledException) { RestoreIfUnchanged(previous, ours); throw; }
 
         // Focus may have moved in the last moment; never type into a window the user switched to.
-        if (RootOf(GetForegroundWindow()) != target) return FlowPasteOutcome.TargetChanged;
+        if (!WindowsStillFocused(target)) return FlowPasteOutcome.TargetChanged;
 
         var sent = SendKeys((VK_CONTROL, false), (VK_V, false), (VK_V, true), (VK_CONTROL, true));
         if (sent != 4)
@@ -65,6 +84,87 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
         RestoreIfUnchanged(previous, ours);
         return FlowPasteOutcome.Pasted;
     }
+
+    /// <summary>Same top-level window, same focused child window, and (when known) the same focused element.</summary>
+    private async Task<bool> StillFocusedAsync(FlowTarget target)
+    {
+        if (!WindowsStillFocused(target)) return false;
+        // Browser tabs and fields usually share one window handle, so compare UI Automation
+        // elements too. The key-up reading is preferred: by then accessibility is awake in apps
+        // like Chrome that only expose fields once a UI Automation client has asked.
+        var then = await WithTimeout(target.ElementAtRelease ?? target.ElementAtPress);
+        if (then is null) return true;
+        var now = await WithTimeout(FocusedElementIdAsync());
+        if (now is null || now == then) return true;
+        log.Info("Sutra Flow: focused element changed since key-up; not pasting.");
+        return false;
+    }
+
+    private static bool WindowsStillFocused(FlowTarget target)
+    {
+        var (window, focus) = FocusNow();
+        return window == target.Window && (target.Focus == 0 || focus == 0 || focus == target.Focus);
+    }
+
+    private static (nint Window, nint Focus) FocusNow()
+    {
+        var foreground = GetForegroundWindow();
+        if (foreground == 0) return (0, 0);
+        var info = new GuiThreadInfo { cbSize = Marshal.SizeOf<GuiThreadInfo>() };
+        var thread = GetWindowThreadProcessId(foreground, out _);
+        var focus = GetGUIThreadInfo(thread, ref info) ? info.hwndFocus : 0;
+        return (RootOf(foreground), focus);
+    }
+
+    private static Task<string?> FocusedElementIdAsync() => Task.Run(() =>
+    {
+        try
+        {
+            var element = System.Windows.Automation.AutomationElement.FocusedElement;
+            var id = element?.GetRuntimeId();
+            return id is { Length: > 0 } ? string.Join(".", id) : null;
+        }
+        catch { return (string?)null; }
+    });
+
+    private static async Task<string?> WithTimeout(Task<string?>? task)
+    {
+        if (task is null) return null;
+        return await Task.WhenAny(task, Task.Delay(400)).ConfigureAwait(true) == task ? task.Result : null;
+    }
+
+    /// <summary>Types text as Unicode keystrokes. True if Windows accepted every keystroke.</summary>
+    private bool TypeText(string text)
+    {
+        var inputs = new List<Input>(text.Length * 2);
+        foreach (var ch in text.Replace("\r\n", "\n"))
+        {
+            if (ch == '\r') continue;
+            if (ch == '\n')
+            {
+                inputs.Add(Key(VK_RETURN, false));
+                inputs.Add(Key(VK_RETURN, true));
+                continue;
+            }
+            inputs.Add(new Input { type = INPUT_KEYBOARD, u = new InputUnion { ki = new KeybdInput { wScan = ch, dwFlags = KEYEVENTF_UNICODE } } });
+            inputs.Add(new Input { type = INPUT_KEYBOARD, u = new InputUnion { ki = new KeybdInput { wScan = ch, dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP } } });
+        }
+        var size = Marshal.SizeOf<Input>();
+        for (var start = 0; start < inputs.Count; start += 200)
+        {
+            var chunk = inputs.Skip(start).Take(200).ToArray();
+            var sent = SendInput((uint)chunk.Length, chunk, size);
+            if (sent != chunk.Length)
+            {
+                log.Info($"Sutra Flow: typing stopped after {start + sent} of {inputs.Count} keystrokes (error {Marshal.GetLastWin32Error()}).");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static Input Key(ushort vk, bool up) =>
+        new() { type = INPUT_KEYBOARD, u = new InputUnion { ki = new KeybdInput { wVk = vk, dwFlags = up ? KEYEVENTF_KEYUP : 0 } } };
 
     private void RestoreIfUnchanged(ClipboardSnapshot previous, uint ours)
     {
@@ -167,6 +267,8 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
         private readonly List<(string Format, object Value)> _items = [];
 
         public bool IsEmpty => _items.Count == 0;
+        /// <summary>False when some format could not be read or copied, so a restore would lose it.</summary>
+        public bool Complete { get; private set; } = true;
 
         public static ClipboardSnapshot Capture(LoggingService log)
         {
@@ -182,11 +284,20 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
                     {
                         var value = Detach(data.GetData(format, autoConvert: false));
                         if (value is not null) snapshot._items.Add((format, value));
+                        else { snapshot.Complete = false; log.Debug($"Sutra Flow: clipboard format {format} can't be copied."); }
                     }
-                    catch (Exception ex) { log.Debug($"Sutra Flow: clipboard format {format} not saved ({ex.Message})."); }
+                    catch (Exception ex)
+                    {
+                        snapshot.Complete = false;
+                        log.Debug($"Sutra Flow: clipboard format {format} not saved ({ex.Message}).");
+                    }
                 }
             }
-            catch (Exception ex) { log.Debug($"Sutra Flow: clipboard snapshot failed ({ex.Message})."); }
+            catch (Exception ex)
+            {
+                snapshot.Complete = false;
+                log.Debug($"Sutra Flow: clipboard snapshot failed ({ex.Message}).");
+            }
             return snapshot;
         }
 
@@ -231,6 +342,18 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
     private const int TokenElevation = 20, ERROR_ACCESS_DENIED = 5;
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct Rect { public int Left, Top, Right, Bottom; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GuiThreadInfo
+    {
+        public int cbSize;
+        public uint flags;
+        public nint hwndActive, hwndFocus, hwndCapture, hwndMenuOwner, hwndMoveSize, hwndCaret;
+        public Rect rcCaret;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     private struct Input { public uint type; public InputUnion u; }
 
     [StructLayout(LayoutKind.Explicit)]
@@ -254,6 +377,8 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
     private static extern nint GetAncestor(nint hwnd, uint flags);
     [DllImport("user32.dll")]
     private static extern uint GetClipboardSequenceNumber();
+    [DllImport("user32.dll")]
+    private static extern bool GetGUIThreadInfo(uint threadId, ref GuiThreadInfo info);
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(nint hwnd, out uint processId);
     [DllImport("kernel32.dll", SetLastError = true)]

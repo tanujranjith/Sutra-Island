@@ -38,14 +38,16 @@ public sealed class FlowPipelineTests
 
     private sealed class FakePaster : IFlowPaster
     {
-        public nint Target = 42;
+        public nint Window = 42;
+        public int Pins;
         public FlowPasteOutcome Outcome = FlowPasteOutcome.Pasted;
         public List<(string Text, nint Target)> Pastes = [];
-        public nint CaptureTarget() => Target;
-        public Task<FlowPasteOutcome> PasteAsync(string text, nint target, CancellationToken token)
+        public FlowTarget? CaptureTarget() => new() { Window = Window };
+        public void PinTarget(FlowTarget target) => Pins++;
+        public Task<FlowPasteOutcome> PasteAsync(string text, FlowTarget? target, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            Pastes.Add((text, target));
+            Pastes.Add((text, target?.Window ?? 0));
             return Task.FromResult(Outcome);
         }
     }
@@ -80,9 +82,10 @@ public sealed class FlowPipelineTests
     {
         var rig = new Rig();
         rig.Pipeline.Press();
-        rig.Paster.Target = 99; // focus moving later must not change the target
+        rig.Paster.Window = 99; // focus moving later must not change the target
         await rig.Pipeline.Release();
         Assert.Equal([("hello world", (nint)42)], rig.Paster.Pastes);
+        Assert.Equal(1, rig.Paster.Pins); // the focused field is recorded again at key-up
         Assert.Equal(2, rig.Words);
         Assert.Contains(rig.Statuses, s => s.State == FlowState.Pasted);
         Assert.False(rig.Pipeline.IsBusy);
@@ -163,7 +166,7 @@ public sealed class FlowPipelineTests
     }
 
     [Theory]
-    [InlineData(FlowPasteOutcome.TargetChanged, "Window changed")]
+    [InlineData(FlowPasteOutcome.TargetChanged, "Focus moved")]
     [InlineData(FlowPasteOutcome.Elevated, "admin window")]
     [InlineData(FlowPasteOutcome.Blocked, "blocked")]
     [InlineData(FlowPasteOutcome.ClipboardBusy, "clipboard is busy")]

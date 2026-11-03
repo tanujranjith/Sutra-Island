@@ -6,7 +6,8 @@
 - Clean up locally (fillers, stutters, spoken punctuation, "new line", "scratch that") or optionally with the Sutra Assistant provider, which falls back to local cleanup if it is slow or rewrites too much.
 - Keep dictations out of Windows clipboard history, restore the previous clipboard text after pasting, and hide Island's own Flow recording from the privacy indicator.
 - Match the Flow overlay to the island's own motion and surface: it uses the island surface colour, fades in over 180 ms with the same 0.82→1 spring as other compact content, and leaves with a short ease-in fade. No existing island animation was changed.
-- Flow pastes only into the window that had focus at key-down; otherwise the text is copied and a notification explains why. It won't type into admin windows, checks that Windows accepted the keystrokes before showing success, restores the full previous clipboard (images and files too) only if nothing else has copied since, and turning Flow off abandons a pending dictation.
+- Flow keeps recording for 150 ms after release and keeps the device's final buffers, so the last word isn't clipped.
+- Flow pastes only where focus was (window, control, and UI Automation field or tab); otherwise the text is copied and a notification explains why. It won't type into admin windows, checks that Windows accepted the keystrokes before showing success, restores the previous clipboard (images and files too) only if nothing else has copied since, types the text instead when the clipboard can't be fully restored, and turning Flow off abandons a pending dictation.
 - A spoken "Thank you" is now kept; it is only dropped as a Whisper guess when the recording has almost no speech.
 - Add a CI workflow that builds and tests every pull request.
 - Add Settings → Sutra Flow: on/off, cleanup level, vocabulary for names and terms, speech model status, and words dictated.

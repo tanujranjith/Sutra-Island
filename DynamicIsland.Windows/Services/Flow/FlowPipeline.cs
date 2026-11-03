@@ -36,7 +36,7 @@ public sealed class FlowPipeline : IDisposable
 
     private Phase _phase;
     private CancellationTokenSource? _session;
-    private nint _target;
+    private FlowTarget? _target;
     private DateTime _pressedAt;
     private int _generation;
     private bool _disposed;
@@ -120,7 +120,7 @@ public sealed class FlowPipeline : IDisposable
     public Task Release()
     {
         CancellationToken token;
-        nint target;
+        FlowTarget? target;
         TimeSpan held;
         int generation;
         lock (_gate)
@@ -131,6 +131,11 @@ public sealed class FlowPipeline : IDisposable
             target = _target;
             held = DateTime.UtcNow - _pressedAt;
             generation = ++_generation;
+        }
+        if (target is not null)
+        {
+            try { _paster.PinTarget(target); }
+            catch (Exception ex) { _logError("Sutra Flow: could not record the focused field.", ex); }
         }
         return ProcessAsync(token, target, held, generation);
     }
@@ -149,7 +154,7 @@ public sealed class FlowPipeline : IDisposable
         TryCancel(session);
     }
 
-    private async Task ProcessAsync(CancellationToken token, nint target, TimeSpan held, int generation)
+    private async Task ProcessAsync(CancellationToken token, FlowTarget? target, TimeSpan held, int generation)
     {
         TimeSpan? settle = null;
         void Fail(string reason) => settle = Report(new FlowStatus(FlowState.Error, reason), _timing.ErrorSettle);
@@ -182,7 +187,7 @@ public sealed class FlowPipeline : IDisposable
                     settle = Report(new FlowStatus(FlowState.Pasted, $"{words} words", words), _timing.PastedSettle);
                     break;
                 case FlowPasteOutcome.TargetChanged:
-                    Fail("Window changed, so nothing was pasted; text copied"); break;
+                    Fail("Focus moved, so nothing was pasted; text copied"); break;
                 case FlowPasteOutcome.Elevated:
                     Fail("Can't paste into an admin window; text copied"); break;
                 case FlowPasteOutcome.Blocked:

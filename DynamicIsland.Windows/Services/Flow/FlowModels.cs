@@ -83,11 +83,27 @@ public interface IFlowAudio
     Task<FlowRecording> StopAsync();
 }
 
+/// <summary>
+/// Where the user was when they started dictating: the top-level window, the focused child window,
+/// and (when UI Automation can tell) the focused element itself, such as a browser tab's text field.
+/// </summary>
+public sealed class FlowTarget
+{
+    public nint Window { get; init; }
+    public nint Focus { get; init; }
+    /// <summary>UI Automation id of the focused element at key-down (null if unknown).</summary>
+    public Task<string?>? ElementAtPress { get; init; }
+    /// <summary>UI Automation id of the focused element at key-up (null if unknown).</summary>
+    public Task<string?>? ElementAtRelease { get; set; }
+}
+
 /// <summary>The output side of a dictation.</summary>
 public interface IFlowPaster
 {
-    /// <summary>The window that should receive the text (the foreground window when the key goes down).</summary>
-    nint CaptureTarget();
-    /// <summary>Pastes into <paramref name="target"/> only if it still has focus.</summary>
-    Task<FlowPasteOutcome> PasteAsync(string text, nint target, CancellationToken token);
+    /// <summary>Records where focus is when the key goes down.</summary>
+    FlowTarget? CaptureTarget();
+    /// <summary>Records the focused element again when the key comes up.</summary>
+    void PinTarget(FlowTarget target);
+    /// <summary>Pastes only if focus is still exactly where the dictation started.</summary>
+    Task<FlowPasteOutcome> PasteAsync(string text, FlowTarget? target, CancellationToken token);
 }
