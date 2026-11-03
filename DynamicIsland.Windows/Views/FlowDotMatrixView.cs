@@ -121,8 +121,8 @@ public sealed class FlowDotMatrixView : FrameworkElement
             for (var r = 0; r < Rows; r++)
             {
                 var seed = _seeds[c * Rows + r];
-                // Dissolve in: dots appear in a scattered order over the first ~300 ms.
-                var appear = ReducedMotion ? 1 : Smooth((sinceShown - seed * 0.22) / 0.12);
+                // Dissolve in: dots appear in a scattered order over the first ~240 ms, inside the entry spring.
+                var appear = ReducedMotion ? 1 : Smooth((sinceShown - seed * 0.14) / 0.1);
                 if (appear <= 0) continue;
 
                 var on = 0.0;

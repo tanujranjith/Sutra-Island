@@ -218,6 +218,12 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         if (!Infrastructure.AppDataPaths.IsPreview) _keyboardLocks.Start();
         _flow = new Services.Flow.FlowController(_settings, _settingsService, Dispatcher, _log, providers, _qSecrets);
         _islandWindow.AttachFlow(_flow);
+        // The dot grid shows a red X; the reason goes to a notification so it is readable.
+        _flow.StatusChanged += (_, status) =>
+        {
+            if (status.State == Services.Flow.FlowState.Error && status.Detail != "Didn't hear anything")
+                _tray?.ShowNotification("Sutra Flow", status.Detail);
+        };
         _flowSettings = new ViewModels.FlowSettingsViewModel(_settings, _settingsService, _flow);
         if (!Infrastructure.AppDataPaths.IsPreview) _flow.Start();
         _notifications.Configure(TimeSpan.FromSeconds(_settings.NotificationPollSeconds));

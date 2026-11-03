@@ -2,7 +2,7 @@
 
 Sutra Island is a Windows desktop companion: a compact, always-on-top island that expands into media controls, system information, timers, and other live activities. It also includes Sutra Assistant and a searchable command palette.
 
-Built with C#, WPF, and .NET 10. The current source version is **1.2.5**. See [release notes](RELEASE_NOTES.md) for changes and [Sutra Assistant](Q.md) for provider setup and privacy details.
+Built with C#, WPF, and .NET 10. The current source version is **1.3.0**. See [release notes](RELEASE_NOTES.md) for changes, [Sutra Assistant](Q.md) for provider setup and privacy details, and [Sutra Flow](SUTRA_FLOW.md) for dictation.
 
 ![Current graphite island with fixture media](media/graphite-island.png)
 
@@ -14,6 +14,7 @@ The screenshots show the current native interface with illustrative verification
 - **At a glance:** clock, date, battery, memory, network, weather, and optional AirPods/compatible Beats information. Availability depends on Windows, device support, and settings. AirPods battery advertisements report ranges rather than exact percentages.
 - **Timers and alarms:** named timers, alarms, a stopwatch, and a compact timer activity.
 - **Sutra Assistant:** typed chat, optional local Windows voice, explicit screen help, and supported device and island actions. Choose a provider and model in Settings. Codex subscription access and API-key providers are separate options. See [Q.md](Q.md).
+- **Sutra Flow dictation:** hold Right Ctrl, speak, and let go to paste clean text at the cursor. Speech is transcribed on this PC with Whisper. See [SUTRA_FLOW.md](SUTRA_FLOW.md).
 - **Command palette:** open with `Ctrl+Alt+K` by default to search commands and settings, control media and timers, calculate, convert units, and solve single-variable linear equations. For example, `3x+44x=1253` shows a copyable solution; nonlinear equations and systems of equations are not supported. Press Enter on a result to copy it. Use Up on an empty query to recall a previously run command.
 - **Customization:** choose visible activities, appearance, position, keyboard shortcuts, and reduced-motion behavior in Settings.
 
@@ -25,7 +26,7 @@ Hold **Right Ctrl**, speak, and let go: clean text is pasted wherever your curso
 - Cleanup is **Basic** by default (fillers, stutters, spoken punctuation, "new line", "scratch that"), or **AI** through the Sutra Assistant provider and key you already set up. AI cleanup sends text only, never audio, and falls back to Basic.
 - A quick tap of Right Ctrl, or Ctrl plus another key, behaves as normal Ctrl.
 - whisper.cpp needs the Microsoft Visual C++ 2015-2022 Redistributable (x64), which most PCs already have.
-- Turn it off or add vocabulary in **Settings → Sutra Flow**.
+- Turn it off or add vocabulary in **Settings → Sutra Flow**. Full guide, privacy notes, and troubleshooting: [SUTRA_FLOW.md](SUTRA_FLOW.md).
 
 ## Screenshots
 
@@ -118,7 +119,7 @@ See the [release review](RELEASE_REVIEW.md) for the checks performed for v1.1.9 
 - `scripts/` — release packaging and verification helpers.
 - `media/` — existing screenshots and historical visuals.
 - `python-versions/` — archived Python prototypes.
-- [RELEASE_NOTES.md](RELEASE_NOTES.md), [Q.md](Q.md), [CUSTOM_THEME.md](CUSTOM_THEME.md), and [design-qa.md](design-qa.md) — release history and additional guides.
+- [RELEASE_NOTES.md](RELEASE_NOTES.md), [Q.md](Q.md), [SUTRA_FLOW.md](SUTRA_FLOW.md), [CUSTOM_THEME.md](CUSTOM_THEME.md), and [design-qa.md](design-qa.md) — release history and additional guides.
 
 ## License
 

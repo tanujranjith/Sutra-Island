@@ -5,6 +5,7 @@
 - Morph the island into a dot-matrix voice display while dictating: voice columns ripple from the center, flatten on release, shimmer while polishing, and draw a green check when pasted (red X on errors).
 - Clean up locally (fillers, stutters, spoken punctuation, "new line", "scratch that") or optionally with the Sutra Assistant provider, which falls back to local cleanup if it is slow or rewrites too much.
 - Keep dictations out of Windows clipboard history, restore the previous clipboard text after pasting, and hide Island's own Flow recording from the privacy indicator.
+- Match the Flow overlay to the island's own motion and surface: it uses the island surface colour, fades in over 180 ms with the same 0.82→1 spring as other compact content, and leaves with a short ease-in fade. No existing island animation was changed.
 - Add Settings → Sutra Flow: on/off, cleanup level, vocabulary for names and terms, speech model status, and words dictated.
 
 ---

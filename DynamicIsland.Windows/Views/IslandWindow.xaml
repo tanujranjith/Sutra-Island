@@ -1254,8 +1254,11 @@
                 </Grid></ScrollViewer>
 
                 <!-- Sutra Flow: while dictating, the island's content dissolves into a dot-matrix voice display. -->
-                <Border x:Name="FlowOverlay" Panel.ZIndex="500" Margin="-1" Visibility="Collapsed" Opacity="0" IsHitTestVisible="False" CornerRadius="{Binding IslandCornerRadius}" Background="#FF0A0A0D" BorderBrush="#FFB9A5FD" BorderThickness="1.5" AutomationProperties.Name="Sutra Flow dictation">
-                    <views:FlowDotMatrixView x:Name="FlowDots" />
+                <!-- Same surface as the island itself so only the content changes, not the island's colour. -->
+                <Border x:Name="FlowOverlay" Panel.ZIndex="500" Margin="-1" Visibility="Collapsed" Opacity="0" IsHitTestVisible="False" CornerRadius="{Binding IslandCornerRadius}" Background="{Binding IslandSurfaceBrush}" BorderBrush="#8CB9A5FD" BorderThickness="1" AutomationProperties.Name="Sutra Flow dictation">
+                    <views:FlowDotMatrixView x:Name="FlowDots" RenderTransformOrigin="0.5,0.5">
+                        <views:FlowDotMatrixView.RenderTransform><ScaleTransform x:Name="FlowDotsScale" ScaleX="1" ScaleY="1" /></views:FlowDotMatrixView.RenderTransform>
+                    </views:FlowDotMatrixView>
                 </Border>
             </Grid>
         </Border>

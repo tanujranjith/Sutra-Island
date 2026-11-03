@@ -31,16 +31,23 @@ public partial class IslandWindow
             _ => "Sutra Flow",
         });
 
+        // Motion matches the island's own content transitions (see the AirPods and privacy intros):
+        // content fades in over ~180 ms while it springs from 0.82 to 1 with a light BackEase,
+        // and leaves with a short CubicEase-in fade.
         if (status.State == FlowState.Idle)
         {
             if (FlowOverlay.Visibility != Visibility.Visible) { FlowDots.SetState(FlowState.Idle); return; }
-            var fadeOut = new DoubleAnimation(0, TimeSpan.FromMilliseconds(reduced ? 1 : 280)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
+            var exit = TimeSpan.FromMilliseconds(reduced ? 1 : 220);
+            var easeIn = new CubicEase { EasingMode = EasingMode.EaseIn };
+            var fadeOut = new DoubleAnimation(0, exit) { EasingFunction = easeIn };
             fadeOut.Completed += (_, _) =>
             {
                 if (_flow?.Status.State != FlowState.Idle) return;
                 FlowOverlay.Visibility = Visibility.Collapsed;
                 FlowDots.SetState(FlowState.Idle);
             };
+            FlowDotsScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, new DoubleAnimation(0.9, exit) { EasingFunction = easeIn });
+            FlowDotsScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, new DoubleAnimation(0.9, exit) { EasingFunction = easeIn });
             FlowOverlay.BeginAnimation(OpacityProperty, fadeOut);
             return;
         }
@@ -49,8 +56,18 @@ public partial class IslandWindow
         if (FlowOverlay.Visibility != Visibility.Visible || FlowOverlay.Opacity < 1)
         {
             FlowOverlay.Visibility = Visibility.Visible;
-            var fadeIn = new DoubleAnimation(1, TimeSpan.FromMilliseconds(reduced ? 1 : 200)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
-            FlowOverlay.BeginAnimation(OpacityProperty, fadeIn);
+            if (reduced)
+            {
+                FlowOverlay.BeginAnimation(OpacityProperty, null);
+                FlowDotsScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, null);
+                FlowDotsScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, null);
+                FlowOverlay.Opacity = 1; FlowDotsScale.ScaleX = FlowDotsScale.ScaleY = 1;
+                return;
+            }
+            var spring = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.16 };
+            FlowOverlay.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(180)));
+            FlowDotsScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, new DoubleAnimation(0.82, 1, TimeSpan.FromMilliseconds(380)) { EasingFunction = spring });
+            FlowDotsScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, new DoubleAnimation(0.82, 1, TimeSpan.FromMilliseconds(380)) { EasingFunction = spring });
         }
     }
 
