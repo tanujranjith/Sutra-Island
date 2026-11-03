@@ -62,7 +62,7 @@ public sealed class FlowSettingsViewModel : ObservableObject
     public string CleanupNote => _settings.FlowCleanup switch
     {
         FlowCleanupMode.Off => "Pastes exactly what Whisper heard.",
-        FlowCleanupMode.Basic => "Removes um and uh, stutters, and spoken punctuation like \"comma\" or \"new line\". Nothing leaves your PC.",
+        FlowCleanupMode.Basic => "Removes um and uh, stutters, and spoken punctuation like \"comma\" or \"new line\". Nothing leaves your PC. It doesn't resolve changes of mind (\"actually no...\"); choose AI for that.",
         _ => _flow.AiUnavailableReason is { } reason
             ? $"{reason}. Until then, Basic cleanup is used."
             : "Also resolves self-corrections (\"Monday, no wait, Tuesday\") and lists. Sends only the text, never audio, to your selected provider. Falls back to Basic if it is slow or rewrites too much.",

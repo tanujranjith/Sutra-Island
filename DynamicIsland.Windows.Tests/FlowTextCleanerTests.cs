@@ -41,4 +41,25 @@ public sealed class FlowTextCleanerTests
     [Fact]
     public void AcceptsFaithfulRewrite() =>
         Assert.True(FlowTextCleaner.LooksSafe("Book the room for Monday, no wait, Tuesday.", "Book the room for Tuesday."));
+
+    private const string Dinner = "For dinner I was thinking we could do tomato soup and grilled cheese. Actually no, I was thinking we could do chicken farm zone. Parmesan.";
+
+    [Fact]
+    public void AcceptsWholeSentenceSelfCorrection() =>
+        Assert.True(FlowTextCleaner.LooksSafe(Dinner, "For dinner I was thinking we could do chicken parmesan."));
+
+    [Fact]
+    public void RejectsBigCutWithoutACorrection() =>
+        Assert.False(FlowTextCleaner.LooksSafe("We need to finish the report, send the slides to the team, and book the room for the review on Friday.", "Finish the report."));
+
+    [Fact]
+    public void RejectsBigCutThatInventsWords() =>
+        Assert.False(FlowTextCleaner.LooksSafe(Dinner, "Let's order pizza from the new place downtown."));
+
+    [Theory]
+    [InlineData("chicken farm zone.Parmesan.", "chicken farm zone. Parmesan.")]
+    [InlineData("Made in the U.S.A today.", "Made in the U.S.A today.")]
+    [InlineData("It costs 3.50 dollars.", "It costs 3.50 dollars.")]
+    public void SeparatesGluedWhisperSegments(string raw, string expected) =>
+        Assert.Equal(expected, FlowTextCleaner.StripWhisperArtifacts(raw));
 }

@@ -16,6 +16,8 @@ public static partial class FlowTextCleaner
         if (string.IsNullOrWhiteSpace(text)) return "";
         var t = BracketTag().Replace(text, " ");
         t = StarTag().Replace(t, " ");
+        // Whisper sometimes starts a new segment with no leading space ("farm zone.Parmesan").
+        t = GluedSentence().Replace(t, " ");
         t = MultiSpace().Replace(t, " ").Trim();
         return t;
     }
@@ -84,11 +86,28 @@ public static partial class FlowTextCleaner
         var b = WordCount(ai);
         if (a == 0) return false;
         var ratio = b / (double)a;
-        if (a >= 6 && (ratio < 0.45 || ratio > 1.6)) return false;
+        if (a >= 6 && ratio > 1.6) return false;
+        if (a >= 6 && ratio < 0.45)
+        {
+            // A big cut is only plausible when the speaker corrected themselves ("tomato soup... actually
+            // no, chicken parmesan"), and then the result must be built from words they actually said.
+            if (ratio < 0.15 || !CorrectionCue().IsMatch(basic) || NovelShare(basic, ai) > 0.2) return false;
+        }
         if (a < 6 && b > a + 6) return false;
         var lower = ai.TrimStart().ToLowerInvariant();
         string[] tells = ["sure", "here is", "here's", "certainly", "i can't", "i cannot", "as an ai", "cleaned text", "```"];
         return !tells.Any(t => lower.StartsWith(t) && !basic.TrimStart().ToLowerInvariant().StartsWith(t));
+    }
+
+    /// <summary>Share of the output's words (ignoring numbers) that the speaker never said.</summary>
+    internal static double NovelShare(string said, string output)
+    {
+        static IEnumerable<string> Words(string text) =>
+            Word().Matches(text.ToLowerInvariant()).Select(m => m.Value).Where(w => !w.All(char.IsDigit));
+        var heard = Words(said).ToHashSet();
+        var produced = Words(output).ToList();
+        if (produced.Count == 0) return 1;
+        return produced.Count(w => !heard.Contains(w)) / (double)produced.Count;
     }
 
     private static string SpokenMark(string text, string words, string mark, bool requireEnd = false)
@@ -105,6 +124,12 @@ public static partial class FlowTextCleaner
 
     [GeneratedRegex(@"\[[^\]]{1,40}\]|\((?:music|applause|laughs?|laughter|silence|inaudible|noise|coughs?|sighs?)\)", RegexOptions.IgnoreCase)]
     private static partial Regex BracketTag();
+    [GeneratedRegex(@"(?<=\p{Ll}{2}[.!?])(?=\p{Lu}\p{Ll})")]
+    private static partial Regex GluedSentence();
+    [GeneratedRegex(@"\b(actually|no wait|wait no|scratch that|i mean|make that|or rather|never ?mind|sorry|correction|change that|on second thought)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex CorrectionCue();
+    [GeneratedRegex(@"[\p{L}\p{N}']+")]
+    private static partial Regex Word();
     [GeneratedRegex(@"\*[^*]{1,30}\*")]
     private static partial Regex StarTag();
     [GeneratedRegex(@"[ \t]{2,}")]

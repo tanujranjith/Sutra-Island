@@ -27,8 +27,8 @@ A quick tap of Right Ctrl does nothing, and Right Ctrl with another key (Ctrl+C,
 - **Push-to-talk dictation:** turns Flow on or off. On by default.
 - **Cleanup:**
   - *Off* pastes exactly what Whisper heard.
-  - *Basic* (default) runs on your PC: removes "um" and "uh", collapses stutters ("the the"), turns spoken "comma", "period", "question mark", "new line", and "new paragraph" into punctuation, handles "scratch that", and fixes capitals.
-  - *AI* runs Basic first, then asks the provider and model selected in Sutra Assistant to resolve self-corrections ("Monday, no wait, Tuesday") and spoken lists. If the provider is slow (over 8 seconds), errors, or rewrites too much, Flow falls back to the Basic text. Codex is not used for cleanup.
+  - *Basic* (default) runs on your PC: removes "um" and "uh", collapses stutters ("the the"), turns spoken "comma", "period", "question mark", "new line", and "new paragraph" into punctuation, handles "scratch that", and fixes capitals. It does not resolve changes of mind like "tomato soup... actually no, chicken parmesan"; that needs AI.
+  - *AI* runs Basic first, then asks the provider and model selected in Sutra Assistant to resolve self-corrections ("Monday, no wait, Tuesday", or a whole restarted sentence) and spoken lists. If the provider is slow (over 8 seconds) or errors, or if the result looks unfaithful (much longer, much shorter without a spoken correction, or using words you didn't say), Flow falls back to the Basic text. Codex is not used for cleanup.
 - **Vocabulary:** comma-separated names and terms (for example `Sutra, Tanuj, DCCC`). Whisper and AI cleanup use them as the spelling to match.
 - **Speech model:** status of the Whisper model, with a Download button if it is missing.
 - **Usage:** total words dictated.

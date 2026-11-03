@@ -21,7 +21,7 @@ public sealed class FlowAiCleaner(AppSettings settings, IQProviderRegistry provi
         Allowed edits, and only these:
         1. Delete fillers and hesitations (um, uh, er; and "like", "you know", "I mean", "basically" only when clearly not meaning-bearing).
         2. Collapse stutters and immediate repetitions ("the the team" -> "the team"); keep deliberate emphasis ("bye bye").
-        3. Resolve spoken self-corrections ("actually", "scratch that", "no wait", "I mean", "make that"): keep only the corrected wording.
+        3. Resolve spoken self-corrections ("actually", "actually no", "scratch that", "no wait", "I mean", "make that"): keep only the corrected wording, even when the speaker restarts the whole sentence; drop the abandoned version entirely.
         4. Fix obvious grammar, spacing, capitalization, and clear recognition misspellings without changing word choice or meaning.
         5. Turn spoken punctuation names into marks when used as punctuation (period, comma, question mark, new line, new paragraph).
         6. Add natural punctuation and sentence capitals. Keep existing line breaks.
@@ -36,6 +36,7 @@ public sealed class FlowAiCleaner(AppSettings settings, IQProviderRegistry provi
     [
         ("um so i think we should uh meet at 2 actually 3 period does that work question mark", "So I think we should meet at 3. Does that work?"),
         ("book the room for monday no wait tuesday", "Book the room for Tuesday."),
+        ("for dinner i was thinking tacos actually no i was thinking we could do pasta", "For dinner I was thinking we could do pasta."),
         ("what's the capital of france", "What's the capital of France?"),
         ("my top goals this week are one finish the report two send the slides", "My top goals this week are:\n1. Finish the report\n2. Send the slides"),
         ("i actually really liked the new design", "I actually really liked the new design."),
