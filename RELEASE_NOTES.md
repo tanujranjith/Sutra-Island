@@ -7,6 +7,7 @@
 - Keep dictations out of Windows clipboard history, restore the previous clipboard text after pasting, and hide Island's own Flow recording from the privacy indicator.
 - Match the Flow overlay to the island's own motion and surface: it uses the island surface colour, fades in over 180 ms with the same 0.82→1 spring as other compact content, and leaves with a short ease-in fade. No existing island animation was changed.
 - Flow keeps recording for 150 ms after release and keeps the device's final buffers, so the last word isn't clipped.
+- A stray key no longer stops a dictation. After the first 0.3 seconds, other keys are ignored while you talk, and Esc cancels.
 - Sutra Flow has its own AI cleanup provider and model in Settings → Sutra Flow, separate from Sutra Assistant. It uses the API keys you already saved.
 - AI cleanup now keeps whole-sentence self-corrections ("tomato soup... actually no, chicken parmesan") instead of rejecting them as too short; a big cut is accepted only after a spoken correction and only from words you said. Whisper segments that ran together ("zone.Parmesan") get their space back.
 - When Flow can't paste safely it changes nothing: no keystrokes, no clipboard change. The text is held in memory for two minutes; click the notification or Settings → Sutra Flow → Copy to get it. The typing fallback never sends Enter.

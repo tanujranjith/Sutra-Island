@@ -8,7 +8,7 @@ Sutra Flow is push-to-talk dictation built into Sutra Island. Hold **Right Ctrl*
 2. Hold **Right Ctrl** and talk. After about a quarter of a second the island's content dissolves into a dot grid, and the columns move with your voice.
 3. Let go. The dots flatten into a row, shimmer while the text is polished, and draw a green check when it's pasted.
 
-A quick tap of Right Ctrl does nothing, and Right Ctrl with another key (Ctrl+C, Ctrl+V) works as a normal shortcut and cancels the dictation.
+A quick tap of Right Ctrl does nothing. Pressing another key within 0.3 seconds (Right Ctrl+C, Right Ctrl+V) works as a normal shortcut and cancels the dictation. After that the dictation locks: other keys are ignored and never reach the app, so an accidental arrow key can't move your cursor or stop you. Press **Esc** to cancel.
 
 ### Island states
 
@@ -96,7 +96,7 @@ FlowPipeline runs one dictation at a time and publishes FlowStatus ─► Island
 
 ## Tests
 
-`FlowPipelineTests` covers the lifecycle with fake audio and paste: rapid presses during processing, disabling mid-dictation, focus changes (window, caret, field, tab), blocked and elevated pastes, text handed back on failure, shortcut cancel, settle, and the "Thank you" rule. `FlowTextCleanerTests` covers Basic cleanup and the AI safety check. The CI workflow runs them on every pull request. The hook, microphone, Whisper, and clipboard code still need a manual check on Windows.
+`FlowPipelineTests` covers the lifecycle with fake audio and paste: rapid presses during processing, disabling mid-dictation, focus changes (window, caret, field, tab), blocked and elevated pastes, text handed back on failure, shortcut cancel, settle, and the "Thank you" rule. `FlowKeyGateTests` covers the shortcut window, the lock, and Esc. `FlowTextCleanerTests` covers Basic cleanup and the AI safety check. The CI workflow runs them on every pull request. The hook, microphone, Whisper, and clipboard code still need a manual check on Windows.
 
 Settings live in `settings.json` as `FlowEnabled`, `FlowCleanup`, `FlowAiProvider` (empty means use the Assistant's), `FlowAiModel` (empty means the Assistant's model with the same provider, otherwise the provider's default), `FlowVocabulary`, and `FlowWordsDictated`. Keys come from the Sutra Assistant key store.
 

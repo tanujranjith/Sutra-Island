@@ -41,7 +41,7 @@ public sealed class FlowController : IDisposable
         _ui = ui;
         _log = log;
         Engine = new WhisperEngine(log);
-        _hook = new FlowHotkeyHook(log);
+        _hook = new FlowHotkeyHook(log, () => _pipeline?.IsRecording == true);
         _recorder = new FlowRecorder(log);
         _ai = new FlowAiCleaner(settings, providers, secrets, log);
         _injector = new FlowTextInjector(log, ui);

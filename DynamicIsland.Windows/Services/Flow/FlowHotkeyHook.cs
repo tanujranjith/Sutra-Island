@@ -8,9 +8,10 @@ namespace DynamicIsland.Windows.Services.Flow;
 /// never stall the callback past Windows' LowLevelHooksTimeout. When that happens
 /// Windows silently removes the hook, so the callback here only records a key change
 /// and posts it to a worker; it never blocks.
-/// The hook never swallows keys: Right Ctrl still works as Ctrl for everything else.
-/// If another key is pressed while the push-to-talk key is held (Ctrl+C, Ctrl+V...),
-/// the press is treated as a normal shortcut and the dictation is cancelled.
+/// Right Ctrl itself always passes through, so it still works as Ctrl. What other keys do
+/// while it is held is decided by <see cref="FlowKeyGate"/>: a quick second key is a shortcut
+/// (cancels, passes through); once a dictation is under way, stray keys are swallowed and
+/// only Esc cancels.
 /// </summary>
 public sealed class FlowHotkeyHook : IDisposable
 {
@@ -18,34 +19,34 @@ public sealed class FlowHotkeyHook : IDisposable
     private const int WM_KEYDOWN = 0x0100, WM_KEYUP = 0x0101, WM_SYSKEYDOWN = 0x0104, WM_SYSKEYUP = 0x0105;
     private const int WM_QUIT = 0x0012;
     private const uint LLKHF_INJECTED = 0x10;
-    private const int VK_RCONTROL = 0xA3;
 
     private readonly LoggingService _log;
     private Thread? _thread;
     private uint _threadId;
     private nint _hook;
     private HookProc? _proc;
-    private const int _vk = VK_RCONTROL;
-    private volatile bool _held;
     private volatile bool _enabled = true;
+    private readonly FlowKeyGate _gate;
 
     /// <summary>The push-to-talk key went down (on the hook thread; marshal before touching UI).</summary>
     public event Action? Pressed;
     /// <summary>The push-to-talk key came up after a clean hold.</summary>
     public event Action? Released;
-    /// <summary>Another key was pressed during the hold, so this was a shortcut, not dictation.</summary>
+    /// <summary>A shortcut during the hold, or Esc during a dictation: discard it.</summary>
     public event Action? Cancelled;
 
-    public FlowHotkeyHook(LoggingService log)
+    /// <param name="isDictating">True while a dictation is recording; read on the hook thread, so it must be quick.</param>
+    public FlowHotkeyHook(LoggingService log, Func<bool> isDictating)
     {
         _log = log;
+        _gate = new FlowKeyGate(isDictating);
         _pump = Task.Run(PumpAsync);
     }
 
     public void Configure(bool enabled)
     {
         _enabled = enabled;
-        if (!enabled && _held) { _held = false; Raise(Cancelled); }
+        if (!enabled && _gate.Reset()) Raise(Cancelled);
     }
 
     public void Start()
@@ -85,16 +86,16 @@ public sealed class FlowHotkeyHook : IDisposable
             {
                 var msg = (int)wParam;
                 var down = msg is WM_KEYDOWN or WM_SYSKEYDOWN;
-                var up = msg is WM_KEYUP or WM_SYSKEYUP;
-                if ((int)data.vkCode == _vk)
+                if (down || msg is WM_KEYUP or WM_SYSKEYUP)
                 {
-                    if (down && !_held) { _held = true; Raise(Pressed); }
-                    else if (up && _held) { _held = false; Raise(Released); }
-                }
-                else if (down && _held)
-                {
-                    _held = false;
-                    Raise(Cancelled);
+                    var decision = _gate.OnKey((int)data.vkCode, down, data.time);
+                    switch (decision.Signal)
+                    {
+                        case FlowKeyGate.Signal.Pressed: Raise(Pressed); break;
+                        case FlowKeyGate.Signal.Released: Raise(Released); break;
+                        case FlowKeyGate.Signal.Cancelled: Raise(Cancelled); break;
+                    }
+                    if (decision.Swallow) return 1; // a stray key during dictation never reaches the app
                 }
             }
         }
