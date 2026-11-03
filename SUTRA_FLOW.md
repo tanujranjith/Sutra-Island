@@ -47,7 +47,9 @@ The whisper.cpp native libraries are embedded in the exe and extracted on first 
 
 - Audio never leaves your PC. Recording starts only while Right Ctrl is held and stops when you let go. Recordings are kept in memory and discarded after transcription.
 - With AI cleanup, only the transcribed text is sent to the provider you chose in Sutra Assistant, using the key already saved there.
-- Pasting briefly puts the text on the clipboard. It is marked to stay out of Windows clipboard history (Win+V) and cloud clipboard, and your previous clipboard text is restored about half a second later. Images or files on the clipboard are not restored.
+- Text only goes to the window you were in when you pressed the key. If you switch windows before it's ready, nothing is pasted: the text is put on the clipboard and a notification tells you, so you can paste it yourself where you meant to.
+- Pasting briefly puts the text on the clipboard. It is marked to stay out of Windows clipboard history (Win+V) and cloud clipboard. About half a second later your previous clipboard is put back, including images, rich text, and copied files. If you or another app copy something in that half second, Flow leaves it alone instead of overwriting it.
+- Turning Flow off in Settings stops a recording and abandons any dictation still being transcribed or cleaned up; nothing is pasted.
 - While Flow is recording, Island hides itself from its own microphone privacy indicator, since the dot grid already shows that the mic is on. Windows' own mic indicator still appears.
 
 ## Troubleshooting
@@ -58,8 +60,11 @@ The whisper.cpp native libraries are embedded in the exe and extracted on first 
 | Notification: "Install the Microsoft Visual C++ Redistributable (x64)" | whisper.cpp needs the Visual C++ 2015–2022 runtime, including `vcomp140.dll`. Install the x64 redistributable from Microsoft and restart Island. |
 | Notification: "Microphone access blocked" or "No microphone found" | Windows Settings → Privacy & security → Microphone: allow desktop apps. Check the default input device. |
 | Red X with no notification | The recording was too short or too quiet. Hold the key a little longer and speak up. |
-| Nothing pastes into an admin window | Windows blocks input from a normal app into an elevated one. Run Island as administrator, or dictate into non-elevated apps. |
-| Notification: "Couldn't paste; text is on the clipboard" | Another app had the clipboard locked. Press Ctrl+V yourself. |
+| Notification: "Didn't catch that" | Whisper heard nothing, or only a stock phrase like "Thank you" in a recording with almost no speech (a known Whisper habit on silence). A clearly spoken "Thank you" is pasted normally. |
+| Notification: "Window changed, so nothing was pasted; text copied" | You switched windows while Flow was working. Click where you want the text and press Ctrl+V. |
+| Notification: "Can't paste into an admin window; text copied" | Windows blocks typing from a normal app into one running as administrator. Press Ctrl+V yourself, or run Island as administrator. |
+| Notification: "Windows blocked the paste; text copied" | Windows refused the keystrokes (for example on the lock screen or a secure desktop). Press Ctrl+V yourself. |
+| Notification: "Couldn't paste; the clipboard is busy" | Another app kept the clipboard locked. Try again. |
 
 Logs are in `%LOCALAPPDATA%\DynamicIsland.Windows\logs`, with lines starting `Sutra Flow:`.
 
@@ -69,21 +74,26 @@ Logs are in `%LOCALAPPDATA%\DynamicIsland.Windows\logs`, with lines starting `Su
 Right Ctrl held ─► FlowHotkeyHook ─► FlowRecorder (16 kHz mono, NAudio WinMM)
 Right Ctrl up   ─► WhisperEngine (whisper.cpp) ─► FlowTextCleaner (Basic)
                 ─► FlowAiCleaner (optional, Q provider) ─► FlowTextInjector (clipboard + Ctrl+V)
-FlowController publishes FlowStatus ─► IslandWindow.Flow / FlowDotMatrixView
+FlowPipeline runs one dictation at a time and publishes FlowStatus ─► IslandWindow.Flow / FlowDotMatrixView
 ```
 
 | File | Role |
 | --- | --- |
-| `Services/Flow/FlowController.cs` | State machine: hold threshold, recording, transcription, cleanup, paste, status. |
+| `Services/Flow/FlowPipeline.cs` | The dictation lifecycle with no Windows dependencies: one session at a time (a new press is refused until the previous one finishes), a cancellation token per session that turning Flow off cancels, stage-by-stage checks, paste outcomes, settle timing. Unit-tested in `FlowPipelineTests`. |
+| `Services/Flow/FlowController.cs` | Wires the hook, recorder, Whisper, cleanup, and paster into the pipeline; marshals status to the UI. |
 | `Services/Flow/FlowHotkeyHook.cs` | Low-level keyboard hook on its own thread with its own message loop. The callback only queues events to a serial worker, so CPU-heavy transcription can't push it past Windows' `LowLevelHooksTimeout` (which silently removes slow hooks). Keys are never swallowed; injected keys are ignored. |
-| `Services/Flow/FlowRecorder.cs` | Microphone capture and the smoothed loudness level that drives the dots. |
+| `Services/Flow/FlowRecorder.cs` | Microphone capture and the smoothed loudness level that drives the dots. Each stop detaches and disposes only its own device. |
 | `Services/Flow/WhisperEngine.cs` | Model download, native library extraction, transcription. |
 | `Services/Flow/FlowTextCleaner.cs` | Basic cleanup rules and the safety check for AI output. Unit-tested in `FlowTextCleanerTests`. |
 | `Services/Flow/FlowAiCleaner.cs` | AI cleanup prompt and provider call. |
-| `Services/Flow/FlowTextInjector.cs` | Clipboard write with history exclusion, `SendInput` Ctrl+V, clipboard restore. |
+| `Services/Flow/FlowTextInjector.cs` | Checks the key-down window still has focus and isn't elevated, writes the clipboard with history exclusion, sends Ctrl+V and verifies Windows accepted it, then restores the full previous clipboard only if its sequence number is unchanged. |
 | `Views/FlowDotMatrixView.cs` | The dot grid. Draws only while visible. |
 | `Views/IslandWindow.Flow.cs` | Shows and hides the overlay with the island's standard motion. |
 | `ViewModels/FlowSettingsViewModel.cs` | Settings → Sutra Flow. |
+
+## Tests
+
+`FlowPipelineTests` covers the lifecycle with fake audio and paste: rapid presses during processing, disabling mid-dictation, focus changes, blocked and elevated pastes, shortcut cancel, settle, and the "Thank you" rule. `FlowTextCleanerTests` covers Basic cleanup and the AI safety check. The CI workflow runs them on every pull request. The hook, microphone, Whisper, and clipboard code still need a manual check on Windows.
 
 Settings live in `settings.json` as `FlowEnabled`, `FlowCleanup`, `FlowVocabulary`, and `FlowWordsDictated`.
 

@@ -36,7 +36,11 @@ public sealed class FlowHotkeyHook : IDisposable
     /// <summary>Another key was pressed during the hold, so this was a shortcut, not dictation.</summary>
     public event Action? Cancelled;
 
-    public FlowHotkeyHook(LoggingService log) => _log = log;
+    public FlowHotkeyHook(LoggingService log)
+    {
+        _log = log;
+        _pump = Task.Run(PumpAsync);
+    }
 
     public void Configure(bool enabled)
     {
@@ -101,12 +105,11 @@ public sealed class FlowHotkeyHook : IDisposable
     // One serial worker keeps press/release/cancel in the order they happened.
     private readonly System.Threading.Channels.Channel<Action> _events =
         System.Threading.Channels.Channel.CreateUnbounded<Action>(new() { SingleReader = true });
-    private Task? _pump;
+    private readonly Task _pump;
 
     private void Raise(Action? handler)
     {
         if (handler is null) return;
-        _pump ??= Task.Run(PumpAsync);
         _events.Writer.TryWrite(handler);
     }
 

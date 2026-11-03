@@ -6,17 +6,17 @@ namespace DynamicIsland.Windows.Services.Flow;
 /// Records the default microphone as 16 kHz mono PCM (what Whisper expects) and
 /// reports a smoothed loudness level about 33 times a second for the dot display.
 /// </summary>
-public sealed class FlowRecorder : IDisposable
+public sealed class FlowRecorder : IFlowAudio, IDisposable
 {
-    public const int SampleRate = 16000;
+    public const int SampleRate = FlowRecording.SampleRate;
     private const int MaxSeconds = 180;
     private readonly LoggingService _log;
     private readonly object _gate = new();
     private WaveInEvent? _wave;
+    private Task _waveStopped = Task.CompletedTask;
     private List<float> _samples = new(SampleRate * 10);
     private float _peak;
     private float _level;
-    private TaskCompletionSource<bool>? _stopped;
 
     /// <summary>True while the microphone is open; the privacy indicator hides Island's own use.</summary>
     public static volatile bool IsRecording;
@@ -43,10 +43,11 @@ public sealed class FlowRecorder : IDisposable
                 NumberOfBuffers = 3,
             };
             wave.DataAvailable += OnData;
+            var stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             wave.RecordingStopped += (_, e) =>
             {
                 if (e.Exception is not null) _log.Error("Sutra Flow: recording stopped with an error.", e.Exception);
-                _stopped?.TrySetResult(true);
+                stopped.TrySetResult(true);
             };
             try
             {
@@ -59,6 +60,7 @@ public sealed class FlowRecorder : IDisposable
                 throw new FlowException("Microphone access blocked");
             }
             _wave = wave;
+            _waveStopped = stopped.Task;
             IsRecording = true;
         }
     }
@@ -70,7 +72,7 @@ public sealed class FlowRecorder : IDisposable
         float peak = 0;
         lock (_gate)
         {
-            if (_samples.Count > SampleRate * MaxSeconds) return;
+            if (!ReferenceEquals(sender, _wave) || _samples.Count > SampleRate * MaxSeconds) return;
             for (var i = 0; i < count; i++)
             {
                 var s = BitConverter.ToInt16(e.Buffer, i * 2) / 32768f;
@@ -81,7 +83,7 @@ public sealed class FlowRecorder : IDisposable
             }
             if (peak > _peak) _peak = peak;
         }
-        if (count == 0) return;
+        if (count == 0 || !ReferenceEquals(sender, _wave)) return;
         var rms = Math.Sqrt(sum / count);
         // Speech RMS sits roughly between 0.01 and 0.3; map it onto 0..1 on a log scale.
         var db = 20 * Math.Log10(Math.Max(rms, 1e-5));
@@ -89,26 +91,30 @@ public sealed class FlowRecorder : IDisposable
         _level = target > _level ? _level + (target - _level) * 0.6f : _level + (target - _level) * 0.25f;
     }
 
-    /// <summary>Closes the microphone and returns what was recorded.</summary>
+    /// <summary>
+    /// Closes the microphone and returns what was recorded. Detaches the device and its samples
+    /// first, so a later <see cref="Start"/> can never have its new device disposed by this call.
+    /// </summary>
     public async Task<FlowRecording> StopAsync()
     {
         WaveInEvent? wave;
+        Task stopped;
         lock (_gate)
         {
             wave = _wave;
-            _stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            stopped = _waveStopped;
+            _wave = null;
+            IsRecording = false;
+            _level = 0;
         }
         if (wave is not null)
         {
             try { wave.StopRecording(); } catch (Exception ex) { _log.Error("Sutra Flow: stop failed.", ex); }
-            await Task.WhenAny(_stopped.Task, Task.Delay(400)).ConfigureAwait(false);
+            await Task.WhenAny(stopped, Task.Delay(400)).ConfigureAwait(false);
+            wave.DataAvailable -= OnData;
+            try { wave.Dispose(); } catch { }
         }
-        lock (_gate)
-        {
-            StopDevice();
-            _level = 0;
-            return new FlowRecording(_samples.ToArray(), _peak);
-        }
+        lock (_gate) return new FlowRecording(_samples.ToArray(), _peak);
     }
 
     private void StopDevice()
@@ -127,11 +133,3 @@ public sealed class FlowRecorder : IDisposable
         lock (_gate) StopDevice();
     }
 }
-
-public sealed record FlowRecording(float[] Samples, float Peak)
-{
-    public double Seconds => Samples.Length / (double)FlowRecorder.SampleRate;
-}
-
-/// <summary>A failure with a short, user-facing reason for the island.</summary>
-public sealed class FlowException(string message) : Exception(message);

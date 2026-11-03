@@ -1,0 +1,25 @@
+# Build and test on every pull request and push to main, so a PR shows real results
+# before anyone tags a release.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Test
+        run: dotnet test .\DynamicIsland.Windows.Tests\DynamicIsland.Windows.Tests.csproj -c Release -m:1
+      - name: Build app
+        run: dotnet build .\DynamicIsland.Windows\DynamicIsland.Windows.csproj -c Release -r win-x64

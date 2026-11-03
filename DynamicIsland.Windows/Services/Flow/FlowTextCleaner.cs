@@ -17,10 +17,20 @@ public static partial class FlowTextCleaner
         var t = BracketTag().Replace(text, " ");
         t = StarTag().Replace(t, " ");
         t = MultiSpace().Replace(t, " ").Trim();
-        // Whisper's classic hallucinations on silence.
-        if (t.Trim('.', ' ', '!').Equals("Thank you", StringComparison.OrdinalIgnoreCase)
-            || t.Trim('.', ' ').Equals("you", StringComparison.OrdinalIgnoreCase)) return "";
         return t;
+    }
+
+    private static readonly string[] SilencePhrases = ["thank you", "thanks for watching", "you", "bye"];
+
+    /// <summary>
+    /// Whisper sometimes "hears" a stock phrase in near-silence. Only treat the text as that kind of
+    /// guess when it is one of those phrases and the audio had almost no speech in it, so someone who
+    /// really says "Thank you" still gets it pasted.
+    /// </summary>
+    public static bool IsLikelyHallucination(string text, double voicedSeconds)
+    {
+        var t = text.Trim().TrimEnd('.', '!', ' ').ToLowerInvariant();
+        return voicedSeconds < 0.25 && SilencePhrases.Contains(t);
     }
 
     /// <summary>Basic cleanup: fillers, stutters, spoken punctuation, "scratch that", capitals.</summary>

@@ -22,9 +22,17 @@ public sealed class FlowTextCleanerTests
 
     [Theory]
     [InlineData("[BLANK_AUDIO]", "")]
-    [InlineData(" Thank you.", "")]
+    [InlineData(" Thank you.", "Thank you.")]
     [InlineData("Hello there (music) friend", "Hello there friend")]
     public void StripsWhisperArtifacts(string raw, string expected) => Assert.Equal(expected, FlowTextCleaner.StripWhisperArtifacts(raw));
+
+    [Theory]
+    [InlineData("Thank you.", 0.0, true)]
+    [InlineData("you", 0.1, true)]
+    [InlineData("Thank you.", 0.9, false)]
+    [InlineData("Thank you for the help.", 0.0, false)]
+    public void HallucinationNeedsSilentAudio(string text, double voiced, bool expected) =>
+        Assert.Equal(expected, FlowTextCleaner.IsLikelyHallucination(text, voiced));
 
     [Fact]
     public void RejectsAnsweringRewrite() =>
