@@ -75,6 +75,8 @@ public sealed class TrayService : IDisposable
             Visible = true
         };
         _icon.DoubleClick += (_, _) => OnUi(_openSettings);
+        _icon.BalloonTipClicked += (_, _) => { var click = _balloonClick; _balloonClick = null; if (click is not null) OnUi(click); };
+        _icon.BalloonTipClosed += (_, _) => _balloonClick = null;
     }
 
     public void SyncChecks()
@@ -84,7 +86,22 @@ public sealed class TrayService : IDisposable
         _focusMode.Checked = _isFocusEnabled();
     }
 
+    private Action? _balloonClick;
+
+    /// <summary>Shows a notification; <paramref name="onClick"/> runs on the UI thread if the user clicks it.</summary>
+    public void ShowNotification(string title, string message, Action? onClick)
+    {
+        _balloonClick = onClick;
+        ShowBalloon(title, message);
+    }
+
     public void ShowNotification(string title, string message)
+    {
+        _balloonClick = null;
+        ShowBalloon(title, message);
+    }
+
+    private void ShowBalloon(string title, string message)
     {
         _icon.BalloonTipTitle = title;
         _icon.BalloonTipText = message;

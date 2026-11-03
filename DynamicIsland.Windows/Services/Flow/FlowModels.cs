@@ -58,19 +58,24 @@ public sealed record FlowRecording(float[] Samples, float Peak)
 /// <summary>A failure with a short, user-facing reason for the island.</summary>
 public sealed class FlowException(string message) : Exception(message);
 
-/// <summary>What happened when Flow tried to put text into the target app.</summary>
+/// <summary>
+/// What happened when Flow tried to put text into the target app. On anything but
+/// <see cref="Pasted"/>, nothing was typed and the user's clipboard was left as it was.
+/// </summary>
 public enum FlowPasteOutcome
 {
-    /// <summary>Ctrl+V was delivered to the window that had focus when the key was pressed.</summary>
+    /// <summary>The text was delivered to the field that had focus when dictation started.</summary>
     Pasted,
-    /// <summary>Focus moved to a different window, so nothing was pasted; the text is on the clipboard.</summary>
+    /// <summary>Focus moved to a different window, control, field, or tab.</summary>
     TargetChanged,
-    /// <summary>The target runs as administrator and Windows would drop the keystrokes; the text is on the clipboard.</summary>
+    /// <summary>The target runs as administrator and Windows would drop the keystrokes.</summary>
     Elevated,
-    /// <summary>Windows refused the synthetic keystrokes; the text is on the clipboard.</summary>
+    /// <summary>Windows refused the synthetic keystrokes.</summary>
     Blocked,
-    /// <summary>Another app kept the clipboard locked; nothing was pasted or copied.</summary>
+    /// <summary>Another app kept the clipboard locked.</summary>
     ClipboardBusy,
+    /// <summary>The clipboard couldn't be saved exactly, and the text has line breaks, which are unsafe to type (Enter can send or submit).</summary>
+    MultilineNeedsClipboard,
 }
 
 /// <summary>The microphone side of a dictation.</summary>
@@ -83,18 +88,47 @@ public interface IFlowAudio
     Task<FlowRecording> StopAsync();
 }
 
+/// <summary>Where keyboard focus is at one moment: top-level window, focused child window, and caret.</summary>
+public sealed record FlowFocus(nint Window, nint Focus, nint CaretWindow, int CaretLeft, int CaretTop)
+{
+    /// <summary>
+    /// True when <paramref name="other"/> is the same place. The focused child window and the caret
+    /// are compared only when both readings have them (many apps draw their own caret).
+    /// </summary>
+    public bool SamePlaceAs(FlowFocus other)
+    {
+        if (Window == 0 || Window != other.Window) return false;
+        if (Focus != 0 && other.Focus != 0 && Focus != other.Focus) return false;
+        if (CaretWindow != 0 && other.CaretWindow != 0
+            && (CaretWindow != other.CaretWindow || CaretLeft != other.CaretLeft || CaretTop != other.CaretTop)) return false;
+        return true;
+    }
+}
+
 /// <summary>
-/// Where the user was when they started dictating: the top-level window, the focused child window,
-/// and (when UI Automation can tell) the focused element itself, such as a browser tab's text field.
+/// Where the user was dictating: focus readings at key-down and key-up, plus (when UI Automation
+/// can tell) the focused element itself at both moments, such as a browser tab's text field.
 /// </summary>
 public sealed class FlowTarget
 {
-    public nint Window { get; init; }
-    public nint Focus { get; init; }
+    public required FlowFocus AtPress { get; init; }
+    public FlowFocus? AtRelease { get; set; }
     /// <summary>UI Automation id of the focused element at key-down (null if unknown).</summary>
     public Task<string?>? ElementAtPress { get; init; }
     /// <summary>UI Automation id of the focused element at key-up (null if unknown).</summary>
     public Task<string?>? ElementAtRelease { get; set; }
+
+    /// <summary>
+    /// Pure decision used before pasting: every focus reading must match, and every element id that
+    /// is known must match the others. Unknown element ids (no UI Automation) don't block.
+    /// </summary>
+    public static bool Unchanged(FlowFocus press, FlowFocus? release, FlowFocus now, string? elementPress, string? elementRelease, string? elementNow)
+    {
+        if (!press.SamePlaceAs(now)) return false;
+        if (release is not null && (!press.SamePlaceAs(release) || !release.SamePlaceAs(now))) return false;
+        var known = new[] { elementPress, elementRelease, elementNow }.Where(e => e is not null).Distinct().Count();
+        return known <= 1;
+    }
 }
 
 /// <summary>The output side of a dictation.</summary>

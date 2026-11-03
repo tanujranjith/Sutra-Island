@@ -30,6 +30,7 @@ public sealed class FlowPipeline : IDisposable
     private readonly Cleaner _clean;
     private readonly Action<FlowStatus> _publish;
     private readonly Action<int> _onPasted;
+    private readonly Action<string> _onUndelivered;
     private readonly Action<string, Exception> _logError;
     private readonly Timing _timing;
     private readonly object _gate = new();
@@ -42,7 +43,7 @@ public sealed class FlowPipeline : IDisposable
     private bool _disposed;
 
     public FlowPipeline(IFlowAudio audio, IFlowPaster paster, Func<bool> enabled, Transcriber transcribe, Cleaner clean,
-        Action<FlowStatus> publish, Action<int> onPasted, Action<string, Exception> logError, Timing? timing = null)
+        Action<FlowStatus> publish, Action<int> onPasted, Action<string> onUndelivered, Action<string, Exception> logError, Timing? timing = null)
     {
         _audio = audio;
         _paster = paster;
@@ -51,6 +52,7 @@ public sealed class FlowPipeline : IDisposable
         _clean = clean;
         _publish = publish;
         _onPasted = onPasted;
+        _onUndelivered = onUndelivered;
         _logError = logError;
         _timing = timing ?? Timing.Default;
     }
@@ -179,6 +181,9 @@ public sealed class FlowPipeline : IDisposable
             if (text.Length == 0) throw new FlowException("Didn't catch that");
 
             var outcome = await _paster.PasteAsync(text, target, token).ConfigureAwait(false);
+            // A dictation that couldn't be delivered is handed back (not put on the clipboard) so
+            // the user can choose to copy it.
+            if (outcome != FlowPasteOutcome.Pasted) _onUndelivered(text);
             switch (outcome)
             {
                 case FlowPasteOutcome.Pasted:
@@ -187,11 +192,13 @@ public sealed class FlowPipeline : IDisposable
                     settle = Report(new FlowStatus(FlowState.Pasted, $"{words} words", words), _timing.PastedSettle);
                     break;
                 case FlowPasteOutcome.TargetChanged:
-                    Fail("Focus moved, so nothing was pasted; text copied"); break;
+                    Fail("Focus moved, so nothing was pasted"); break;
                 case FlowPasteOutcome.Elevated:
-                    Fail("Can't paste into an admin window; text copied"); break;
+                    Fail("Can't paste into an admin window"); break;
                 case FlowPasteOutcome.Blocked:
-                    Fail("Windows blocked the paste; text copied"); break;
+                    Fail("Windows blocked the paste"); break;
+                case FlowPasteOutcome.MultilineNeedsClipboard:
+                    Fail("Your clipboard couldn't be saved, so multi-line text wasn't typed"); break;
                 default:
                     Fail("Couldn't paste; the clipboard is busy"); break;
             }

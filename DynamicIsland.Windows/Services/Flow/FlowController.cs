@@ -20,6 +20,11 @@ public sealed class FlowController : IDisposable
     private readonly FlowRecorder _recorder;
     private readonly FlowAiCleaner _ai;
     private readonly FlowPipeline _pipeline;
+    private readonly FlowTextInjector _injector;
+    private string? _heldText;
+    private DispatcherTimer? _heldTimer;
+    /// <summary>How long undelivered dictation stays available to copy (memory only, never saved).</summary>
+    private static readonly TimeSpan HoldFor = TimeSpan.FromMinutes(2);
 
     public WhisperEngine Engine { get; }
     public FlowStatus Status { get; private set; } = new(FlowState.Idle);
@@ -39,8 +44,9 @@ public sealed class FlowController : IDisposable
         _hook = new FlowHotkeyHook(log);
         _recorder = new FlowRecorder(log);
         _ai = new FlowAiCleaner(settings, providers, secrets, log);
-        _pipeline = new FlowPipeline(_recorder, new FlowTextInjector(log, ui), () => _settings.FlowEnabled,
-            TranscribeAsync, CleanAsync, Publish, OnPasted, (message, ex) => _log.Error(message, ex));
+        _injector = new FlowTextInjector(log, ui);
+        _pipeline = new FlowPipeline(_recorder, _injector, () => _settings.FlowEnabled,
+            TranscribeAsync, CleanAsync, Publish, OnPasted, Hold, (message, ex) => _log.Error(message, ex));
         // The hook's worker calls these one at a time; each returns at once (Release hands the
         // slow work to a task after marking the session busy), so key events never queue up behind it.
         _hook.Pressed += _pipeline.Press;
@@ -92,6 +98,38 @@ public sealed class FlowController : IDisposable
         catch (OperationCanceledException) when (!token.IsCancellationRequested) { return text; } // AI too slow: keep Basic
     }
 
+    /// <summary>True while a dictation that couldn't be pasted is waiting for the user to copy it.</summary>
+    public bool HasHeldText => _heldText is not null;
+    /// <summary>Raised on the UI thread when held text appears or goes away.</summary>
+    public event EventHandler? HeldTextChanged;
+
+    private void Hold(string text) => _ui.BeginInvoke(() =>
+    {
+        _heldText = text;
+        _heldTimer?.Stop();
+        _heldTimer = new DispatcherTimer { Interval = HoldFor };
+        _heldTimer.Tick += (_, _) => ClearHeld();
+        _heldTimer.Start();
+        HeldTextChanged?.Invoke(this, EventArgs.Empty);
+    });
+
+    /// <summary>Copies the held dictation because the user asked to (UI thread). Clears it afterwards.</summary>
+    public bool CopyHeldText()
+    {
+        if (_heldText is not { } text) return false;
+        var copied = _injector.CopyForUser(text);
+        if (copied) ClearHeld();
+        return copied;
+    }
+
+    private void ClearHeld()
+    {
+        _heldTimer?.Stop();
+        if (_heldText is null) return;
+        _heldText = null;
+        HeldTextChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     private void OnPasted(int words)
     {
         _settings.FlowWordsDictated += words;
@@ -115,6 +153,7 @@ public sealed class FlowController : IDisposable
 
     public void Dispose()
     {
+        _heldText = null;
         _pipeline.Dispose();
         _hook.Dispose();
         _recorder.Dispose();

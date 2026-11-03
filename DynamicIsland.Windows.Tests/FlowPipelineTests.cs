@@ -42,12 +42,12 @@ public sealed class FlowPipelineTests
         public int Pins;
         public FlowPasteOutcome Outcome = FlowPasteOutcome.Pasted;
         public List<(string Text, nint Target)> Pastes = [];
-        public FlowTarget? CaptureTarget() => new() { Window = Window };
+        public FlowTarget? CaptureTarget() => new() { AtPress = new FlowFocus(Window, 0, 0, 0, 0) };
         public void PinTarget(FlowTarget target) => Pins++;
         public Task<FlowPasteOutcome> PasteAsync(string text, FlowTarget? target, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            Pastes.Add((text, target?.Window ?? 0));
+            Pastes.Add((text, target?.AtPress.Window ?? 0));
             return Task.FromResult(Outcome);
         }
     }
@@ -59,6 +59,7 @@ public sealed class FlowPipelineTests
         public readonly List<FlowStatus> Statuses = [];
         public bool Enabled = true;
         public int Words, Cleans;
+        public List<string> Held = [];
         public Func<FlowRecording, CancellationToken, Task<string>> Transcribe = (_, _) => Task.FromResult("hello world");
         public readonly FlowPipeline Pipeline;
 
@@ -69,6 +70,7 @@ public sealed class FlowPipelineTests
                 (raw, _) => { Cleans++; return Task.FromResult(raw); },
                 s => { lock (Statuses) Statuses.Add(s); },
                 w => Words += w,
+                t => Held.Add(t),
                 (_, ex) => throw new Xunit.Sdk.XunitException(ex.ToString()),
                 Fast);
         }
@@ -86,6 +88,7 @@ public sealed class FlowPipelineTests
         await rig.Pipeline.Release();
         Assert.Equal([("hello world", (nint)42)], rig.Paster.Pastes);
         Assert.Equal(1, rig.Paster.Pins); // the focused field is recorded again at key-up
+        Assert.Empty(rig.Held);
         Assert.Equal(2, rig.Words);
         Assert.Contains(rig.Statuses, s => s.State == FlowState.Pasted);
         Assert.False(rig.Pipeline.IsBusy);
@@ -170,6 +173,7 @@ public sealed class FlowPipelineTests
     [InlineData(FlowPasteOutcome.Elevated, "admin window")]
     [InlineData(FlowPasteOutcome.Blocked, "blocked")]
     [InlineData(FlowPasteOutcome.ClipboardBusy, "clipboard is busy")]
+    [InlineData(FlowPasteOutcome.MultilineNeedsClipboard, "multi-line")]
     public async Task FailedPasteNeverShowsSuccess(FlowPasteOutcome outcome, string reason)
     {
         var rig = new Rig();
@@ -179,6 +183,7 @@ public sealed class FlowPipelineTests
         Assert.DoesNotContain(rig.Statuses, s => s.State == FlowState.Pasted);
         Assert.Contains(reason, rig.LastDetail);
         Assert.Equal(0, rig.Words);
+        Assert.Equal(["hello world"], rig.Held); // handed back for the user to copy, not put on the clipboard
     }
 
     [Fact]
@@ -221,4 +226,30 @@ public sealed class FlowPipelineTests
         for (var i = 0; i < 100 && rig.Last != FlowState.Idle; i++) await Task.Delay(10);
         Assert.Equal(FlowState.Idle, rig.Last);
     }
+
+    private static readonly FlowFocus Field = new(10, 11, 11, 40, 8);
+
+    [Fact]
+    public void FocusUnchangedWhenEverythingMatches() =>
+        Assert.True(FlowTarget.Unchanged(Field, Field, Field, "a", "a", "a"));
+
+    [Fact]
+    public void FocusMovedBetweenPressAndRelease() =>
+        Assert.False(FlowTarget.Unchanged(Field, Field, Field, "field-1", "field-2", "field-2"));
+
+    [Fact]
+    public void FocusMovedToAnotherTabInTheSameWindow() =>
+        Assert.False(FlowTarget.Unchanged(Field, Field, Field, "tab-1", "tab-1", "tab-2"));
+
+    [Fact]
+    public void CaretMovedToAnotherFieldWithoutAccessibility() =>
+        Assert.False(FlowTarget.Unchanged(Field, Field, Field with { CaretTop = 120 }, null, null, null));
+
+    [Fact]
+    public void FocusedChildWindowChanged() =>
+        Assert.False(FlowTarget.Unchanged(Field, Field with { Focus = 12 }, Field with { Focus = 12 }, null, null, null));
+
+    [Fact]
+    public void MissingAccessibilityDoesNotBlock() =>
+        Assert.True(FlowTarget.Unchanged(Field, Field, Field, null, "a", null));
 }

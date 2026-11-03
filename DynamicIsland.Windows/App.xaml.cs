@@ -218,10 +218,15 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         if (!Infrastructure.AppDataPaths.IsPreview) _keyboardLocks.Start();
         _flow = new Services.Flow.FlowController(_settings, _settingsService, Dispatcher, _log, providers, _qSecrets);
         _islandWindow.AttachFlow(_flow);
-        // The dot grid shows a red X; the reason goes to a notification so it is readable.
+        // The dot grid shows a red X; the reason goes to a notification so it is readable. When the
+        // text couldn't be delivered, clicking the notification copies it (the user's clipboard is
+        // never changed without that click).
         _flow.StatusChanged += (_, status) =>
         {
-            if (status.State == Services.Flow.FlowState.Error && status.Detail != "Didn't hear anything")
+            if (status.State != Services.Flow.FlowState.Error || status.Detail == "Didn't hear anything") return;
+            if (_flow.HasHeldText)
+                _tray?.ShowNotification("Sutra Flow", status.Detail + ". Click to copy your text.", () => _flow.CopyHeldText());
+            else
                 _tray?.ShowNotification("Sutra Flow", status.Detail);
         };
         _flowSettings = new ViewModels.FlowSettingsViewModel(_settings, _settingsService, _flow);
