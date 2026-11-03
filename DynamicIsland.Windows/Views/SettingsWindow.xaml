@@ -332,6 +332,7 @@
                         <ToggleButton x:Name="ActivitiesTab" Content="Widgets &amp; connections" Tag="&#xE753;" Style="{StaticResource SideNavButton}" CommandParameter="activities" Click="Section_Click" Margin="0,14,0,2" />
                         <TextBlock Text="BEHAVIOR" Style="{StaticResource GroupLabel}" Margin="12,22,0,8"/><ToggleButton x:Name="PollingTab" Content="Polling rate" Tag="&#xE895;" Style="{StaticResource SideNavButton}" CommandParameter="polling" Click="Section_Click" />
                         <ToggleButton x:Name="QTab" Content="Sutra Assistant" Tag="&#xE720;" Style="{StaticResource SideNavButton}" CommandParameter="q" Click="Section_Click" />
+                        <ToggleButton x:Name="FlowTab" Content="Sutra Flow" Tag="&#xE1D6;" Style="{StaticResource SideNavButton}" CommandParameter="flow" Click="Section_Click" />
                         <ToggleButton x:Name="ShortcutsTab" Content="Shortcuts &amp; behavior" Tag="&#xE765;" Style="{StaticResource SideNavButton}" CommandParameter="shortcuts" Click="Section_Click" />
                         <ToggleButton x:Name="AdvancedTab" Content="Advanced" Tag="&#xE9F5;" Style="{StaticResource SideNavButton}" CommandParameter="advanced" Click="Section_Click" />
                         <TextBlock x:Name="SettingsSearchEmpty" Text="No settings found." Foreground="{StaticResource Muted}" FontSize="12" Margin="12,18,0,0" Visibility="Collapsed" />
@@ -754,6 +755,21 @@
                     </StackPanel>
 
                     <!-- Shortcuts and window behavior -->
+                    <StackPanel x:Name="FlowPage" Visibility="Collapsed">
+                        <TextBlock Text="Sutra Flow" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="Hold Right Ctrl, speak, and let go. Clean text lands wherever your cursor is. Speech is transcribed on this PC with Whisper." Style="{StaticResource PageDescription}" TextWrapping="Wrap" />
+                        <TextBlock Text="DICTATION" Style="{StaticResource GroupLabel}" Margin="0,0,0,9" />
+                        <Border Style="{StaticResource InsetGroup}"><StackPanel>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Push-to-talk dictation" Style="{StaticResource RowTitle}" /><TextBlock Text="Hold Right Ctrl to dictate. A quick tap, or Ctrl with another key, still works as normal." Style="{StaticResource RowDescription}" TextWrapping="Wrap" /></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding Enabled}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Cleanup" Style="{StaticResource RowTitle}" /><TextBlock Text="{Binding CleanupNote}" Style="{StaticResource RowDescription}" TextWrapping="Wrap" MaxWidth="340" HorizontalAlignment="Left" /></StackPanel><ComboBox Grid.Column="1" Style="{StaticResource FieldCombo}" Tag="{Binding Cleanup}" ItemsSource="{Binding CleanupOptions}" SelectedItem="{Binding Cleanup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Top" /></Grid></Border>
+                            <Border Style="{StaticResource LastPreferenceRow}"><StackPanel><TextBlock Text="Vocabulary" Style="{StaticResource RowTitle}" /><TextBlock Text="Names and terms to spell exactly, separated by commas (for example: Sutra, Tanuj, DCCC)." Style="{StaticResource RowDescription}" TextWrapping="Wrap" /><TextBox Style="{StaticResource FieldText}" Width="Auto" HorizontalAlignment="Stretch" Margin="0,8,0,0" Text="{Binding Vocabulary, UpdateSourceTrigger=LostFocus}" /></StackPanel></Border>
+                        </StackPanel></Border>
+                        <TextBlock Text="SPEECH MODEL" Style="{StaticResource GroupLabel}" />
+                        <Border Style="{StaticResource InsetGroup}"><StackPanel>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Whisper base.en" Style="{StaticResource RowTitle}" /><TextBlock Text="{Binding ModelStatus}" Style="{StaticResource RowDescription}" TextWrapping="Wrap" /></StackPanel><Button Grid.Column="1" Content="Download" Command="{Binding DownloadModelCommand}" Style="{StaticResource ActionButton}" /></Grid></Border>
+                            <Border Style="{StaticResource LastPreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Usage" Style="{StaticResource RowTitle}" /><TextBlock Text="{Binding WordsDictated}" Style="{StaticResource RowDescription}" /></StackPanel></Grid></Border>
+                        </StackPanel></Border>
+                    </StackPanel>
                     <StackPanel x:Name="ShortcutsPage" Visibility="Collapsed">
                         <TextBlock Text="Shortcuts &amp; behavior" Style="{StaticResource PageTitle}" />
                         <TextBlock Text="Set how Sutra Island starts and responds, and manage keyboard shortcuts." Style="{StaticResource PageDescription}" />

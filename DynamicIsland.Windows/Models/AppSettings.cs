@@ -203,6 +203,13 @@ public sealed class AppSettings
     public string QHotkeyShortcut { get; set; } = "";
     public bool QDisclosureAccepted { get; set; }
 
+    // ===== Sutra Flow (push-to-talk dictation) =====
+    public bool FlowEnabled { get; set; } = true;
+    public Services.Flow.FlowCleanupMode FlowCleanup { get; set; } = Services.Flow.FlowCleanupMode.Basic;
+    // Names and terms Whisper and the cleanup should spell exactly as written.
+    public List<string> FlowVocabulary { get; set; } = [];
+    public long FlowWordsDictated { get; set; }
+
     // ===== Battery warnings =====
     public bool ShowBatteryTime { get; set; }
     public bool LowBatteryWarning { get; set; } = true;

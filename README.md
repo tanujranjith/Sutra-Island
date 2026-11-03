@@ -17,6 +17,16 @@ The screenshots show the current native interface with illustrative verification
 - **Command palette:** open with `Ctrl+Alt+K` by default to search commands and settings, control media and timers, calculate, convert units, and solve single-variable linear equations. For example, `3x+44x=1253` shows a copyable solution; nonlinear equations and systems of equations are not supported. Press Enter on a result to copy it. Use Up on an empty query to recall a previously run command.
 - **Customization:** choose visible activities, appearance, position, keyboard shortcuts, and reduced-motion behavior in Settings.
 
+## Sutra Flow dictation
+
+Hold **Right Ctrl**, speak, and let go: clean text is pasted wherever your cursor is. While you talk, the island keeps its size and its content dissolves into a dot-matrix voice display; it shimmers while polishing and draws a check when the text lands.
+
+- Speech is transcribed on this PC with Whisper (`ggml-base.en`, 148 MB, downloaded once on first launch into `%LOCALAPPDATA%\DynamicIsland.Windows\SutraFlow`).
+- Cleanup is **Basic** by default (fillers, stutters, spoken punctuation, "new line", "scratch that"), or **AI** through the Sutra Assistant provider and key you already set up. AI cleanup sends text only, never audio, and falls back to Basic.
+- A quick tap of Right Ctrl, or Ctrl plus another key, behaves as normal Ctrl.
+- whisper.cpp needs the Microsoft Visual C++ 2015-2022 Redistributable (x64), which most PCs already have.
+- Turn it off or add vocabulary in **Settings → Sutra Flow**.
+
 ## Screenshots
 
 | Sutra Assistant | Settings and live preview |

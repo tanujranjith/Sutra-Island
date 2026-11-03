@@ -1,3 +1,13 @@
+# Sutra Island v1.3.0
+
+- Add Sutra Flow, local push-to-talk dictation: hold Right Ctrl, speak, and let go to paste clean text wherever the cursor is. A quick tap, or Ctrl with another key, still works as Ctrl.
+- Transcribe on this PC with Whisper (whisper.cpp via Whisper.net). The 148 MB base.en speech model downloads once on first launch; nothing is bundled into the exe.
+- Morph the island into a dot-matrix voice display while dictating: voice columns ripple from the center, flatten on release, shimmer while polishing, and draw a green check when pasted (red X on errors).
+- Clean up locally (fillers, stutters, spoken punctuation, "new line", "scratch that") or optionally with the Sutra Assistant provider, which falls back to local cleanup if it is slow or rewrites too much.
+- Keep dictations out of Windows clipboard history, restore the previous clipboard text after pasting, and hide Island's own Flow recording from the privacy indicator.
+- Add Settings → Sutra Flow: on/off, cleanup level, vocabulary for names and terms, speech model status, and words dictated.
+
+---
 # Sutra Island v1.2.5
 
 - Open screenshot capture directly with Region selected, then switch to Window or Full screen from the floating toolbar.

@@ -51,6 +51,10 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     private SpeechInputService? _qSpeech;
     private AssistantVoiceController? _voice;
     private KeyboardLockService? _keyboardLocks;
+    private Services.Flow.FlowController? _flow;
+    private ViewModels.FlowSettingsViewModel? _flowSettings;
+    /// <summary>Sutra Flow settings for the Settings window (null until startup finishes).</summary>
+    public ViewModels.FlowSettingsViewModel? FlowSettings => _flowSettings;
     private readonly System.Diagnostics.Stopwatch _startupWatch = System.Diagnostics.Stopwatch.StartNew();
     private DpapiSecretStore? _qSecrets;
     private CodexAppServerClient? _codexClient;
@@ -212,6 +216,10 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _islandWindow.ContentRendered += (_, _) => _log.Debug($"Island first render: startupMs={_startupWatch.Elapsed.TotalMilliseconds:0}.");
         _islandWindow.Show();
         if (!Infrastructure.AppDataPaths.IsPreview) _keyboardLocks.Start();
+        _flow = new Services.Flow.FlowController(_settings, _settingsService, Dispatcher, _log, providers, _qSecrets);
+        _islandWindow.AttachFlow(_flow);
+        _flowSettings = new ViewModels.FlowSettingsViewModel(_settings, _settingsService, _flow);
+        if (!Infrastructure.AppDataPaths.IsPreview) _flow.Start();
         _notifications.Configure(TimeSpan.FromSeconds(_settings.NotificationPollSeconds));
         if (_settings.ShowNotifications) _ = _notifications.StartAsync();
         _ = _islandViewModel.ConfigureVoiceAsync();
@@ -586,6 +594,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _islandViewModel?.Dispose();
         _voice?.Dispose();
         _keyboardLocks?.Dispose();
+        _flow?.Dispose();
         _qSession?.Dispose();
         _codexClient?.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _qSpeech?.Dispose();

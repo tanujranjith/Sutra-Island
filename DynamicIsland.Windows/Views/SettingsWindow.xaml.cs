@@ -38,6 +38,7 @@ public partial class SettingsWindow : Window
         Closed += (_, _) => PreviewIslandData.SizeChanged -= PreviewIslandData_SizeChanged;
         _islandViewModel.PropertyChanged += IslandPreviewOnPropertyChanged;
         Closed += (_, _) => _islandViewModel.PropertyChanged -= IslandPreviewOnPropertyChanged;
+        FlowPage.DataContext = (System.Windows.Application.Current as App)?.FlowSettings;
         SetPreviewExpanded(false, animate: false);
         ShowSection("content");
         UpdateNavigationFilter(string.Empty);
@@ -304,12 +305,13 @@ public partial class SettingsWindow : Window
         ActivitiesTab.Visibility = Matches(ActivitiesTab, "widgets", "connections", "activities", "weather", "notifications", "notification", "integrations", "network", "wifi", "bluetooth", "stocks", "calendar", "meeting", "clipboard", "privacy", "countdown", "caps", "num", "lock") ? Visibility.Visible : Visibility.Collapsed;
         PollingTab.Visibility = Matches(PollingTab, "polling", "rate", "refresh", "interval", "frequency", "cadence", "window", "screen", "wifi", "wireless", "connectivity", "clock", "date", "media", "playback", "audio", "timer", "battery", "system monitor", "privacy", "theme", "airpods", "notifications", "calendar", "stocks", "weather") ? Visibility.Visible : Visibility.Collapsed;
         QTab.Visibility = Matches(QTab, "q", "assistant", "provider", "model", "api", "prompt", "response", "tokens", "screen", "voice", "speech", "wake", "hey sutra") ? Visibility.Visible : Visibility.Collapsed;
+        FlowTab.Visibility = Matches(FlowTab, "flow", "sutra flow", "dictation", "dictate", "whisper", "voice", "speech", "transcribe", "push-to-talk", "microphone", "vocabulary") ? Visibility.Visible : Visibility.Collapsed;
         ShortcutsTab.Visibility = Matches(ShortcutsTab, "shortcuts", "behavior", "command palette", "startup", "hotkey", "hover", "click-through", "always on top", "expand") ? Visibility.Visible : Visibility.Collapsed;
         AdvancedTab.Visibility = Matches(AdvancedTab, "advanced", "developer", "backup", "profiles", "warnings", "debug", "import", "export", "reset", "volume warning", "battery warning") ? Visibility.Visible : Visibility.Collapsed;
 
         var showIslandGroup = query.Length == 0 || "island content appearance position".Contains(query, StringComparison.OrdinalIgnoreCase);
         IslandNavLabel.Visibility = showIslandGroup ? Visibility.Visible : Visibility.Collapsed;
-        SettingsSearchEmpty.Visibility = new System.Windows.Controls.Primitives.ToggleButton[] { OverviewTab, ContentTab, AppearanceTab, PositionTab, ActivitiesTab, PollingTab, QTab, ShortcutsTab, AdvancedTab }
+        SettingsSearchEmpty.Visibility = new System.Windows.Controls.Primitives.ToggleButton[] { OverviewTab, ContentTab, AppearanceTab, PositionTab, ActivitiesTab, PollingTab, QTab, FlowTab, ShortcutsTab, AdvancedTab }
             .Any(item => item.Visibility == Visibility.Visible) ? Visibility.Collapsed : Visibility.Visible;
     }
 
@@ -322,6 +324,8 @@ public partial class SettingsWindow : Window
         ActivitiesPage.Visibility = key == "activities" ? Visibility.Visible : Visibility.Collapsed;
         PollingPage.Visibility = key == "polling" ? Visibility.Visible : Visibility.Collapsed;
         QPage.Visibility = key == "q" ? Visibility.Visible : Visibility.Collapsed;
+        FlowPage.Visibility = key == "flow" ? Visibility.Visible : Visibility.Collapsed;
+        if (key == "flow") (FlowPage.DataContext as FlowSettingsViewModel)?.Refresh();
         ShortcutsPage.Visibility = key == "shortcuts" ? Visibility.Visible : Visibility.Collapsed;
         AdvancedPage.Visibility = key == "advanced" ? Visibility.Visible : Visibility.Collapsed;
 
@@ -332,6 +336,7 @@ public partial class SettingsWindow : Window
         ActivitiesTab.IsChecked = key == "activities";
         PollingTab.IsChecked = key == "polling";
         QTab.IsChecked = key == "q";
+        FlowTab.IsChecked = key == "flow";
         ShortcutsTab.IsChecked = key == "shortcuts";
         AdvancedTab.IsChecked = key == "advanced";
     }

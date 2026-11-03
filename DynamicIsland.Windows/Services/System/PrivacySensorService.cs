@@ -81,7 +81,7 @@ public sealed class PrivacySensorService(LoggingService log, Func<PrivacySensorS
 
     private static void CollectTree(RegistryKey key, string trail, List<string> found)
     {
-        if (IsActive(key))
+        if (IsActive(key) && !IsOwnFlowRecording(trail))
         {
             var friendly = ToFriendlyAppName(trail);
             if (!string.IsNullOrWhiteSpace(friendly) && !IsCapabilityRootName(trail))
@@ -99,6 +99,11 @@ public sealed class PrivacySensorService(LoggingService log, Func<PrivacySensorS
             catch (System.Security.SecurityException) { }
         }
     }
+
+    // Sutra Flow dictation is shown by the island itself; don't also flag Island as a mic user.
+    private static bool IsOwnFlowRecording(string trail) =>
+        Flow.FlowRecorder.IsRecording && Environment.ProcessPath is { } self
+        && trail.Contains(self.Replace('\\', '#'), StringComparison.OrdinalIgnoreCase);
 
     private static bool IsCapabilityRootName(string trail) =>
         trail.Equals("webcam", StringComparison.OrdinalIgnoreCase) ||
