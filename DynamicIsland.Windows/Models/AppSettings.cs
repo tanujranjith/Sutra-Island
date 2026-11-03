@@ -206,6 +206,10 @@ public sealed class AppSettings
     // ===== Sutra Flow (push-to-talk dictation) =====
     public bool FlowEnabled { get; set; } = true;
     public Services.Flow.FlowCleanupMode FlowCleanup { get; set; } = Services.Flow.FlowCleanupMode.Basic;
+    /// <summary>Provider for AI cleanup; empty means use the Sutra Assistant's provider.</summary>
+    public string FlowAiProvider { get; set; } = "";
+    /// <summary>Model for AI cleanup; empty means the Assistant's model (same provider) or the provider's default.</summary>
+    public string FlowAiModel { get; set; } = "";
     // Names and terms Whisper and the cleanup should spell exactly as written.
     public List<string> FlowVocabulary { get; set; } = [];
     public long FlowWordsDictated { get; set; }

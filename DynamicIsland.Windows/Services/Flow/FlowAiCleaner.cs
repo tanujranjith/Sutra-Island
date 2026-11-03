@@ -42,14 +42,38 @@ public sealed class FlowAiCleaner(AppSettings settings, IQProviderRegistry provi
         ("i actually really liked the new design", "I actually really liked the new design."),
     ];
 
+    /// <summary>The provider Flow cleans with: its own choice, or the Sutra Assistant's.</summary>
+    public string ProviderId => string.IsNullOrWhiteSpace(settings.FlowAiProvider) ? settings.QSelectedProvider : settings.FlowAiProvider;
+
+    /// <summary>
+    /// The model Flow cleans with: its own choice; else the Assistant's model when the provider is the
+    /// Assistant's; else that provider's default.
+    /// </summary>
+    public string ModelId
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(settings.FlowAiModel)) return settings.FlowAiModel.Trim();
+            var sameAsAssistant = string.Equals(ProviderId, settings.QSelectedProvider, StringComparison.OrdinalIgnoreCase);
+            if (sameAsAssistant && !string.IsNullOrWhiteSpace(settings.QSelectedModel)) return settings.QSelectedModel;
+            return providers.Find(ProviderId)?.Info.DefaultModel ?? "";
+        }
+    }
+
+    /// <summary>Providers that can clean dictation (Codex can't).</summary>
+    public IReadOnlyList<QProviderInfo> Providers => providers.Providers.Select(p => p.Info)
+        .Where(i => !string.Equals(i.Id, "codex", StringComparison.OrdinalIgnoreCase)).ToArray();
+
+    public bool HasKey(string id) => !string.IsNullOrWhiteSpace(secrets.Get(id));
+
     /// <summary>Why AI cleanup can't run right now, or null when it can.</summary>
     public string? Unavailable()
     {
-        var id = settings.QSelectedProvider;
-        if (string.Equals(id, "codex", StringComparison.OrdinalIgnoreCase)) return "Codex can't clean dictation; pick another provider";
-        if (providers.Find(id) is null) return "No Sutra Assistant provider selected";
-        if (!string.Equals(id, "ollama", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(secrets.Get(id)))
-            return "Add an API key in Sutra Assistant settings";
+        var id = ProviderId;
+        if (string.Equals(id, "codex", StringComparison.OrdinalIgnoreCase)) return "Codex can't clean dictation; pick another provider for Flow";
+        if (providers.Find(id) is not { } provider) return "No provider selected for Flow";
+        if (!string.Equals(id, "ollama", StringComparison.OrdinalIgnoreCase) && !HasKey(id))
+            return $"Add a {provider.Info.DisplayName} API key in Sutra Assistant settings";
         return null;
     }
 
@@ -57,7 +81,7 @@ public sealed class FlowAiCleaner(AppSettings settings, IQProviderRegistry provi
     public async Task<string?> CleanAsync(string text, IReadOnlyList<string> vocabulary, CancellationToken token)
     {
         if (Unavailable() is { } reason) { log.Debug($"Sutra Flow: AI cleanup skipped ({reason})."); return null; }
-        var provider = providers.Find(settings.QSelectedProvider)!;
+        var provider = providers.Find(ProviderId)!;
         var isOllama = string.Equals(provider.Info.Id, "ollama", StringComparison.OrdinalIgnoreCase);
         var history = new List<QMessage>();
         foreach (var (raw, clean) in Examples)
@@ -67,7 +91,7 @@ public sealed class FlowAiCleaner(AppSettings settings, IQProviderRegistry provi
         }
         var system = vocabulary.Count > 0 ? Instructions + "\nVocabulary: " + string.Join(", ", vocabulary.Take(60)) : Instructions;
         var request = new QRequest(QMode.Say, text, null, history,
-            string.IsNullOrWhiteSpace(settings.QSelectedModel) ? provider.Info.DefaultModel : settings.QSelectedModel,
+            string.IsNullOrWhiteSpace(ModelId) ? provider.Info.DefaultModel : ModelId,
             IncludeImage: false, MaxResponseTokens: Math.Clamp(text.Length, 256, 4096),
             CustomSystemPrompt: system, ReasoningEffort: "low");
         var sb = new StringBuilder();

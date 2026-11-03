@@ -55,6 +55,8 @@ public sealed class FlowController : IDisposable
     }
 
     public string? AiUnavailableReason => _ai.Unavailable();
+    /// <summary>The AI cleanup side, for the settings page (provider list, effective model, key check).</summary>
+    public FlowAiCleaner Ai => _ai;
 
     public void Start()
     {
