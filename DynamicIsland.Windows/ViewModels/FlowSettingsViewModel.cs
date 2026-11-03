@@ -88,13 +88,28 @@ public sealed class FlowSettingsViewModel : ObservableObject
         }
     }
 
+    public IReadOnlyList<string> AiEffortOptions => _flow.Ai.EffortOptions;
+
+    /// <summary>Reasoning effort for cleanup. Lower is faster; a level the model doesn't support falls back to auto.</summary>
+    public string AiEffort
+    {
+        get => _flow.Ai.Effort;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value) || string.Equals(value, _settings.FlowAiEffort, StringComparison.OrdinalIgnoreCase)) return;
+            _settings.FlowAiEffort = value;
+            RaisePropertyChanged();
+            Save();
+        }
+    }
+
     public string AiModelNote => _flow.AiUnavailableReason is { } reason
         ? reason + "."
         : "Small, fast models work best: cleanup has 8 seconds before Flow falls back to Basic.";
 
     private void RaiseAi()
     {
-        foreach (var name in new[] { nameof(AiProvider), nameof(AiProviderOptions), nameof(AiModel), nameof(AiModelOptions), nameof(AiModelNote), nameof(CleanupNote) })
+        foreach (var name in new[] { nameof(AiProvider), nameof(AiProviderOptions), nameof(AiModel), nameof(AiModelOptions), nameof(AiEffortOptions), nameof(AiEffort), nameof(AiModelNote), nameof(CleanupNote) })
             RaisePropertyChanged(name);
     }
 

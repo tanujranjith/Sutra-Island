@@ -28,7 +28,7 @@ A quick tap of Right Ctrl does nothing. Pressing another key within 0.3 seconds 
 - **Cleanup:**
   - *Off* pastes exactly what Whisper heard.
   - *Basic* (default) runs on your PC: removes "um" and "uh", collapses stutters ("the the"), turns spoken "comma", "period", "question mark", "new line", and "new paragraph" into punctuation, handles "scratch that", and fixes capitals. It does not resolve changes of mind like "tomato soup... actually no, chicken parmesan"; that needs AI.
-  - *AI* runs Basic first, then asks the provider and model chosen under **AI cleanup provider** and **AI cleanup model** (by default, the same ones as Sutra Assistant) to resolve self-corrections ("Monday, no wait, Tuesday", or a whole restarted sentence) and spoken lists. If the provider is slow (over 8 seconds) or errors, or if the result looks unfaithful (much longer, much shorter without a spoken correction, or using words you didn't say), Flow falls back to the Basic text. Codex is not used for cleanup.
+  - *AI* runs Basic first, then asks the provider and model chosen under **AI cleanup provider**, **AI cleanup model**, and **AI cleanup reasoning** (by default, the same ones as Sutra Assistant) to resolve self-corrections ("Monday, no wait, Tuesday", or a whole restarted sentence) and spoken lists. If the provider is slow (over 8 seconds) or errors, or if the result looks unfaithful (much longer, much shorter without a spoken correction, or using words you didn't say), Flow falls back to the Basic text. Codex is not used for cleanup.
 - **Vocabulary:** comma-separated names and terms (for example `Sutra, Tanuj, DCCC`). Whisper and AI cleanup use them as the spelling to match.
 - **Speech model:** status of the Whisper model, with a Download button if it is missing.
 - **Usage:** total words dictated.
@@ -98,7 +98,7 @@ FlowPipeline runs one dictation at a time and publishes FlowStatus ─► Island
 
 `FlowPipelineTests` covers the lifecycle with fake audio and paste: rapid presses during processing, disabling mid-dictation, focus changes (window, caret, field, tab), blocked and elevated pastes, text handed back on failure, shortcut cancel, settle, and the "Thank you" rule. `FlowKeyGateTests` covers the shortcut window, the lock, and Esc. `FlowTextCleanerTests` covers Basic cleanup and the AI safety check. The CI workflow runs them on every pull request. The hook, microphone, Whisper, and clipboard code still need a manual check on Windows.
 
-Settings live in `settings.json` as `FlowEnabled`, `FlowCleanup`, `FlowAiProvider` (empty means use the Assistant's), `FlowAiModel` (empty means the Assistant's model with the same provider, otherwise the provider's default), `FlowVocabulary`, and `FlowWordsDictated`. Keys come from the Sutra Assistant key store.
+Settings live in `settings.json` as `FlowEnabled`, `FlowCleanup`, `FlowAiProvider` (empty means use the Assistant's), `FlowAiModel` (empty means the Assistant's model with the same provider, otherwise the provider's default), `FlowAiEffort` (default `low`; falls back to `auto` when the model doesn't support it), `FlowVocabulary`, and `FlowWordsDictated`. Keys come from the Sutra Assistant key store.
 
 ## Not yet included
 

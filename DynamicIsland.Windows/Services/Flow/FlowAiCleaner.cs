@@ -60,6 +60,12 @@ public sealed class FlowAiCleaner(AppSettings settings, IQProviderRegistry provi
         }
     }
 
+    /// <summary>Effort levels the chosen provider and model accept.</summary>
+    public IReadOnlyList<string> EffortOptions => QProviderPolicy.EffortOptions(ProviderId, ModelId);
+
+    /// <summary>The effort actually sent: the chosen level if this model supports it, otherwise auto.</summary>
+    public string Effort => QProviderPolicy.NormalizeEffort(ProviderId, ModelId, settings.FlowAiEffort);
+
     /// <summary>Providers that can clean dictation (Codex can't).</summary>
     public IReadOnlyList<QProviderInfo> Providers => providers.Providers.Select(p => p.Info)
         .Where(i => !string.Equals(i.Id, "codex", StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -93,7 +99,7 @@ public sealed class FlowAiCleaner(AppSettings settings, IQProviderRegistry provi
         var request = new QRequest(QMode.Say, text, null, history,
             string.IsNullOrWhiteSpace(ModelId) ? provider.Info.DefaultModel : ModelId,
             IncludeImage: false, MaxResponseTokens: Math.Clamp(text.Length, 256, 4096),
-            CustomSystemPrompt: system, ReasoningEffort: "low");
+            CustomSystemPrompt: system, ReasoningEffort: Effort);
         var sb = new StringBuilder();
         try
         {

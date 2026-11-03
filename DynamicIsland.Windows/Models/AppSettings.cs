@@ -210,6 +210,8 @@ public sealed class AppSettings
     public string FlowAiProvider { get; set; } = "";
     /// <summary>Model for AI cleanup; empty means the Assistant's model (same provider) or the provider's default.</summary>
     public string FlowAiModel { get; set; } = "";
+    /// <summary>Reasoning effort for AI cleanup; sent only when the provider and model support it, otherwise auto.</summary>
+    public string FlowAiEffort { get; set; } = "low";
     // Names and terms Whisper and the cleanup should spell exactly as written.
     public List<string> FlowVocabulary { get; set; } = [];
     public long FlowWordsDictated { get; set; }
