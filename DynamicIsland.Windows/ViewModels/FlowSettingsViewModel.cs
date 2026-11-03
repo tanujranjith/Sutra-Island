@@ -23,6 +23,7 @@ public sealed class FlowSettingsViewModel : ObservableObject
         _flow = flow;
         DownloadModelCommand = new RelayCommand(() => _ = _flow.Engine.EnsureModelAsync(), () => !_flow.Engine.IsModelInstalled && !_flow.Engine.IsDownloading);
         CopyHeldTextCommand = new RelayCommand(() => _flow.CopyHeldText(), () => _flow.HasHeldText);
+        RefreshUsageCommand = new RelayCommand(() => RaisePropertyChanged(nameof(WordsDictated)));
         _flow.HeldTextChanged += (_, _) => ((RelayCommand)CopyHeldTextCommand).RaiseCanExecuteChanged();
         _flow.Engine.ModelStatusChanged += (_, _) => Application.Current?.Dispatcher.BeginInvoke(() =>
         {
@@ -155,6 +156,7 @@ public sealed class FlowSettingsViewModel : ObservableObject
     public ICommand DownloadModelCommand { get; }
     /// <summary>Copies the last dictation that couldn't be pasted (kept in memory for two minutes).</summary>
     public ICommand CopyHeldTextCommand { get; }
+    public ICommand RefreshUsageCommand { get; }
     public string WordsDictated => _settings.FlowWordsDictated == 1 ? "1 word dictated" : $"{_settings.FlowWordsDictated:N0} words dictated";
 
     public void Refresh()
