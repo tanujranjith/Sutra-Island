@@ -109,7 +109,6 @@ The project includes its logo assets, so a source checkout does not require file
 
 A source update or local build does not automatically publish a GitHub Release. Review screenshots and release artifacts before sharing; local QA captures may contain private desktop content and are ignored by Git.
 
-See the [release review](RELEASE_REVIEW.md) for the checks performed for v1.1.9 and the remaining device and account testing limits.
 
 ## Repository layout
 
@@ -117,9 +116,8 @@ See the [release review](RELEASE_REVIEW.md) for the checks performed for v1.1.9 
 - `DynamicIsland.Q.Core/` — assistant contracts, prompt composition, and session logic.
 - `DynamicIsland.Windows.Tests/` — xUnit tests for app logic.
 - `scripts/` — release packaging and verification helpers.
-- `media/` — existing screenshots and historical visuals.
-- `python-versions/` — archived Python prototypes.
-- [RELEASE_NOTES.md](RELEASE_NOTES.md), [Q.md](Q.md), [SUTRA_FLOW.md](SUTRA_FLOW.md), [CUSTOM_THEME.md](CUSTOM_THEME.md), and [design-qa.md](design-qa.md) — release history and additional guides.
+- `media/` — screenshots used in this README.
+- [RELEASE_NOTES.md](RELEASE_NOTES.md), [Q.md](Q.md), [SUTRA_FLOW.md](SUTRA_FLOW.md), and [CUSTOM_THEME.md](CUSTOM_THEME.md) — release history and additional guides.
 
 ## License
 
