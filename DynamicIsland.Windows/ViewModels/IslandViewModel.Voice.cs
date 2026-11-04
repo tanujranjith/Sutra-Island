@@ -13,6 +13,7 @@ public sealed partial class IslandViewModel
     public bool QUseScreenNext { get => _qUseScreenNext; set { _qUseScreenNext = value; RaiseMany(nameof(QUseScreenNext), nameof(QSourceText)); } }
     public string VoiceStatus => _voiceSnapshot.Error is null ? _voiceSnapshot.Status : _voiceSnapshot.Status + ": " + _voiceSnapshot.Error;
     public bool VoiceBusy => _voiceSnapshot.State is AssistantVoiceState.Listening or AssistantVoiceState.Thinking or AssistantVoiceState.Speaking;
+    public AssistantVoiceState VoiceState => _voiceSnapshot.State;
     public bool AssistantSpeaking => _voiceSnapshot.State == AssistantVoiceState.Speaking;
     public QRunState AssistantMascotState => _voiceSnapshot.State == AssistantVoiceState.Listening ? QRunState.Listening : QState;
     public void AttachVoice(AssistantVoiceController voice)
@@ -22,7 +23,7 @@ public sealed partial class IslandViewModel
         _voiceSnapshot = snapshot;
         if (snapshot.State == AssistantVoiceState.Listening)
         { CancelQ(); _ = StartChatAsync(useScreen: QUseScreenNext); }
-        RaiseMany(nameof(VoiceStatus), nameof(VoiceBusy), nameof(AssistantSpeaking), nameof(AssistantMascotState), nameof(QCanStop), nameof(QShowResponseActions), nameof(PinExpanded));
+        RaiseMany(nameof(VoiceStatus), nameof(VoiceState), nameof(VoiceBusy), nameof(AssistantSpeaking), nameof(AssistantMascotState), nameof(QCanStop), nameof(QShowResponseActions), nameof(PinExpanded));
         UpdateQAutoCloseTimer();
     });
     public Task ConfigureVoiceAsync() => _voice?.ConfigureAsync(Settings.QEnabled && Settings.WakeListeningEnabled, Settings.VoiceReadAloud, Settings.VoiceName) ?? Task.CompletedTask;

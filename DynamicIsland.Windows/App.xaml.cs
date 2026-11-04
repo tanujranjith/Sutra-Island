@@ -51,6 +51,10 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     private SpeechInputService? _qSpeech;
     private AssistantVoiceController? _voice;
     private KeyboardLockService? _keyboardLocks;
+    private Services.Flow.FlowController? _flow;
+    private ViewModels.FlowSettingsViewModel? _flowSettings;
+    /// <summary>Sutra Flow settings for the Settings window (null until startup finishes).</summary>
+    public ViewModels.FlowSettingsViewModel? FlowSettings => _flowSettings;
     private readonly System.Diagnostics.Stopwatch _startupWatch = System.Diagnostics.Stopwatch.StartNew();
     private DpapiSecretStore? _qSecrets;
     private CodexAppServerClient? _codexClient;
@@ -212,6 +216,26 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _islandWindow.ContentRendered += (_, _) => _log.Debug($"Island first render: startupMs={_startupWatch.Elapsed.TotalMilliseconds:0}.");
         _islandWindow.Show();
         if (!Infrastructure.AppDataPaths.IsPreview) _keyboardLocks.Start();
+        _flow = new Services.Flow.FlowController(_settings, _settingsService, Dispatcher, _log, providers, _qSecrets);
+        _islandWindow.AttachFlow(_flow);
+        // Sutra Assistant listens with Flow's Whisper model too (Windows speech until it's downloaded).
+        _qSpeech?.AttachWhisper(new Services.Q.WhisperVoiceInput(_log, _flow.Engine, _settings));
+        _islandWindow.AttachAssistantVoiceDots(() => _qSpeech?.Level ?? 0f);
+        _voice!.Changed += snapshot => _flow?.SetAssistantVoiceActive(snapshot.State is DynamicIsland.Q.Core.AssistantVoiceState.Listening
+            or DynamicIsland.Q.Core.AssistantVoiceState.Thinking or DynamicIsland.Q.Core.AssistantVoiceState.Speaking);
+        // The dot grid shows a red X; the reason goes to a notification so it is readable. When the
+        // text couldn't be delivered, clicking the notification copies it (the user's clipboard is
+        // never changed without that click).
+        _flow.StatusChanged += (_, status) =>
+        {
+            if (status.State != Services.Flow.FlowState.Error || status.Detail == "Didn't hear anything") return;
+            if (_flow.HasHeldText)
+                _tray?.ShowNotification("Sutra Flow", status.Detail + ". Click to copy your text.", () => _flow.CopyHeldText());
+            else
+                _tray?.ShowNotification("Sutra Flow", status.Detail);
+        };
+        _flowSettings = new ViewModels.FlowSettingsViewModel(_settings, _settingsService, _flow);
+        if (!Infrastructure.AppDataPaths.IsPreview) _flow.Start();
         _notifications.Configure(TimeSpan.FromSeconds(_settings.NotificationPollSeconds));
         if (_settings.ShowNotifications) _ = _notifications.StartAsync();
         _ = _islandViewModel.ConfigureVoiceAsync();
@@ -586,6 +610,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _islandViewModel?.Dispose();
         _voice?.Dispose();
         _keyboardLocks?.Dispose();
+        _flow?.Dispose();
         _qSession?.Dispose();
         _codexClient?.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _qSpeech?.Dispose();

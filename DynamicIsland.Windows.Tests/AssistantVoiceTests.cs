@@ -69,6 +69,23 @@ public sealed class AssistantVoiceTests
         Assert.Equal(AssistantVoiceState.WakeListening, controller.Snapshot.State);
     }
     [Fact]
+    public async Task QueuedWakeFromOldSessionCannotStartAfterDisableAndReenable()
+    {
+        var platform = new FakeVoice();
+        Func<Task>? queued = null;
+        using var controller = new AssistantVoiceController(platform, platform, platform,
+            (_, _) => Task.FromResult("answer"), () => { }, work => queued = work);
+        await controller.ConfigureAsync(true, true, "");
+        platform.TriggerWake();
+        Assert.NotNull(queued);
+        await controller.ConfigureAsync(false, true, "");
+        await controller.ConfigureAsync(true, true, "");
+        await queued!();
+        Assert.DoesNotContain("dictate", platform.Calls);
+        Assert.Equal(AssistantVoiceState.WakeListening, controller.Snapshot.State);
+    }
+
+    [Fact]
     public async Task WakeOffAlsoCancelsAManualVoiceTurnWhenWakeWasAlreadyOff()
     {
         var platform = new FakeVoice { HoldDictation = true };

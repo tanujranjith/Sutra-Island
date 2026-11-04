@@ -35,6 +35,8 @@ public sealed class AppSettings
     public bool CapsLockNotifications { get; set; } = true;
     public bool NumLockNotifications { get; set; } = true;
     public bool WakeListeningEnabled { get; set; }
+    /// <summary>"high", "normal", or "low": how readily the Whisper wake detector reacts to "Hey Sutra".</summary>
+    public string AssistantWakeSensitivity { get; set; } = "normal";
     public bool VoiceReadAloud { get; set; } = true;
     public string VoiceName { get; set; } = "";
     public List<string> PaletteFavorites { get; set; } = [];
@@ -202,6 +204,43 @@ public sealed class AppSettings
     // Empty means Ctrl+Alt+Q opens Q without automatically submitting a quick shortcut.
     public string QHotkeyShortcut { get; set; } = "";
     public bool QDisclosureAccepted { get; set; }
+
+    // ===== Sutra Flow (push-to-talk dictation) =====
+    public bool FlowEnabled { get; set; } = true;
+    public Services.Flow.FlowCleanupMode FlowCleanup { get; set; } = Services.Flow.FlowCleanupMode.Basic;
+    /// <summary>Provider for AI cleanup; empty means use the Sutra Assistant's provider.</summary>
+    public string FlowAiProvider { get; set; } = "";
+    /// <summary>Model for AI cleanup; empty means the Assistant's model (same provider) or the provider's default.</summary>
+    public string FlowAiModel { get; set; } = "";
+    /// <summary>Reasoning effort for AI cleanup; sent only when the provider and model support it, otherwise auto.</summary>
+    public string FlowAiEffort { get; set; } = "low";
+    /// <summary>Push-to-talk key: RightCtrl, RightAlt or RightShift.</summary>
+    public string FlowPushKey { get; set; } = "RightCtrl";
+    /// <summary>Microphone name as Windows lists it; empty follows the Windows default input.</summary>
+    public string FlowMicrophone { get; set; } = "";
+    /// <summary>Whisper language code ("en", "auto", "es", ...). Anything but English uses the multilingual model.</summary>
+    public string FlowLanguage { get; set; } = "en";
+    /// <summary>Soft start and stop sounds.</summary>
+    public bool FlowSounds { get; set; } = true;
+    /// <summary>Automatic punctuation, capitals and lists. Off keeps only what you say out loud.</summary>
+    public bool FlowSmartFormatting { get; set; } = true;
+    /// <summary>Show "Dictating with Sutra Flow" on the island while listening.</summary>
+    public bool FlowCreatorMode { get; set; }
+    /// <summary>Words you retype right after a paste are added to the vocabulary.</summary>
+    public bool FlowAutoDictionary { get; set; }
+    /// <summary>In code editors: spoken casing ("camel case user id") and identifier-aware AI cleanup.</summary>
+    public bool FlowCodeVariables { get; set; } = true;
+    /// <summary>In Cursor and Windsurf: "at index dot tsx" becomes @index.tsx.</summary>
+    public bool FlowFileTagging { get; set; } = true;
+    /// <summary>Expressive mode: keep uhs, ohs, hmms and drawn-out sounds instead of cleaning them away.</summary>
+    public bool FlowExpressive { get; set; }
+    /// <summary>Turn other apps' audio down while Flow is listening.</summary>
+    public bool FlowDuckAudio { get; set; } = true;
+    /// <summary>How loud other apps stay while Flow listens, as a percent of their volume.</summary>
+    public int FlowDuckPercent { get; set; } = 10;
+    // Names and terms Whisper and the cleanup should spell exactly as written.
+    public List<string> FlowVocabulary { get; set; } = [];
+    public long FlowWordsDictated { get; set; }
 
     // ===== Battery warnings =====
     public bool ShowBatteryTime { get; set; }

@@ -2,7 +2,7 @@
 
 Sutra Island is a Windows desktop companion: a compact, always-on-top island that expands into media controls, system information, timers, and other live activities. It also includes Sutra Assistant and a searchable command palette.
 
-Built with C#, WPF, and .NET 10. The current source version is **1.2.5**. See [release notes](RELEASE_NOTES.md) for changes and [Sutra Assistant](Q.md) for provider setup and privacy details.
+Built with C#, WPF, and .NET 10. The current source version is **1.3.0**. See [release notes](RELEASE_NOTES.md) for changes, [Sutra Assistant](Q.md) for provider setup and privacy details, and [Sutra Flow](SUTRA_FLOW.md) for dictation.
 
 ![Current graphite island with fixture media](media/graphite-island.png)
 
@@ -14,8 +14,19 @@ The screenshots show the current native interface with illustrative verification
 - **At a glance:** clock, date, battery, memory, network, weather, and optional AirPods/compatible Beats information. Availability depends on Windows, device support, and settings. AirPods battery advertisements report ranges rather than exact percentages.
 - **Timers and alarms:** named timers, alarms, a stopwatch, and a compact timer activity.
 - **Sutra Assistant:** typed chat, optional local Windows voice, explicit screen help, and supported device and island actions. Choose a provider and model in Settings. Codex subscription access and API-key providers are separate options. See [Q.md](Q.md).
+- **Sutra Flow dictation:** hold Right Ctrl, speak, and let go to paste clean text at the cursor. Speech is transcribed on this PC with Whisper. See [SUTRA_FLOW.md](SUTRA_FLOW.md).
 - **Command palette:** open with `Ctrl+Alt+K` by default to search commands and settings, control media and timers, calculate, convert units, and solve single-variable linear equations. For example, `3x+44x=1253` shows a copyable solution; nonlinear equations and systems of equations are not supported. Press Enter on a result to copy it. Use Up on an empty query to recall a previously run command.
 - **Customization:** choose visible activities, appearance, position, keyboard shortcuts, and reduced-motion behavior in Settings.
+
+## Sutra Flow dictation
+
+Hold **Right Ctrl**, speak, and let go: clean text is pasted wherever your cursor is. While you talk, the island keeps its size and its content dissolves into a dot-matrix voice display; it shimmers while polishing and draws a check when the text lands.
+
+- Speech is transcribed on this PC with Whisper (`ggml-base.en`, 148 MB, downloaded once on first launch into `%LOCALAPPDATA%\DynamicIsland.Windows\SutraFlow`).
+- Cleanup is **Basic** by default (fillers, stutters, spoken punctuation, "new line", "scratch that"), or **AI** through the Sutra Assistant provider and key you already set up. AI cleanup sends text only, never audio, and falls back to Basic.
+- A quick tap of Right Ctrl, or Ctrl plus another key, behaves as normal Ctrl.
+- whisper.cpp needs the Microsoft Visual C++ 2015-2022 Redistributable (x64), which most PCs already have.
+- Turn it off or add vocabulary in **Settings → Sutra Flow**. Full guide, privacy notes, and troubleshooting: [SUTRA_FLOW.md](SUTRA_FLOW.md).
 
 ## Screenshots
 
@@ -98,7 +109,6 @@ The project includes its logo assets, so a source checkout does not require file
 
 A source update or local build does not automatically publish a GitHub Release. Review screenshots and release artifacts before sharing; local QA captures may contain private desktop content and are ignored by Git.
 
-See the [release review](RELEASE_REVIEW.md) for the checks performed for v1.1.9 and the remaining device and account testing limits.
 
 ## Repository layout
 
@@ -106,9 +116,9 @@ See the [release review](RELEASE_REVIEW.md) for the checks performed for v1.1.9 
 - `DynamicIsland.Q.Core/` — assistant contracts, prompt composition, and session logic.
 - `DynamicIsland.Windows.Tests/` — xUnit tests for app logic.
 - `scripts/` — release packaging and verification helpers.
-- `media/` — existing screenshots and historical visuals.
-- `python-versions/` — archived Python prototypes.
-- [RELEASE_NOTES.md](RELEASE_NOTES.md), [Q.md](Q.md), [CUSTOM_THEME.md](CUSTOM_THEME.md), and [design-qa.md](design-qa.md) — release history and additional guides.
+- `media/` — screenshots used in this README.
+- `site/` — the Sutra Island landing page (static `index.html`, `styles.css`, `script.js` and images; open `index.html` to preview).
+- [RELEASE_NOTES.md](RELEASE_NOTES.md), [Q.md](Q.md), [SUTRA_FLOW.md](SUTRA_FLOW.md), and [CUSTOM_THEME.md](CUSTOM_THEME.md) — release history and additional guides.
 
 ## License
 

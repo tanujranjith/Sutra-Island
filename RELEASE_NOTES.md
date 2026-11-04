@@ -1,3 +1,25 @@
+# Sutra Island v1.3.0
+
+- Add Sutra Flow, local push-to-talk dictation: hold Right Ctrl, speak, and let go to paste clean text wherever the cursor is. A quick tap, or Ctrl with another key, still works as Ctrl.
+- Transcribe on this PC with Whisper (whisper.cpp via Whisper.net). The 148 MB base.en speech model downloads once on first launch; nothing is bundled into the exe.
+- Morph the island into a dot-matrix voice display while dictating: voice columns ripple from the center, flatten on release, shimmer while polishing, and draw a green check when pasted (red X on errors).
+- Clean up locally (fillers, stutters, spoken punctuation, "new line", "scratch that") or optionally with the Sutra Assistant provider, which falls back to local cleanup if it is slow or rewrites too much.
+- Keep dictations out of Windows clipboard history, restore the previous clipboard text after pasting, and hide Island's own Flow recording from the privacy indicator.
+- Match the Flow overlay to the island's own motion and surface: it uses the island surface colour, fades in over 180 ms with the same 0.82→1 spring as other compact content, and leaves with a short ease-in fade. No existing island animation was changed.
+- Flow keeps recording for 150 ms after release and keeps the device's final buffers, so the last word isn't clipped.
+- A stray key no longer stops a dictation. After the first 0.3 seconds, other keys are ignored while you talk, and Esc cancels.
+- Sutra Flow settings: push-to-talk key, microphone, language (auto-detect and 11 others), sounds, smart formatting, creator mode, code variable recognition, Cursor/Windsurf @file tagging, vocabulary import, reset
+- Sutra Flow Expressive mode keeps the uhhhs, ohhhs and drawn-out sounds
+- Sutra Flow lowers music and other apps while you dictate, then restores them
+- Sutra Flow has its own AI cleanup provider, model, and reasoning level in Settings → Sutra Flow, separate from Sutra Assistant. It uses the API keys you already saved.
+- AI cleanup now keeps whole-sentence self-corrections ("tomato soup... actually no, chicken parmesan") instead of rejecting them as too short; a big cut is accepted only after a spoken correction and only from words you said. Whisper segments that ran together ("zone.Parmesan") get their space back.
+- When Flow can't paste safely it changes nothing: no keystrokes, no clipboard change. The text is held in memory for two minutes; click the notification or Settings → Sutra Flow → Copy to get it. The typing fallback never sends Enter.
+- Flow pastes only where focus was at key-down, key-up, and right before the paste (window, control, caret, and UI Automation field or tab); otherwise the text is held for the user to copy and a notification explains why. It won't type into admin windows, checks that Windows accepted the keystrokes before showing success, restores the previous clipboard (images and files too) only if nothing else has copied since, types the text instead when the clipboard can't be fully restored, and turning Flow off abandons a pending dictation.
+- A spoken "Thank you" is now kept; it is only dropped as a Whisper guess when the recording has almost no speech.
+- Add a CI workflow that builds and tests every pull request.
+- Add Settings → Sutra Flow: on/off, cleanup level, vocabulary for names and terms, speech model status, and words dictated.
+
+---
 # Sutra Island v1.2.5
 
 - Open screenshot capture directly with Region selected, then switch to Window or Full screen from the floating toolbar.

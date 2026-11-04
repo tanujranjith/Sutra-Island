@@ -1,0 +1,86 @@
+using System.Text.Json;
+
+namespace DynamicIsland.Windows.Services.Flow;
+
+/// <summary>One app's audio session as Flow sees it when deciding what to turn down.</summary>
+public sealed record FlowAudioSession(string Id, uint ProcessId, bool IsSystemSounds, bool Active, float Volume);
+
+/// <summary>A session Flow turned down: what it was, and what Flow set it to.</summary>
+public sealed record FlowDuckedSession(string Id, float Original, float Lowered);
+
+/// <summary>
+/// Pure rules for lowering other apps' audio while Sutra Flow records, and for putting it back.
+/// Every other app's session is touched, playing or paused (never Sutra Island itself or Windows system sounds), and a
+/// session is restored only if its volume is still what Flow set, so a change the user made
+/// while dictating is kept.
+/// </summary>
+public static class FlowDucking
+{
+    /// <summary>Persist a complete recovery plan before changing any audio volume.</summary>
+    public static bool TrySaveRecovery(string path, IReadOnlyList<FlowDuckedSession> sessions)
+    {
+        var temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                JsonSerializer.Serialize(stream, sessions);
+                stream.Flush(flushToDisk: true);
+            }
+            File.Move(temporary, path, overwrite: true);
+            return true;
+        }
+        catch
+        {
+            try { File.Delete(temporary); } catch { }
+            return false;
+        }
+    }
+
+    /// <summary>How close a session's volume must be to what Flow set for Flow to restore it.</summary>
+    public const float Tolerance = 0.02f;
+
+    /// <summary>
+    /// Turns the slider's percent into a volume multiplier on an audio taper (squared), so "10%" sounds
+    /// about as quiet as 10% on the Windows volume slider instead of the much louder 10% amplitude.
+    /// 2% becomes 0.0004 (about -68 dB): background music is barely there.
+    /// </summary>
+    public static float GainFor(int percent)
+    {
+        var p = Math.Clamp(percent, 0, 100) / 100f;
+        return p * p;
+    }
+
+    /// <summary>The sessions to lower, to <paramref name="level"/> (0..1) of their current volume.</summary>
+    public static IReadOnlyList<FlowDuckedSession> Plan(IEnumerable<FlowAudioSession> sessions, uint ownProcessId, float level)
+    {
+        level = Math.Clamp(level, 0f, 1f);
+        var plan = new List<FlowDuckedSession>();
+        foreach (var s in sessions)
+        {
+            // Paused or "inactive" sessions are lowered too: some players report Inactive while they play,
+            // and music that resumes mid-dictation should come in quiet. Restoring them is just as safe.
+            if (s.IsSystemSounds || s.ProcessId == ownProcessId || s.ProcessId == 0) continue;
+            if (string.IsNullOrEmpty(s.Id) || s.Volume <= 0.001f) continue;
+            if (plan.Any(p => p.Id == s.Id)) continue;
+            var lowered = s.Volume * level;
+            if (s.Volume - lowered < Tolerance) continue; // nothing worth changing
+            plan.Add(new FlowDuckedSession(s.Id, s.Volume, lowered));
+        }
+        return plan;
+    }
+
+    /// <summary>The (session, volume) pairs to set back: only sessions still at the volume Flow set.</summary>
+    public static IReadOnlyList<(string Id, float Volume)> Restore(IEnumerable<FlowDuckedSession> ducked, IReadOnlyDictionary<string, float> current)
+    {
+        var restore = new List<(string, float)>();
+        foreach (var d in ducked)
+        {
+            if (!current.TryGetValue(d.Id, out var now)) continue;          // app closed
+            if (Math.Abs(now - d.Lowered) > Tolerance) continue;            // the user changed it
+            restore.Add((d.Id, d.Original));
+        }
+        return restore;
+    }
+}

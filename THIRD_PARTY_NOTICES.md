@@ -35,3 +35,16 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+---
+
+## Sutra Flow components
+
+- Whisper.net and Whisper.net.Runtime 1.9.1, MIT License, Copyright (c) Sandro Hanea. https://github.com/sandrohanea/whisper.net
+  The runtime package ships whisper.cpp and ggml, MIT License, Copyright (c) Georgi Gerganov. https://github.com/ggml-org/whisper.cpp
+- NAudio.WinMM and NAudio.Core 2.2.1, MIT License, Copyright (c) Mark Heath and contributors. https://github.com/naudio/NAudio
+- The Whisper base.en model (ggml-base.en.bin) is downloaded at runtime from https://huggingface.co/ggerganov/whisper.cpp; OpenAI Whisper weights are MIT licensed.
+- Sutra Flow's cleanup instructions and examples are adapted from WhimprFlow, MIT License, Copyright (c) 2026 WhimprFlow contributors. https://github.com/Blueturboguy07/WhimprFlow
+
+Each is provided under the MIT License text reproduced above, with its own copyright notice.

@@ -78,7 +78,12 @@ internal static partial class UpgradeVerification
             "Notification motion: a stale dismissed entrance cannot hide the next notification");
         vm.DismissCurrentNotificationCommand.Execute(null);
         settings.AnimationIntensity = AnimationIntensity.Reduced;
-        vm.ApplySettings(); window.ApplySettings(); Deliver(1004); window.UpdateLayout();
+        vm.ApplySettings(); window.ApplySettings();
+        // Earlier fixture interactions can leave banner delivery intentionally deferred.
+        // Establish the idle precondition before testing the reduced-motion entrance.
+        vm.InteractionProtected = false;
+        check(!vm.DeferOrdinaryBanners, "Notification motion: reduced-motion fixture is idle");
+        Deliver(1004); window.UpdateLayout();
         check(host.RevealProgress == 1 && !host.HasConnection && host.IsHitTestVisible && card.Opacity == 1,
             "Notification motion: reduced motion shows usable final content immediately");
         vm.DismissCurrentNotificationCommand.Execute(null);

@@ -1141,7 +1141,9 @@
                             </ScrollViewer>
                             <Grid Grid.Row="3">
                                 <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="22" /></Grid.RowDefinitions>
-                                <Border Background="{DynamicResource QControl}" BorderBrush="#FF4D465D" BorderThickness="1" CornerRadius="16" Padding="12,8">
+                                <!-- Voice mode: Sutra Flow's dots stand in for the composer while the assistant listens, thinks, and speaks. -->
+                                <views:FlowDotMatrixView x:Name="QVoiceDots" MinHeight="88" Visibility="Collapsed" AutomationProperties.Name="Sutra Assistant voice" />
+                                <Border x:Name="QComposer" Background="{DynamicResource QControl}" BorderBrush="#FF4D465D" BorderThickness="1" CornerRadius="16" Padding="12,8">
                                     <Grid>
                                         <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="38" /></Grid.RowDefinitions>
                                         <Grid>
@@ -1252,6 +1254,18 @@
                     </Popup>
 
                 </Grid></ScrollViewer>
+
+                <!-- Sutra Flow: while dictating, the island's content dissolves into a dot-matrix voice display. -->
+                <!-- Same surface as the island itself so only the content changes, not the island's colour. -->
+                <Border x:Name="FlowOverlay" Panel.ZIndex="500" Margin="-1" Visibility="Collapsed" Opacity="0" IsHitTestVisible="False" CornerRadius="{Binding IslandCornerRadius}" Background="{Binding IslandSurfaceBrush}" BorderBrush="#8CB9A5FD" BorderThickness="1" AutomationProperties.Name="Sutra Flow dictation">
+                    <Grid>
+                        <views:FlowDotMatrixView x:Name="FlowDots" RenderTransformOrigin="0.5,0.5">
+                            <views:FlowDotMatrixView.RenderTransform><ScaleTransform x:Name="FlowDotsScale" ScaleX="1" ScaleY="1" /></views:FlowDotMatrixView.RenderTransform>
+                        </views:FlowDotMatrixView>
+                        <!-- Creator mode: tells an audience (a stream, a recording) why text is appearing. -->
+                        <TextBlock x:Name="FlowCreatorLabel" Text="Dictating with Sutra Flow" Visibility="Collapsed" FontSize="9.5" FontWeight="SemiBold" Foreground="#CCF3EFE7" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,3" IsHitTestVisible="False" />
+                    </Grid>
+                </Border>
             </Grid>
         </Border>
 
