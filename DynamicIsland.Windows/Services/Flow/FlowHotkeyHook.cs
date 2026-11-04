@@ -27,6 +27,7 @@ public sealed class FlowHotkeyHook : IDisposable
     private HookProc? _proc;
     private volatile bool _enabled = true;
     private readonly FlowKeyGate _gate;
+    private readonly object _keyGateLock = new();
 
     /// <summary>The push-to-talk key went down (on the hook thread; marshal before touching UI).</summary>
     public event Action? Pressed;
@@ -45,9 +46,12 @@ public sealed class FlowHotkeyHook : IDisposable
 
     public void Configure(bool enabled, int pushKey = FlowKeyGate.VkRightCtrl)
     {
-        if (_gate.PttKey != pushKey) { if (_gate.Reset()) Raise(Cancelled); _gate.PttKey = pushKey; }
-        _enabled = enabled;
-        if (!enabled && _gate.Reset()) Raise(Cancelled);
+        lock (_keyGateLock)
+        {
+            if (_gate.PttKey != pushKey) { if (_gate.Reset()) Raise(Cancelled); _gate.PttKey = pushKey; }
+            _enabled = enabled;
+            if (!enabled && _gate.Reset()) Raise(Cancelled);
+        }
     }
 
     public void Start()
@@ -89,12 +93,20 @@ public sealed class FlowHotkeyHook : IDisposable
                 var down = msg is WM_KEYDOWN or WM_SYSKEYDOWN;
                 if (down || msg is WM_KEYUP or WM_SYSKEYUP)
                 {
-                    var decision = _gate.OnKey((int)data.vkCode, down, data.time);
-                    switch (decision.Signal)
+                    FlowKeyGate.Decision decision = default;
+                    // Serialize reconfiguration and queued signals without running listeners on the hook thread.
+                    lock (_keyGateLock)
                     {
-                        case FlowKeyGate.Signal.Pressed: Raise(Pressed); break;
-                        case FlowKeyGate.Signal.Released: Raise(Released); break;
-                        case FlowKeyGate.Signal.Cancelled: Raise(Cancelled); break;
+                        if (_enabled)
+                        {
+                            decision = _gate.OnKey((int)data.vkCode, down, data.time);
+                            switch (decision.Signal)
+                            {
+                                case FlowKeyGate.Signal.Pressed: Raise(Pressed); break;
+                                case FlowKeyGate.Signal.Released: Raise(Released); break;
+                                case FlowKeyGate.Signal.Cancelled: Raise(Cancelled); break;
+                            }
+                        }
                     }
                     if (decision.Swallow) return 1; // a stray key during dictation never reaches the app
                 }
