@@ -212,7 +212,7 @@ public sealed class FlowPipeline : IDisposable
                     settle = Report(new FlowStatus(FlowState.Pasted, $"{words} words", words), _timing.PastedSettle);
                     break;
                 case FlowPasteOutcome.TargetChanged:
-                    Fail("Focus moved, so nothing was pasted"); break;
+                    Fail("Focus changed or couldn't be verified; text is held to copy"); break;
                 case FlowPasteOutcome.Elevated:
                     Fail("Can't paste into an admin window"); break;
                 case FlowPasteOutcome.Blocked:

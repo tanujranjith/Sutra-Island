@@ -169,7 +169,7 @@ public sealed class FlowPipelineTests
     }
 
     [Theory]
-    [InlineData(FlowPasteOutcome.TargetChanged, "Focus moved")]
+    [InlineData(FlowPasteOutcome.TargetChanged, "Focus changed")]
     [InlineData(FlowPasteOutcome.Elevated, "admin window")]
     [InlineData(FlowPasteOutcome.Blocked, "blocked")]
     [InlineData(FlowPasteOutcome.ClipboardBusy, "clipboard is busy")]
@@ -274,7 +274,15 @@ public sealed class FlowPipelineTests
     public void FocusedChildWindowChanged() =>
         Assert.False(FlowTarget.Unchanged(Field, Field with { Focus = 12 }, Field with { Focus = 12 }, null, null, null));
 
+    [Theory]
+    [InlineData(null, "a", "a")]
+    [InlineData("a", null, "a")]
+    [InlineData("a", "a", null)]
+    [InlineData("", "", "")]
+    public void MissingAccessibilityBlocksUnverifiedPaste(string? press, string? release, string? now) =>
+        Assert.False(FlowTarget.Unchanged(Field, Field, Field, press, release, now));
+
     [Fact]
-    public void MissingAccessibilityDoesNotBlock() =>
-        Assert.True(FlowTarget.Unchanged(Field, Field, Field, null, "a", null));
+    public void MissingReleaseFocusBlocksUnverifiedPaste() =>
+        Assert.False(FlowTarget.Unchanged(Field, null, Field, "a", "a", "a"));
 }

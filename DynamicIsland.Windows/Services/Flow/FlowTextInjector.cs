@@ -16,9 +16,8 @@ namespace DynamicIsland.Windows.Services.Flow;
 /// Safeguards:
 /// - Pastes only if focus hasn't moved: the top-level window, focused child window, and caret
 ///   match at key-down, key-up, and right before the keystrokes, and so do the UI Automation
-///   focused elements (a browser tab's field) wherever they can be read. Otherwise the text is
-///   left on the clipboard (out of clipboard history) and the user is told, so private dictation
-///   never lands in a window they switched to.
+///   focused elements (a browser tab's field). If identity is unavailable or changes, text is held
+///   for the user to copy instead of being pasted into an unverified field.
 /// - Won't send keystrokes into an elevated (admin) window from a non-elevated Island, which
 ///   Windows would silently drop.
 /// - Checks that Windows accepted all four keystrokes.
@@ -97,7 +96,9 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
     private async Task<bool> StillFocusedAsync(FlowTarget target)
     {
         var now = FocusNow();
-        if (!FlowTarget.Unchanged(target.AtPress, target.AtRelease, now, null, null, null)) return Moved("window or caret");
+        if (target.AtRelease is null || !target.AtPress.SamePlaceAs(now)
+            || !target.AtPress.SamePlaceAs(target.AtRelease) || !target.AtRelease.SamePlaceAs(now))
+            return Moved("window or caret");
         var press = await WithTimeout(target.ElementAtPress);
         var release = await WithTimeout(target.ElementAtRelease);
         var current = await WithTimeout(FocusedElementIdAsync());

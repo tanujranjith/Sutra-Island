@@ -148,14 +148,15 @@ public sealed class FlowTarget
 
     /// <summary>
     /// Pure decision used before pasting: every focus reading must match, and every element id that
-    /// is known must match the others. Unknown element ids (no UI Automation) don't block.
+    /// is available and must match. When field identity cannot be verified, hold the text
+    /// for the user instead of risking a paste into another field in the same window.
     /// </summary>
     public static bool Unchanged(FlowFocus press, FlowFocus? release, FlowFocus now, string? elementPress, string? elementRelease, string? elementNow)
     {
-        if (!press.SamePlaceAs(now)) return false;
-        if (release is not null && (!press.SamePlaceAs(release) || !release.SamePlaceAs(now))) return false;
-        var known = new[] { elementPress, elementRelease, elementNow }.Where(e => e is not null).Distinct().Count();
-        return known <= 1;
+        if (release is null || !press.SamePlaceAs(now)) return false;
+        if (!press.SamePlaceAs(release) || !release.SamePlaceAs(now)) return false;
+        return !string.IsNullOrEmpty(elementPress)
+            && elementPress == elementRelease && elementPress == elementNow;
     }
 }
 
