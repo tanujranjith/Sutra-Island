@@ -59,7 +59,10 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
         // If any part of the current clipboard can't be saved and put back exactly, don't touch the
         // clipboard: type the text as Unicode keystrokes. Line breaks would have to be typed as Enter,
         // which sends messages and submits forms, so multi-line text is handed back instead.
+        var beforeSnapshot = GetClipboardSequenceNumber();
         var previous = ClipboardSnapshot.Capture(log);
+        // Do not overwrite a clipboard another app changed while the snapshot was being read.
+        if (GetClipboardSequenceNumber() != beforeSnapshot) return FlowPasteOutcome.ClipboardBusy;
         if (!previous.Complete)
         {
             if (text.Contains('\n') || text.Contains('\r')) return FlowPasteOutcome.MultilineNeedsClipboard;
@@ -67,7 +70,7 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
             return TypeText(text);
         }
 
-        if (!TrySetClipboard(Dictation(text))) return FlowPasteOutcome.ClipboardBusy;
+        if (!TrySetClipboard(Dictation(text), beforeSnapshot)) return FlowPasteOutcome.ClipboardBusy;
         var ours = GetClipboardSequenceNumber();
         try
         {
@@ -216,10 +219,11 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
         data.SetData("CanUploadToCloudClipboard", new MemoryStream(BitConverter.GetBytes(0)));
     }
 
-    private bool TrySetClipboard(DataObject data)
+    private bool TrySetClipboard(DataObject data, uint? expectedSequence = null)
     {
         for (var attempt = 0; attempt < 5; attempt++)
         {
+            if (expectedSequence is uint expected && GetClipboardSequenceNumber() != expected) return false;
             try { Clipboard.SetDataObject(data, copy: true); return true; }
             catch (COMException) { Thread.Sleep(40); }
             catch (Exception ex) { log.Error("Sutra Flow: clipboard write failed.", ex); return false; }
@@ -277,10 +281,6 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
     private sealed class ClipboardSnapshot
     {
         private const long MaxStreamBytes = 64L * 1024 * 1024;
-        private static readonly HashSet<string> Skip = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "ExcludeClipboardContentFromMonitorProcessing", "CanIncludeInClipboardHistory", "CanUploadToCloudClipboard",
-        };
         private readonly List<(string Format, object Value)> _items = [];
 
         public bool IsEmpty => _items.Count == 0;
@@ -296,7 +296,6 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
                 if (data is null) return snapshot;
                 foreach (var format in data.GetFormats(autoConvert: false))
                 {
-                    if (Skip.Contains(format)) continue;
                     try
                     {
                         var value = Detach(data.GetData(format, autoConvert: false));
@@ -324,7 +323,7 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
             string[] files => files.ToArray(),
             BitmapSource bitmap => Frozen(bitmap),
             MemoryStream ms when ms.Length <= MaxStreamBytes => new MemoryStream(ms.ToArray()),
-            Stream stream when stream.CanRead && (!stream.CanSeek || stream.Length <= MaxStreamBytes) => Copy(stream),
+            Stream stream when stream.CanRead && stream.CanSeek && stream.Length <= MaxStreamBytes => Copy(stream),
             _ => null,
         };
 
@@ -350,7 +349,8 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
             foreach (var (format, value) in _items)
                 data.SetData(format, value is MemoryStream ms ? new MemoryStream(ms.ToArray()) : value);
             // A restore is not a new copy: keep it out of clipboard history so Win+V doesn't fill with duplicates.
-            data.SetData("ExcludeClipboardContentFromMonitorProcessing", new MemoryStream(new byte[4]));
+            if (!_items.Any(item => string.Equals(item.Format, "ExcludeClipboardContentFromMonitorProcessing", StringComparison.OrdinalIgnoreCase)))
+                data.SetData("ExcludeClipboardContentFromMonitorProcessing", new MemoryStream(new byte[4]));
             return data;
         }
     }
