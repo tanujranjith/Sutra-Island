@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Reflection;
+using System.Security.Cryptography;
 using Whisper.net;
 using Whisper.net.LibraryLoader;
 
@@ -15,8 +16,9 @@ public sealed class WhisperEngine : IDisposable
 {
     private const string EnglishModel = "ggml-base.en.bin";
     private const string MultilingualModel = "ggml-base.bin";
-    private const string ModelBaseUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
+    private const string ModelBaseUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/80da2d8bfee42b0e836fc3a9890373e5defc00a6/";
     private const long MinModelBytes = 100L * 1024 * 1024;
+    private const long MaxModelBytes = 180L * 1024 * 1024;
     private static readonly string[] NativeFiles = ["ggml-base-whisper.dll", "ggml-cpu-whisper.dll", "ggml-whisper.dll", "whisper.dll"];
 
     private readonly LoggingService _log;
@@ -25,6 +27,7 @@ public sealed class WhisperEngine : IDisposable
     private WhisperFactory? _factory;
     private string? _factoryPath;
     private Task? _download;
+    private volatile string? _invalidModelPath;
     private double _downloadProgress = -1;
 
     public event EventHandler? ModelStatusChanged;
@@ -44,7 +47,7 @@ public sealed class WhisperEngine : IDisposable
 
     public static string Folder => Path.Combine(Infrastructure.AppDataPaths.Root, "SutraFlow");
     public string ModelPath => Path.Combine(Folder, "models", ModelFileName);
-    public bool IsModelInstalled => File.Exists(ModelPath) && new FileInfo(ModelPath).Length >= MinModelBytes;
+    public bool IsModelInstalled => _invalidModelPath != ModelPath && File.Exists(ModelPath) && new FileInfo(ModelPath).Length >= MinModelBytes;
     public bool IsDownloading => _download is { IsCompleted: false };
     /// <summary>0..1 while downloading, otherwise -1.</summary>
     public double DownloadProgress => _downloadProgress;
@@ -74,7 +77,8 @@ public sealed class WhisperEngine : IDisposable
         _downloadProgress = 0;
         Raise();
         var modelPath = ModelPath;
-        var url = ModelBaseUrl + ModelFileName;
+        var modelName = Path.GetFileName(modelPath);
+        var url = ModelBaseUrl + modelName;
         var part = modelPath + ".part";
         try
         {
@@ -87,21 +91,27 @@ public sealed class WhisperEngine : IDisposable
             await using (var input = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
             await using (var output = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, true))
             {
+                using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
                 var buffer = new byte[1 << 16];
                 long read = 0;
                 var lastRaise = DateTime.UtcNow;
                 int n;
                 while ((n = await input.ReadAsync(buffer).ConfigureAwait(false)) > 0)
                 {
-                    await output.WriteAsync(buffer.AsMemory(0, n)).ConfigureAwait(false);
                     read += n;
+                    if (read > MaxModelBytes) throw new IOException("the model download exceeded the size limit");
+                    hash.AppendData(buffer, 0, n);
+                    await output.WriteAsync(buffer.AsMemory(0, n)).ConfigureAwait(false);
                     _downloadProgress = Math.Min(0.999, read / (double)total);
                     if ((DateTime.UtcNow - lastRaise).TotalMilliseconds > 250) { lastRaise = DateTime.UtcNow; Raise(); }
                 }
                 if (read < MinModelBytes || (response.Content.Headers.ContentLength is long expected && read != expected))
                     throw new IOException("the download was incomplete");
+                if (!WhisperModelIntegrity.Matches(hash.GetHashAndReset(), WhisperModelIntegrity.ExpectedSha256(modelName)))
+                    throw new IOException("the speech model failed its integrity check");
             }
             File.Move(part, modelPath, overwrite: true);
+            if (_invalidModelPath == modelPath) _invalidModelPath = null;
             _log.Info("Sutra Flow: speech model downloaded.");
         }
         catch (Exception ex)
@@ -157,6 +167,13 @@ public sealed class WhisperEngine : IDisposable
         if (_factory is not null && _factoryPath == path) return _factory;
         _factory?.Dispose(); // the language changed between English and multilingual
         _factory = null;
+        // Existing models are checked before the native parser sees them, too.
+        if (new FileInfo(path).Length > MaxModelBytes || !WhisperModelIntegrity.CheckFile(path, Path.GetFileName(path)))
+        {
+            _invalidModelPath = path;
+            Raise();
+            throw new FlowException("Speech model failed verification; download it again in Settings");
+        }
         ExtractNatives();
         try
         {

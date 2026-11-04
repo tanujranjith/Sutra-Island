@@ -41,6 +41,8 @@ Flow uses Whisper `base.en` (about 148 MB) through whisper.cpp. It is not bundle
 %LOCALAPPDATA%\DynamicIsland.Windows\SutraFlow\models\ggml-base.en.bin
 ```
 
+Model files are downloaded from a fixed upstream revision and checked against pinned SHA-256 digests before use. If verification fails, Flow asks for a fresh download.
+
 The whisper.cpp native libraries are embedded in the exe and extracted on first use to `%LOCALAPPDATA%\DynamicIsland.Windows\SutraFlow\runtime\<version>\`. Expect about one to two seconds of transcription for a short sentence on a typical CPU.
 
 ## Privacy
