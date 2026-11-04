@@ -21,6 +21,8 @@ public sealed class FlowController : IDisposable
     private readonly FlowAiCleaner _ai;
     private readonly FlowPipeline _pipeline;
     private readonly FlowTextInjector _injector;
+    private readonly FlowAudioDucker _ducker;
+    private bool _ducking;
     private string? _heldText;
     private DispatcherTimer? _heldTimer;
     /// <summary>How long undelivered dictation stays available to copy (memory only, never saved).</summary>
@@ -45,6 +47,7 @@ public sealed class FlowController : IDisposable
         _recorder = new FlowRecorder(log);
         _ai = new FlowAiCleaner(settings, providers, secrets, log);
         _injector = new FlowTextInjector(log, ui);
+        _ducker = new FlowAudioDucker(log);
         _pipeline = new FlowPipeline(_recorder, _injector, () => _settings.FlowEnabled,
             TranscribeAsync, CleanAsync, Publish, OnPasted, Hold, (message, ex) => _log.Error(message, ex));
         // The hook's worker calls these one at a time; each returns at once (Release hands the
@@ -60,6 +63,7 @@ public sealed class FlowController : IDisposable
 
     public void Start()
     {
+        _ducker.RecoverFromCrash();
         ApplySettings();
         _hook.Start();
     }
@@ -149,13 +153,26 @@ public sealed class FlowController : IDisposable
         if (!_ui.CheckAccess()) { _ui.BeginInvoke(() => Publish(status)); return; }
         if (Status == status) return;
         Status = status;
+        UpdateDucking(status.State);
         _log.Debug($"Sutra Flow: {status.State} {status.Detail}");
         StatusChanged?.Invoke(this, status);
+    }
+
+    /// <summary>Music goes down when listening starts and comes back once the recording's tail is captured.</summary>
+    private void UpdateDucking(FlowState state)
+    {
+        var want = state == FlowState.Listening || (state == FlowState.Released && _ducking);
+        if (want == _ducking) return;
+        if (want && !_settings.FlowDuckAudio) return;
+        _ducking = want;
+        if (want) _ducker.Duck(_settings.FlowDuckPercent / 100f);
+        else _ducker.Restore();
     }
 
     public void Dispose()
     {
         _heldText = null;
+        _ducker.Dispose();
         _pipeline.Dispose();
         _hook.Dispose();
         _recorder.Dispose();

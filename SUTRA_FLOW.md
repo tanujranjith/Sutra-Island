@@ -110,3 +110,14 @@ Settings live in `settings.json` as `FlowEnabled`, `FlowCleanup`, `FlowAiProvide
 ## Credits
 
 Inspired by [WhimprFlow](https://github.com/Blueturboguy07/WhimprFlow) (MIT). Flow's AI cleanup instructions and examples are adapted from WhimprFlow's cleanup prompt; the rest is a native C# implementation. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+
+## Lowering other audio while listening
+
+When **Lower other audio while listening** is on (the default), Flow turns other apps down in Windows' per-app volume mixer while you hold Right Ctrl. It brings them back once the recording's tail has been captured. The master volume is never touched.
+
+- Level: Mute, 10%, 20% (default), 30%, or 50% of each app's own volume (`FlowDuckAudio`, `FlowDuckPercent`).
+- Only sessions that are playing are lowered. Sutra Island's own audio and Windows system sounds are left alone.
+- A session is restored only if it's still at the volume Flow set, so a change you make mid-dictation is kept.
+- The volumes Flow lowered are written to `%LOCALAPPDATA%\DynamicIsland.Windows\SutraFlow\ducked.json` until they're restored. If the island exits unexpectedly, the next launch restores them.
+- The rules are in `FlowDucking` (pure, covered by `FlowDuckingTests`). The Core Audio work is in `FlowAudioDucker`, on a background queue with a 120 ms fade.

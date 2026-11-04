@@ -212,6 +212,10 @@ public sealed class AppSettings
     public string FlowAiModel { get; set; } = "";
     /// <summary>Reasoning effort for AI cleanup; sent only when the provider and model support it, otherwise auto.</summary>
     public string FlowAiEffort { get; set; } = "low";
+    /// <summary>Turn other apps' audio down while Flow is listening.</summary>
+    public bool FlowDuckAudio { get; set; } = true;
+    /// <summary>How loud other apps stay while Flow listens, as a percent of their volume.</summary>
+    public int FlowDuckPercent { get; set; } = 20;
     // Names and terms Whisper and the cleanup should spell exactly as written.
     public List<string> FlowVocabulary { get; set; } = [];
     public long FlowWordsDictated { get; set; }

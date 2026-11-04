@@ -45,6 +45,35 @@ public sealed class FlowSettingsViewModel : ObservableObject
         }
     }
 
+    /// <summary>Lower other apps' audio while listening.</summary>
+    public bool DuckAudio
+    {
+        get => _settings.FlowDuckAudio;
+        set
+        {
+            if (_settings.FlowDuckAudio == value) return;
+            _settings.FlowDuckAudio = value;
+            RaisePropertyChanged();
+            Save();
+        }
+    }
+
+    public IReadOnlyList<string> DuckLevelOptions { get; } = ["Mute", "10%", "20%", "30%", "50%"];
+
+    /// <summary>How loud other apps stay while listening.</summary>
+    public string DuckLevel
+    {
+        get => _settings.FlowDuckPercent <= 0 ? "Mute" : $"{_settings.FlowDuckPercent}%";
+        set
+        {
+            var percent = value == "Mute" ? 0 : int.TryParse(value?.TrimEnd('%'), out var p) ? Math.Clamp(p, 0, 100) : 20;
+            if (percent == _settings.FlowDuckPercent) return;
+            _settings.FlowDuckPercent = percent;
+            RaisePropertyChanged();
+            Save();
+        }
+    }
+
     public IReadOnlyList<string> CleanupOptions { get; } = ["Off", "Basic (on this PC)", "AI (your chosen provider)"];
 
     private const string SameAsAssistant = "";
@@ -161,7 +190,7 @@ public sealed class FlowSettingsViewModel : ObservableObject
 
     public void Refresh()
     {
-        foreach (var name in new[] { nameof(Enabled), nameof(Cleanup), nameof(CleanupNote), nameof(Vocabulary), nameof(ModelStatus), nameof(ModelReady), nameof(WordsDictated) })
+        foreach (var name in new[] { nameof(Enabled), nameof(DuckAudio), nameof(DuckLevel), nameof(Cleanup), nameof(CleanupNote), nameof(Vocabulary), nameof(ModelStatus), nameof(ModelReady), nameof(WordsDictated) })
             RaisePropertyChanged(name);
         RaiseAi(); // keys and the Assistant's provider can change on other settings pages
     }
