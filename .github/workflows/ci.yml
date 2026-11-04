@@ -39,3 +39,19 @@ jobs:
           if (Test-Path $errorFile) { Get-Content $errorFile }
           if ($p.ExitCode -ne 0) { throw "WPF fixture exited with code $($p.ExitCode)" }
           if (-not (Test-Path $report)) { throw 'WPF verification produced no report' }
+      - name: Probe notification-only fixture
+        if: always()
+        shell: pwsh
+        run: |
+          $env:ISLAND_PREVIEW = '1'
+          $env:ISLAND_PREVIEW_DATA = Join-Path $env:RUNNER_TEMP 'sutra-notification-fixture'
+          $exe = Get-ChildItem .\DynamicIsland.Windows\bin\Release -Recurse -Filter DynamicIsland.Windows.exe | Select-Object -First 1
+          if (-not $exe) { throw 'Built application was not found' }
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList '--verify-notification-motion' -PassThru
+          if (-not $p.WaitForExit(90000)) { $p.Kill(); throw 'Notification fixture timed out' }
+          $report = Join-Path $env:ISLAND_PREVIEW_DATA 'captures\sutra-checks.txt'
+          $errorFile = Join-Path $env:ISLAND_PREVIEW_DATA 'verification-error.txt'
+          if (Test-Path $report) { Get-Content $report }
+          if (Test-Path $errorFile) { Get-Content $errorFile }
+          if ($p.ExitCode -ne 0) { throw "Notification fixture exited with code $($p.ExitCode)" }
+          if (-not (Test-Path $report)) { throw 'Notification fixture produced no report' }
