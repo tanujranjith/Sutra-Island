@@ -29,7 +29,14 @@ internal static class FlowPasteVerification
             var target = injector.CaptureTarget() ?? throw new InvalidOperationException("No focused target was available in the isolated CI desktop.");
             injector.PinTarget(target);
             var result = await injector.PasteAsync("Sutra pasted fixture", target, CancellationToken.None);
-            if (result.Outcome != FlowPasteOutcome.Pasted) throw new InvalidOperationException($"Paste was not attempted: {result.Outcome}");
+            if (result.Outcome != FlowPasteOutcome.Pasted)
+            {
+                var current = injector.CaptureTarget();
+                var pressId = target.ElementAtPress is null ? "null" : await target.ElementAtPress ?? "null";
+                var releaseId = target.ElementAtRelease is null ? "null" : await target.ElementAtRelease ?? "null";
+                var nowId = current?.ElementAtPress is null ? "null" : await current.ElementAtPress ?? "null";
+                throw new InvalidOperationException($"Paste outcome={result.Outcome}; press={target.AtPress}; release={target.AtRelease}; now={current?.AtPress}; element IDs press={pressId}, release={releaseId}, now={nowId}; window active={window.IsActive}; first focused={first.IsKeyboardFocused}");
+            }
             if (first.Text != "Sutra pasted fixture") throw new InvalidOperationException("Pasted text did not reach the original test field.");
             if (Clipboard.GetText() != "Sutra original clipboard fixture") throw new InvalidOperationException("The original clipboard text was not restored.");
 
