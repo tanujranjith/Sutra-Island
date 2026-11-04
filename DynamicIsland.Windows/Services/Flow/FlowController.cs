@@ -99,7 +99,44 @@ public sealed class FlowController : IDisposable
         return await Task.Run(() => Engine.TranscribeAsync(recording.Samples, Vocabulary(), limit.Token, _settings.FlowExpressive), limit.Token).ConfigureAwait(false);
     }
 
+    private volatile bool _commandPress;
+    private string? _lastPasted;
+    private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>Raised (UI thread) when words you corrected were added to the dictionary.</summary>
+    public event EventHandler<IReadOnlyList<string>>? VocabularyLearned;
+
     private async Task<string> CleanAsync(string raw, CancellationToken token)
+    {
+        _lastPasted = null;
+        if (_commandPress) return await RunCommandAsync(raw, token).ConfigureAwait(false);
+        var text = await DictationTextAsync(raw, token).ConfigureAwait(false);
+        _lastPasted = text;
+        return text;
+    }
+
+    /// <summary>
+    /// Command mode (double-tap and hold the push key): the words are an instruction. With text
+    /// selected, the AI rewrites the selection and the result replaces it; with nothing selected,
+    /// it writes what you asked for at the cursor.
+    /// </summary>
+    private async Task<string> RunCommandAsync(string raw, CancellationToken token)
+    {
+        var app = _targetApp;
+        var codeApp = FlowCodeText.IsCodeEditor(app) ? app : null;
+        var selection = await _injector.CopySelectionAsync(_injector.LastTarget, token).ConfigureAwait(false);
+        // Code editors copy the whole line when nothing is selected; that isn't a selection.
+        if (codeApp is not null && selection is not null && selection.EndsWith('\n') && selection.TrimEnd('\r', '\n').IndexOf('\n') < 0)
+            selection = null;
+        var instruction = FlowTextCleaner.Basic(raw);
+        _log.Info($"Sutra Flow: command mode ({(selection is null ? "no selection" : selection.Length + " selected chars")}).");
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(token);
+        limit.CancelAfter(CommandTimeout);
+        try { return await _ai.CommandAsync(instruction, selection, Vocabulary(), limit.Token, codeApp).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new FlowException("The command took too long"); }
+    }
+
+    private async Task<string> DictationTextAsync(string raw, CancellationToken token)
     {
         var app = _targetApp;
         var inEditor = _settings.FlowCodeVariables && FlowCodeText.IsCodeEditor(app);
@@ -123,6 +160,7 @@ public sealed class FlowController : IDisposable
     /// <summary>Runs on the hook's event worker, not inside the hook callback.</summary>
     private void CaptureTargetApp()
     {
+        _commandPress = _settings.FlowCommandMode && _hook.IsCommandPress;
         try
         {
             var hwnd = GetForegroundWindow();
@@ -175,6 +213,42 @@ public sealed class FlowController : IDisposable
     {
         _settings.FlowWordsDictated += words;
         _ = SaveSettingsQuietly();
+        if (_settings.FlowAutoDictionary && _lastPasted is { } pasted) _ = WatchForCorrectionsAsync(pasted);
+    }
+
+    /// <summary>
+    /// Auto-add to dictionary: reads the field right after the paste and again a little later. Words
+    /// you retyped that closely resemble a pasted word (Cirk → Circ) are added to the vocabulary.
+    /// Only fields that expose their text to UI Automation can be checked.
+    /// </summary>
+    private async Task WatchForCorrectionsAsync(string pasted)
+    {
+        try
+        {
+            await Task.Delay(500).ConfigureAwait(false);
+            var (id, before) = await Task.Run(FlowTextInjector.ReadFocusedText).ConfigureAwait(false);
+            if (id is null || string.IsNullOrEmpty(before) || before.Length > 20000) return;
+            var first = FlowCorrections.Words(pasted).FirstOrDefault();
+            if (first is null || !before.Contains(first, StringComparison.Ordinal)) return; // can't see our text in this field
+            foreach (var wait in new[] { 10, 15 })
+            {
+                await Task.Delay(TimeSpan.FromSeconds(wait)).ConfigureAwait(false);
+                if (!_settings.FlowAutoDictionary) return;
+                var (nowId, after) = await Task.Run(FlowTextInjector.ReadFocusedText).ConfigureAwait(false);
+                if (nowId != id || after is null) return; // you moved on
+                var learned = FlowCorrections.Find(pasted, before, after, _settings.FlowVocabulary);
+                if (learned.Count == 0) continue;
+                await _ui.InvokeAsync(() =>
+                {
+                    foreach (var w in learned) if (_settings.FlowVocabulary.Count < 300 && !_settings.FlowVocabulary.Contains(w, StringComparer.OrdinalIgnoreCase)) _settings.FlowVocabulary.Add(w);
+                    VocabularyLearned?.Invoke(this, learned);
+                });
+                _log.Info($"Sutra Flow: added {learned.Count} corrected word(s) to the dictionary.");
+                await SaveSettingsQuietly().ConfigureAwait(false);
+                return;
+            }
+        }
+        catch (Exception ex) { _log.Debug($"Sutra Flow: correction check skipped ({ex.Message})."); }
     }
 
     private async Task SaveSettingsQuietly()

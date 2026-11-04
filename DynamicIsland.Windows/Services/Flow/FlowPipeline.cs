@@ -125,6 +125,7 @@ public sealed class FlowPipeline : IDisposable
         FlowTarget? target;
         TimeSpan held;
         int generation;
+        CancellationTokenSource? tap = null;
         lock (_gate)
         {
             if (_phase != Phase.Recording || _session is null) return Task.CompletedTask;
@@ -133,6 +134,22 @@ public sealed class FlowPipeline : IDisposable
             target = _target;
             held = DateTime.UtcNow - _pressedAt;
             generation = ++_generation;
+            if (held < _timing.MinHold)
+            {
+                // A quick tap (or the first tap of a double-tap for command mode): drop it now so a
+                // second press a moment later isn't refused while the microphone winds down.
+                _phase = Phase.Idle;
+                tap = _session;
+                _session = null;
+                try { _audio.Abort(); } catch (Exception ex) { _logError("Sutra Flow: dropping a tap failed.", ex); }
+            }
+        }
+        if (tap is not null || held < _timing.MinHold)
+        {
+            TryCancel(tap);
+            tap?.Dispose();
+            _publish(new FlowStatus(FlowState.Idle));
+            return Task.CompletedTask;
         }
         if (target is not null)
         {

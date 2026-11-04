@@ -112,6 +112,8 @@ public interface IFlowAudio
     void Start();
     /// <summary>Closes the microphone opened by the matching <see cref="Start"/> and returns what it recorded.</summary>
     Task<FlowRecording> StopAsync();
+    /// <summary>Drops the recording at once (a quick tap), so the next press can start immediately.</summary>
+    void Abort() => _ = StopAsync();
 }
 
 /// <summary>Where keyboard focus is at one moment: top-level window, focused child window, and caret.</summary>

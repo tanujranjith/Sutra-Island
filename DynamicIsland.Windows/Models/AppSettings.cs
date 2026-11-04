@@ -226,6 +226,10 @@ public sealed class AppSettings
     public bool FlowSmartFormatting { get; set; } = true;
     /// <summary>Show "Dictating with Sutra Flow" on the island while listening.</summary>
     public bool FlowCreatorMode { get; set; }
+    /// <summary>Double-tap and hold the push key to speak an instruction that edits the selection or writes new text (needs AI).</summary>
+    public bool FlowCommandMode { get; set; } = true;
+    /// <summary>Words you retype right after a paste are added to the vocabulary.</summary>
+    public bool FlowAutoDictionary { get; set; } = true;
     /// <summary>In code editors: spoken casing ("camel case user id") and identifier-aware AI cleanup.</summary>
     public bool FlowCodeVariables { get; set; } = true;
     /// <summary>In Cursor and Windsurf: "at index dot tsx" becomes @index.tsx.</summary>

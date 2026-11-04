@@ -27,6 +27,11 @@ public sealed class FlowSettingsViewModel : ObservableObject
         ImportVocabularyCommand = new RelayCommand(ImportVocabulary);
         TestDuckingCommand = new RelayCommand(TestDucking);
         ResetCommand = new RelayCommand(ResetFlow);
+        _flow.VocabularyLearned += (_, words) =>
+        {
+            LearnedNote = "Just added: " + string.Join(", ", words);
+            RaisePropertyChanged(nameof(Vocabulary));
+        };
         _flow.HeldTextChanged += (_, _) => ((RelayCommand)CopyHeldTextCommand).RaiseCanExecuteChanged();
         _flow.Engine.ModelStatusChanged += (_, _) => Application.Current?.Dispatcher.BeginInvoke(() =>
         {
@@ -110,6 +115,11 @@ public sealed class FlowSettingsViewModel : ObservableObject
 
     public bool Sounds { get => _settings.FlowSounds; set => Set(value, _settings.FlowSounds, v => _settings.FlowSounds = v); }
     public bool SmartFormatting { get => _settings.FlowSmartFormatting; set => Set(value, _settings.FlowSmartFormatting, v => _settings.FlowSmartFormatting = v); }
+    public bool CommandMode { get => _settings.FlowCommandMode; set => Set(value, _settings.FlowCommandMode, v => _settings.FlowCommandMode = v); }
+    public bool AutoDictionary { get => _settings.FlowAutoDictionary; set => Set(value, _settings.FlowAutoDictionary, v => _settings.FlowAutoDictionary = v); }
+    private string _learnedNote = "";
+    /// <summary>The latest words auto-added to the dictionary.</summary>
+    public string LearnedNote { get => _learnedNote; private set { _learnedNote = value; RaisePropertyChanged(); } }
     public bool CreatorMode { get => _settings.FlowCreatorMode; set => Set(value, _settings.FlowCreatorMode, v => _settings.FlowCreatorMode = v); }
     public bool CodeVariables { get => _settings.FlowCodeVariables; set => Set(value, _settings.FlowCodeVariables, v => _settings.FlowCodeVariables = v); }
     public bool FileTagging { get => _settings.FlowFileTagging; set => Set(value, _settings.FlowFileTagging, v => _settings.FlowFileTagging = v); }
@@ -338,7 +348,7 @@ public sealed class FlowSettingsViewModel : ObservableObject
     public void Refresh()
     {
         foreach (var name in new[] { nameof(Enabled), nameof(PushKey), nameof(PushKeyNote), nameof(MicrophoneOptions), nameof(Microphone), nameof(Language),
-                     nameof(Sounds), nameof(SmartFormatting), nameof(CreatorMode), nameof(CodeVariables), nameof(FileTagging), nameof(DuckAudio), nameof(DuckPercent), nameof(DuckLevel), nameof(Expressive), nameof(Cleanup), nameof(CleanupNote), nameof(Vocabulary), nameof(ModelStatus), nameof(ModelReady), nameof(WordsDictated) })
+                     nameof(Sounds), nameof(SmartFormatting), nameof(CreatorMode), nameof(CommandMode), nameof(AutoDictionary), nameof(CodeVariables), nameof(FileTagging), nameof(DuckAudio), nameof(DuckPercent), nameof(DuckLevel), nameof(Expressive), nameof(Cleanup), nameof(CleanupNote), nameof(Vocabulary), nameof(ModelStatus), nameof(ModelReady), nameof(WordsDictated) })
             RaisePropertyChanged(name);
         RaiseAi(); // keys and the Assistant's provider can change on other settings pages
     }

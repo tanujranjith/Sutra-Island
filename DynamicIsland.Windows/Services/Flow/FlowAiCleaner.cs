@@ -111,6 +111,47 @@ public sealed class FlowAiCleaner(AppSettings settings, IQProviderRegistry provi
         return null;
     }
 
+    private const string CommandInstructions =
+        "You are Sutra Flow's command mode. The user spoke an instruction. If SELECTED TEXT is given, apply the " +
+        "instruction to it (rewrite, shorten, translate, fix, reformat, reply to it, and so on) and output only the " +
+        "replacement text. If no text is selected, write what the instruction asks for. Output only the final text " +
+        "that will be pasted into their app: no preamble, no quotes, no explanation, no markdown fences unless the " +
+        "text itself is code. Keep the selected text's language unless told to translate.";
+
+    /// <summary>
+    /// Command mode: runs a spoken instruction on the selected text (or with none selected, writes
+    /// what it asks for). Throws <see cref="FlowException"/> with a short reason when it can't.
+    /// </summary>
+    public async Task<string> CommandAsync(string instruction, string? selection, IReadOnlyList<string> vocabulary, CancellationToken token, string? codeApp = null)
+    {
+        if (Unavailable() is { } reason) throw new FlowException("Command mode needs AI: " + reason);
+        var provider = providers.Find(ProviderId)!;
+        var isOllama = string.Equals(provider.Info.Id, "ollama", StringComparison.OrdinalIgnoreCase);
+        var system = CommandInstructions;
+        if (codeApp is not null) system += "\nThe user is in a code editor (" + codeApp + "); code stays valid code.";
+        if (vocabulary.Count > 0) system += "\nVocabulary (spell exactly): " + string.Join(", ", vocabulary.Take(60));
+        var prompt = string.IsNullOrWhiteSpace(selection)
+            ? "INSTRUCTION: " + instruction
+            : "INSTRUCTION: " + instruction + "\n\nSELECTED TEXT:\n" + selection;
+        var request = new QRequest(QMode.Say, prompt, null, [],
+            string.IsNullOrWhiteSpace(ModelId) ? provider.Info.DefaultModel : ModelId,
+            IncludeImage: false, MaxResponseTokens: Math.Clamp((selection?.Length ?? 0) * 2, 512, 8192),
+            CustomSystemPrompt: system, ReasoningEffort: Effort);
+        var sb = new StringBuilder();
+        await foreach (var ev in provider.StreamAsync(request, isOllama ? null : secrets.Get(provider.Info.Id),
+                           isOllama ? settings.QOllamaBaseUrl : null, token).ConfigureAwait(false))
+        {
+            switch (ev)
+            {
+                case QStreamEvent.Text t: sb.Append(t.Value); break;
+                case QStreamEvent.Failed f: log.Info($"Sutra Flow: command failed ({f.Message})."); throw new FlowException("The AI provider couldn't run that command");
+            }
+        }
+        var result = sb.ToString().Trim();
+        if (result.Length == 0) throw new FlowException("The AI returned nothing");
+        return result;
+    }
+
     /// <summary>Returns the AI-cleaned text, or null to fall back to local cleanup.</summary>
     /// <param name="codeApp">The code editor being dictated into, or null.</param>
     public async Task<string?> CleanAsync(string text, IReadOnlyList<string> vocabulary, CancellationToken token, string? codeApp = null)

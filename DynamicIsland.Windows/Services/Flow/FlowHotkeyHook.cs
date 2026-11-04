@@ -30,6 +30,8 @@ public sealed class FlowHotkeyHook : IDisposable
 
     /// <summary>The push-to-talk key went down (on the hook thread; marshal before touching UI).</summary>
     public event Action? Pressed;
+    /// <summary>Whether the latest press was a double-tap-and-hold (command mode).</summary>
+    public bool IsCommandPress => _gate.CommandPress;
     /// <summary>The push-to-talk key came up after a clean hold.</summary>
     public event Action? Released;
     /// <summary>A shortcut during the hold, or Esc during a dictation: discard it.</summary>

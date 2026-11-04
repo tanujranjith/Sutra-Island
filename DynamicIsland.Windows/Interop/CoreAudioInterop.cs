@@ -161,7 +161,10 @@ internal interface IAudioSessionControl2
     int GetSessionIdentifier([MarshalAs(UnmanagedType.LPWStr)] out string sessionIdentifier);
     int GetSessionInstanceIdentifier([MarshalAs(UnmanagedType.LPWStr)] out string sessionInstanceIdentifier);
     int GetProcessId(out uint processId);
-    int IsSystemSoundsSession();
+    // S_OK (0) means the system-sounds session and S_FALSE (1) means any other. Without PreserveSig the
+    // runtime turned both into "success" and returned 0, so every app looked like system sounds and
+    // Sutra Flow never lowered anything.
+    [PreserveSig] int IsSystemSoundsSession();
     int SetDuckingPreference([MarshalAs(UnmanagedType.Bool)] bool optOut);
 }
 

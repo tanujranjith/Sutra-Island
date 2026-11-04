@@ -149,6 +149,19 @@ public sealed class FlowRecorder : IFlowAudio, IDisposable
         lock (take.Samples) return new FlowRecording(take.Samples.ToArray(), take.Peak);
     }
 
+    public void Abort()
+    {
+        Take? take;
+        lock (_gate) { take = _current; _current = null; IsRecording = false; _level = 0; }
+        if (take is null) return;
+        _ = Task.Run(() =>
+        {
+            try { take.Wave.StopRecording(); } catch { }
+            take.Stopped.Task.Wait(DrainLimit);
+            try { take.Wave.Dispose(); } catch { }
+        });
+    }
+
     public void Dispose()
     {
         Take? take;
