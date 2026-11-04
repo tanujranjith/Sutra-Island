@@ -25,31 +25,44 @@ public sealed class AssistantVoiceController : IDisposable
     private readonly SemaphoreSlim _turnGate = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource? _turn;
-    private bool _enabled, _disposed;
+    private volatile bool _enabled, _disposed;
+    private int _wakeGeneration;
+    private readonly Action<Func<Task>> _queueWake;
     private bool _readAloud = true;
     private string _voice = "";
     public AssistantVoiceSnapshot Snapshot { get; private set; } = new(AssistantVoiceState.Off, "Voice off");
     public event Action<AssistantVoiceSnapshot>? Changed;
     public AssistantVoiceController(IWakeWordInput wake, IQSpeechInputService input, ISpeechOutput output,
-        Func<string, CancellationToken, Task<string>> submit, Action cancelResponse)
-    { _wake = wake; _input = input; _output = output; _submit = submit; _cancelResponse = cancelResponse; _wake.WakeDetected += OnWake; }
-    private void OnWake() { if (_enabled && Snapshot.State == AssistantVoiceState.WakeListening) _ = Task.Run(ListenAsync); }
+        Func<string, CancellationToken, Task<string>> submit, Action cancelResponse, Action<Func<Task>>? queueWake = null)
+    { _wake = wake; _input = input; _output = output; _submit = submit; _cancelResponse = cancelResponse; _queueWake = queueWake ?? (work => { _ = Task.Run(work); }); _wake.WakeDetected += OnWake; }
+    private void OnWake()
+    {
+        if (!_enabled || Snapshot.State != AssistantVoiceState.WakeListening) return;
+        var generation = Volatile.Read(ref _wakeGeneration);
+        _queueWake(() => ListenAsync(generation));
+    }
     public async Task ConfigureAsync(bool enabled, bool readAloud, string voice)
     {
         if (_disposed) return;
         _readAloud = readAloud; _voice = voice;
         if (_enabled == enabled && (enabled ? Snapshot.State != AssistantVoiceState.Off : _turn is null)) return;
+        Interlocked.Increment(ref _wakeGeneration);
         _enabled = enabled;
         if (!enabled) { Stop(); await _wake.StopWakeAsync(); Publish(AssistantVoiceState.Off, "Voice off"); }
         else await ResumeWakeAsync();
     }
-    public async Task ListenAsync()
+    public Task ListenAsync() => ListenAsync(null);
+
+    private async Task ListenAsync(int? wakeGeneration)
     {
         if (_disposed || !await _turnGate.WaitAsync(0)) return;
         var turn = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _turn = turn;
+        var resumeWake = true;
         try
         {
+            if (wakeGeneration is int generation && (!_enabled || generation != Volatile.Read(ref _wakeGeneration)))
+            { resumeWake = false; return; }
             await _wake.StopWakeAsync();
             _output.StopSpeaking();
             turn.Token.ThrowIfCancellationRequested();
@@ -78,7 +91,7 @@ public sealed class AssistantVoiceController : IDisposable
         {
             if (ReferenceEquals(_turn, turn)) _turn = null;
             turn.Dispose(); _turnGate.Release();
-            if (!_disposed && Snapshot.State != AssistantVoiceState.Error) await ResumeWakeAsync();
+            if (resumeWake && !_disposed && Snapshot.State != AssistantVoiceState.Error) await ResumeWakeAsync();
         }
     }
     public async Task ReadAsync(string text)
@@ -119,7 +132,7 @@ public sealed class AssistantVoiceController : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        _disposed = true; _enabled = false; _wake.WakeDetected -= OnWake;
+        _disposed = true; _enabled = false; Interlocked.Increment(ref _wakeGeneration); _wake.WakeDetected -= OnWake;
         _lifetime.Cancel(); _turn?.Cancel(); _output.StopSpeaking(); _cancelResponse();
         _ = _wake.StopWakeAsync();
     }
