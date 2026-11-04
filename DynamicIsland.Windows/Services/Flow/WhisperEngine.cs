@@ -25,6 +25,7 @@ public sealed class WhisperEngine : IDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Func<string> _language;
     private WhisperFactory? _factory;
+    private int _disposed;
     private string? _factoryPath;
     private Task? _download;
     private volatile string? _invalidModelPath;
@@ -62,6 +63,7 @@ public sealed class WhisperEngine : IDisposable
     /// <summary>Starts the model download if it is missing. Safe to call repeatedly.</summary>
     public Task EnsureModelAsync()
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         if (IsModelInstalled) return Task.CompletedTask;
         lock (NativeFiles)
         {
@@ -133,10 +135,12 @@ public sealed class WhisperEngine : IDisposable
     /// <param name="expressive">Prompts Whisper with written-out hesitations so it keeps "uhh" and "ohhh" instead of dropping them.</param>
     public async Task<string> TranscribeAsync(float[] samples, IReadOnlyList<string> vocabulary, CancellationToken token, bool expressive = false, string? hint = null)
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         if (!IsModelInstalled) throw new FlowException("Speech model still downloading");
         await _gate.WaitAsync(token).ConfigureAwait(false);
         try
         {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
             var factory = GetFactory();
             var builder = factory.CreateBuilder()
                 .WithLanguage(Language)
@@ -216,7 +220,18 @@ public sealed class WhisperEngine : IDisposable
 
     public void Dispose()
     {
-        _factory?.Dispose();
-        _factory = null;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        // Do not dispose native state under an in-flight transcription. The caller cancels its
+        // session; cleanup waits without blocking the UI and no new transcription can enter.
+        _ = Task.Run(CleanupWhenIdleAsync);
+    }
+
+    private async Task CleanupWhenIdleAsync()
+    {
+        try
+        {
+            await DeferredEngineDisposal.RunAsync(_gate, () => { _factory?.Dispose(); _factory = null; }).ConfigureAwait(false);
+        }
+        catch (Exception ex) { _log.Error("Sutra Flow: speech engine cleanup failed.", ex); }
     }
 }
