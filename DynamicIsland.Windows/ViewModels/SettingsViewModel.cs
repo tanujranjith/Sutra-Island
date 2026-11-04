@@ -129,6 +129,12 @@ public sealed class SettingsViewModel : ObservableObject
             _ = _settingsService.SaveAsync(_settings);
         }
     }
+    public IReadOnlyList<string> WakeSensitivityOptions { get; } = ["High", "Normal", "Low"];
+    public string WakeSensitivity
+    {
+        get => string.IsNullOrWhiteSpace(_settings.AssistantWakeSensitivity) ? "Normal" : char.ToUpperInvariant(_settings.AssistantWakeSensitivity[0]) + _settings.AssistantWakeSensitivity[1..].ToLowerInvariant();
+        set => Set(v => _settings.AssistantWakeSensitivity = v, (value ?? "Normal").ToLowerInvariant());
+    }
     public bool VoiceReadAloud { get => _settings.VoiceReadAloud; set => Set(v => _settings.VoiceReadAloud = v, value); }
     public string VoiceName { get => _settings.VoiceName; set => Set(v => _settings.VoiceName = v, value); }
     public IReadOnlyList<string> InstalledVoices => Services.Q.SpeechInputService.GetInstalledVoices();

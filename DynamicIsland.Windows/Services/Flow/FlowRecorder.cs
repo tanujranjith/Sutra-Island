@@ -51,7 +51,7 @@ public sealed class FlowRecorder : IFlowAudio, IDisposable
     /// <summary>The microphone to record from; empty or unknown follows the Windows default.</summary>
     public Func<string>? PreferredDevice { get; set; }
 
-    private static int DeviceNumberFor(string? name)
+    internal static int DeviceNumberFor(string? name)
     {
         if (string.IsNullOrWhiteSpace(name)) return -1;
         var names = Microphones();

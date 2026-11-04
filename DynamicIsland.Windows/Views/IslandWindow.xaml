@@ -1141,7 +1141,9 @@
                             </ScrollViewer>
                             <Grid Grid.Row="3">
                                 <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="22" /></Grid.RowDefinitions>
-                                <Border Background="{DynamicResource QControl}" BorderBrush="#FF4D465D" BorderThickness="1" CornerRadius="16" Padding="12,8">
+                                <!-- Voice mode: Sutra Flow's dots stand in for the composer while the assistant listens, thinks, and speaks. -->
+                                <views:FlowDotMatrixView x:Name="QVoiceDots" MinHeight="88" Visibility="Collapsed" AutomationProperties.Name="Sutra Assistant voice" />
+                                <Border x:Name="QComposer" Background="{DynamicResource QControl}" BorderBrush="#FF4D465D" BorderThickness="1" CornerRadius="16" Padding="12,8">
                                     <Grid>
                                         <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="38" /></Grid.RowDefinitions>
                                         <Grid>

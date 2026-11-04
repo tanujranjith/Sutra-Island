@@ -218,6 +218,11 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         if (!Infrastructure.AppDataPaths.IsPreview) _keyboardLocks.Start();
         _flow = new Services.Flow.FlowController(_settings, _settingsService, Dispatcher, _log, providers, _qSecrets);
         _islandWindow.AttachFlow(_flow);
+        // Sutra Assistant listens with Flow's Whisper model too (Windows speech until it's downloaded).
+        _qSpeech?.AttachWhisper(new Services.Q.WhisperVoiceInput(_log, _flow.Engine, _settings));
+        _islandWindow.AttachAssistantVoiceDots(() => _qSpeech?.Level ?? 0f);
+        _voice!.Changed += snapshot => _flow?.SetAssistantVoiceActive(snapshot.State is DynamicIsland.Q.Core.AssistantVoiceState.Listening
+            or DynamicIsland.Q.Core.AssistantVoiceState.Thinking or DynamicIsland.Q.Core.AssistantVoiceState.Speaking);
         // The dot grid shows a red X; the reason goes to a notification so it is readable. When the
         // text couldn't be delivered, clicking the notification copies it (the user's clipboard is
         // never changed without that click).

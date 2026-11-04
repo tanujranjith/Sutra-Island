@@ -206,9 +206,34 @@ public sealed class FlowController : IDisposable
     /// <summary>Music goes down when listening starts and comes back once the recording's tail is captured.</summary>
     private void UpdateDucking(FlowState state)
     {
-        var want = state == FlowState.Listening || (state == FlowState.Released && _ducking);
+        lock (_duckGate)
+        {
+            _flowWantsDuck = state == FlowState.Listening || (state == FlowState.Released && _flowWantsDuck);
+            ApplyDucking();
+        }
+    }
+
+    /// <summary>
+    /// Sutra Assistant's voice chat uses the same setting: other audio stays lowered while it
+    /// listens, thinks, and speaks its reply, and comes back when the voice turn ends.
+    /// </summary>
+    public void SetAssistantVoiceActive(bool active)
+    {
+        lock (_duckGate)
+        {
+            _assistantWantsDuck = active;
+            ApplyDucking();
+        }
+    }
+
+    private readonly object _duckGate = new();
+    private bool _flowWantsDuck;
+    private bool _assistantWantsDuck;
+
+    private void ApplyDucking()
+    {
+        var want = (_flowWantsDuck || _assistantWantsDuck) && (_ducking || _settings.FlowDuckAudio);
         if (want == _ducking) return;
-        if (want && !_settings.FlowDuckAudio) return;
         _ducking = want;
         if (want) _ducker.Duck(FlowDucking.GainFor(_settings.FlowDuckPercent));
         else _ducker.Restore();

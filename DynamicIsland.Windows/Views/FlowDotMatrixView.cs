@@ -35,6 +35,8 @@ public sealed class FlowDotMatrixView : FrameworkElement
     public bool ReducedMotion { get; set; }
 
     public void Attach(FlowController controller) => _controller = controller;
+    /// <summary>Where the voice level comes from when no Flow controller is attached (the assistant's dots).</summary>
+    public Func<float>? LevelSource { get; set; }
 
     /// <summary>Shows a state. Called by the island window on the UI thread.</summary>
     public void SetState(FlowState state)
@@ -67,9 +69,9 @@ public sealed class FlowDotMatrixView : FrameworkElement
 
     private void OnFrame(object? sender, EventArgs e)
     {
-        if (_controller is not null && _state == FlowState.Listening)
+        if (_state == FlowState.Listening && (_controller is not null || LevelSource is not null))
         {
-            _history[_historyHead] = _controller.Level;
+            _history[_historyHead] = _controller?.Level ?? LevelSource!.Invoke();
             _historyHead = (_historyHead + 1) % _history.Length;
         }
         InvalidateVisual();

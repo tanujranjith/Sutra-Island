@@ -35,6 +35,8 @@ public sealed class AppSettings
     public bool CapsLockNotifications { get; set; } = true;
     public bool NumLockNotifications { get; set; } = true;
     public bool WakeListeningEnabled { get; set; }
+    /// <summary>"high", "normal", or "low": how readily the Whisper wake detector reacts to "Hey Sutra".</summary>
+    public string AssistantWakeSensitivity { get; set; } = "normal";
     public bool VoiceReadAloud { get; set; } = true;
     public string VoiceName { get; set; } = "";
     public List<string> PaletteFavorites { get; set; } = [];

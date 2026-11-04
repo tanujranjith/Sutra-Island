@@ -17,6 +17,33 @@ public partial class IslandWindow
         flow.StatusChanged += (_, status) => ShowFlow(status);
     }
 
+    /// <summary>Voice mode for Sutra Assistant: the composer gives way to the dots while a voice turn runs.</summary>
+    public void AttachAssistantVoiceDots(Func<float> level)
+    {
+        QVoiceDots.LevelSource = level;
+        if (DataContext is not IslandViewModel vm) return;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(IslandViewModel.VoiceState) or null) Dispatcher.BeginInvoke(() => ShowAssistantVoice(vm.VoiceState));
+        };
+    }
+
+    private void ShowAssistantVoice(DynamicIsland.Q.Core.AssistantVoiceState state)
+    {
+        var dots = state switch
+        {
+            DynamicIsland.Q.Core.AssistantVoiceState.Listening => FlowState.Listening,
+            DynamicIsland.Q.Core.AssistantVoiceState.Thinking => FlowState.Polishing,
+            DynamicIsland.Q.Core.AssistantVoiceState.Speaking => FlowState.Released,
+            _ => FlowState.Idle,
+        };
+        QVoiceDots.ReducedMotion = (DataContext as IslandViewModel)?.IsReducedMotion ?? false;
+        QVoiceDots.SetState(dots);
+        var voice = dots != FlowState.Idle;
+        QVoiceDots.Visibility = voice ? Visibility.Visible : Visibility.Collapsed;
+        QComposer.Visibility = voice ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     private void ShowFlow(FlowStatus status)
     {
         var reduced = (DataContext as IslandViewModel)?.IsReducedMotion ?? false;

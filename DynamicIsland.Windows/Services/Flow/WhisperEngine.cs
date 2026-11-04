@@ -121,7 +121,7 @@ public sealed class WhisperEngine : IDisposable
 
     /// <summary>Transcribes 16 kHz mono samples. The vocabulary nudges spelling of names and terms.</summary>
     /// <param name="expressive">Prompts Whisper with written-out hesitations so it keeps "uhh" and "ohhh" instead of dropping them.</param>
-    public async Task<string> TranscribeAsync(float[] samples, IReadOnlyList<string> vocabulary, CancellationToken token, bool expressive = false)
+    public async Task<string> TranscribeAsync(float[] samples, IReadOnlyList<string> vocabulary, CancellationToken token, bool expressive = false, string? hint = null)
     {
         if (!IsModelInstalled) throw new FlowException("Speech model still downloading");
         await _gate.WaitAsync(token).ConfigureAwait(false);
@@ -135,6 +135,7 @@ public sealed class WhisperEngine : IDisposable
                 .WithSingleSegment();
             var prompt = new List<string>();
             // Whisper copies the style of its prompt; a prompt full of hesitations makes it write them down.
+            if (!string.IsNullOrWhiteSpace(hint)) prompt.Add(hint);
             if (expressive) prompt.Add("Umm, uhhh... hmm. Ohhh, okay. Uh, I was like, ahhh, wow!");
             if (vocabulary.Count > 0) prompt.Add("Vocabulary: " + string.Join(", ", vocabulary.Take(60)) + ".");
             if (prompt.Count > 0) builder = builder.WithPrompt(string.Join(" ", prompt));
