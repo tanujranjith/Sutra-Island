@@ -11,7 +11,7 @@ namespace DynamicIsland.Windows.Services.Flow;
 /// </summary>
 public sealed class FlowPipeline : IDisposable
 {
-    public sealed record Timing(TimeSpan MinHold, TimeSpan ReleaseBeat, TimeSpan PastedSettle, TimeSpan ErrorSettle)
+    public sealed record Timing(TimeSpan MinHold, TimeSpan ReleaseBeat, TimeSpan PastedSettle, TimeSpan ErrorSettle, TimeSpan? MaxRecording = null)
     {
         public static Timing Default { get; } = new(
             TimeSpan.FromMilliseconds(280), TimeSpan.FromMilliseconds(260),
@@ -85,6 +85,7 @@ public sealed class FlowPipeline : IDisposable
         }
         // A quick tap of the key shows nothing; only a real hold morphs the island.
         _ = ShowListeningAfterHold(generation, token);
+        _ = StopAtRecordingLimitAsync(generation, token);
     }
 
     private async Task ShowListeningAfterHold(int generation, CancellationToken token)
@@ -93,6 +94,28 @@ public sealed class FlowPipeline : IDisposable
         catch (OperationCanceledException) { return; }
         lock (_gate) { if (_phase != Phase.Recording || generation != _generation) return; }
         _publish(new FlowStatus(FlowState.Listening));
+    }
+
+    /// <summary>Discard an unattended take rather than leave the microphone open indefinitely.</summary>
+    private async Task StopAtRecordingLimitAsync(int generation, CancellationToken token)
+    {
+        try { await Task.Delay(_timing.MaxRecording ?? TimeSpan.FromMinutes(3), token).ConfigureAwait(false); }
+        catch (OperationCanceledException) { return; }
+        CancellationTokenSource? session;
+        int limitGeneration;
+        lock (_gate)
+        {
+            if (_disposed || _phase != Phase.Recording || generation != _generation) return;
+            _phase = Phase.Processing;
+            session = _session;
+            limitGeneration = ++_generation;
+        }
+        TryCancel(session);
+        try { await _audio.StopAsync().ConfigureAwait(false); }
+        catch (Exception ex) { _logError("Sutra Flow: stopping the microphone at the recording limit failed.", ex); }
+        finally { Finish(); }
+        lock (_gate) { if (_disposed || _phase != Phase.Idle || limitGeneration != _generation) return; }
+        Fail("Recording stopped at the three-minute limit; nothing was pasted", limitGeneration);
     }
 
     /// <summary>Another key was pressed during the hold: it was a shortcut, so drop the recording.</summary>
@@ -261,6 +284,7 @@ public sealed class FlowPipeline : IDisposable
             _session = null;
             _phase = Phase.Idle;
         }
+        TryCancel(session); // also retire the safety timer when a take finishes normally
         session?.Dispose();
     }
 

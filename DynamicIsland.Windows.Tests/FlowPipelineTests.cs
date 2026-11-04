@@ -63,7 +63,7 @@ public sealed class FlowPipelineTests
         public Func<FlowRecording, CancellationToken, Task<string>> Transcribe = (_, _) => Task.FromResult("hello world");
         public readonly FlowPipeline Pipeline;
 
-        public Rig()
+        public Rig(FlowPipeline.Timing? timing = null)
         {
             Pipeline = new FlowPipeline(Audio, Paster, () => Enabled,
                 (r, t) => Transcribe(r, t),
@@ -72,7 +72,7 @@ public sealed class FlowPipelineTests
                 w => Words += w,
                 t => Held.Add(t),
                 (_, ex) => throw new Xunit.Sdk.XunitException(ex.ToString()),
-                Fast);
+                timing ?? Fast);
         }
 
         public FlowState Last { get { lock (Statuses) return Statuses[^1].State; } }
@@ -92,6 +92,29 @@ public sealed class FlowPipelineTests
         Assert.Equal(2, rig.Words);
         Assert.Contains(rig.Statuses, s => s.State == FlowState.Pasted);
         Assert.False(rig.Pipeline.IsBusy);
+    }
+
+    [Fact]
+    public async Task RecordingLimitStopsMicrophoneAndDoesNotPaste()
+    {
+        var timing = Fast with { MaxRecording = TimeSpan.FromMilliseconds(30) };
+        var rig = new Rig(timing);
+        rig.Pipeline.Press();
+        for (var i = 0; i < 100; i++)
+        {
+            bool reported;
+            lock (rig.Statuses) reported = rig.Statuses.Any(s => s.State == FlowState.Error);
+            if (reported) break;
+            await Task.Delay(10);
+        }
+        Assert.Equal(1, rig.Audio.Stops);
+        Assert.Equal(0, rig.Audio.Open);
+        Assert.Empty(rig.Paster.Pastes);
+        Assert.Empty(rig.Held);
+        Assert.False(rig.Pipeline.IsBusy);
+        Assert.Contains(rig.Statuses, s => s.State == FlowState.Error && s.Detail.Contains("three-minute limit"));
+        await rig.Pipeline.Release();
+        Assert.Equal(1, rig.Audio.Stops);
     }
 
     [Fact]
