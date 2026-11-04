@@ -136,11 +136,12 @@ public sealed class SettingsViewModel : ObservableObject
         set => Set(v => _settings.AssistantWakeSensitivity = v, (value ?? "Normal").ToLowerInvariant());
     }
     public bool VoiceReadAloud { get => _settings.VoiceReadAloud; set => Set(v => _settings.VoiceReadAloud = v, value); }
+    public bool CompactVoiceMode { get => _settings.CompactVoiceMode; set => Set(v => _settings.CompactVoiceMode = v, value); }
     public string VoiceName { get => _settings.VoiceName; set => Set(v => _settings.VoiceName = v, value); }
     public IReadOnlyList<string> InstalledVoices => Services.Q.SpeechInputService.GetInstalledVoices();
     public void RefreshRuntimePreferences()
     {
-        foreach (var property in new[] { nameof(ShowNotifications), nameof(WakeListeningEnabled), nameof(VoiceReadAloud), nameof(VoiceName), nameof(ShowDate), nameof(ShowCompactDate), nameof(CapsLockNotifications), nameof(NumLockNotifications) }) RaisePropertyChanged(property);
+        foreach (var property in new[] { nameof(ShowNotifications), nameof(WakeListeningEnabled), nameof(VoiceReadAloud), nameof(CompactVoiceMode), nameof(VoiceName), nameof(ShowDate), nameof(ShowCompactDate), nameof(CapsLockNotifications), nameof(NumLockNotifications) }) RaisePropertyChanged(property);
     }
     public bool ShowTimerAlarm { get => _settings.ShowTimerAlarm; set => Set(v => _settings.ShowTimerAlarm = v, value); }
     public bool FocusModeEnabled { get => _settings.FocusModeEnabled; set { Set(v => _settings.FocusModeEnabled = v, value); RaisePropertyChanged(nameof(FocusModeLabel)); _apply(); } }

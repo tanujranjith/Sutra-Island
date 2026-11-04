@@ -50,6 +50,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     private ScreenContextService? _qScreen;
     private SpeechInputService? _qSpeech;
     private AssistantVoiceController? _voice;
+    private int _compactVoiceEscHotkeyId;
     private KeyboardLockService? _keyboardLocks;
     private Services.Flow.FlowController? _flow;
     private ViewModels.FlowSettingsViewModel? _flowSettings;
@@ -254,6 +255,16 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _hotkeys.Register("Open settings", GlobalHotkeyService.SettingsModifiers, GlobalHotkeyService.SettingsKey,
             ShowSettings);
         RegisterQHotkey();
+        // Compact voice orb: interim words, and Esc cancels while (and only while) the orb is up.
+        _qSpeech!.PartialTranscript += _islandViewModel.OnVoicePartialTranscript;
+        _islandViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(IslandViewModel.CompactVoiceActive) || _hotkeys is null) return;
+            if (_islandViewModel.CompactVoiceActive && _compactVoiceEscHotkeyId == 0)
+                _compactVoiceEscHotkeyId = _hotkeys.Register("Dismiss voice", 0x4000 /* MOD_NOREPEAT */, 0x1B /* VK_ESCAPE */, _islandViewModel.DismissCompactVoice);
+            else if (!_islandViewModel.CompactVoiceActive && _compactVoiceEscHotkeyId != 0)
+            { _hotkeys.Unregister(_compactVoiceEscHotkeyId); _compactVoiceEscHotkeyId = 0; }
+        };
         _ = Dispatcher.BeginInvoke(async () =>
         {
             PrepareCommandPalette();

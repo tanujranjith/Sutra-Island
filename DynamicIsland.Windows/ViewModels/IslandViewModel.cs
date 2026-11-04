@@ -406,10 +406,13 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     }
     public bool IsEdgePill => Settings.DefaultPosition is PositionMode.TopLeft or PositionMode.TopRight;
     public bool IsHolePunchMode => Settings.IslandWidth <= 90 && Settings.IslandHeight <= 48;
-    public bool ShowCompactMediaContent => ShowMedia && !IsQActive && !IsHolePunchMode;
-    public bool ShowCompactQContent => IsQActive && (!IsHolePunchMode || QCompareEnabled);
-    public bool ShowCompactHolePunchQOutput => IsQActive && IsHolePunchMode && !QCompareEnabled;
-    public bool ShowCompactArtSurface => !IsQActive && ((ShowMedia && !IsHolePunchMode) || (IsHolePunchMode && HasArtwork));
+    // While the compact voice orb owns a voice turn, the island underneath keeps its media/system
+    // content, so it fades back in unchanged when the orb hands the island back.
+    private bool ShowQInCompact => IsQActive && !_compactVoice.IsActive;
+    public bool ShowCompactMediaContent => ShowMedia && !ShowQInCompact && !IsHolePunchMode;
+    public bool ShowCompactQContent => ShowQInCompact && (!IsHolePunchMode || QCompareEnabled);
+    public bool ShowCompactHolePunchQOutput => ShowQInCompact && IsHolePunchMode && !QCompareEnabled;
+    public bool ShowCompactArtSurface => !ShowQInCompact && ((ShowMedia && !IsHolePunchMode) || (IsHolePunchMode && HasArtwork));
     public bool ShowCompactStatusContent => !IsHolePunchMode && !QShowCompactComparison;
 
     private string CleanQResponseText(string response) => _responsePresentation.Format(response);
@@ -427,7 +430,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public MediaInfo Media { get => _media; private set { if (SetProperty(ref _media, value)) UpdateArtwork(value.Artwork); } }
     public AudioState Audio { get => _audio; private set => SetProperty(ref _audio, value); }
     public BatteryState Battery { get => _battery; private set => SetProperty(ref _battery, value); }
-    public bool IsExpanded { get => _isExpanded; set { if (SetProperty(ref _isExpanded, value)) { if (value && Settings.QuoteRotation == QuoteRotation.EveryExpand) AdvanceQuote(); RaiseExpansionProperties(); } } }
+    public bool IsExpanded { get => _isExpanded; set { if (SetProperty(ref _isExpanded, value)) { if (value) OnExpandedDuringCompactVoice(); if (value && Settings.QuoteRotation == QuoteRotation.EveryExpand) AdvanceQuote(); RaiseExpansionProperties(); } } }
     private double _nativeFrostInset;
     public double NativeFrostInset { get=>_nativeFrostInset; set {if(SetProperty(ref _nativeFrostInset,value))RaiseMany(nameof(IslandSurfaceBrush), nameof(IslandBaseSurfaceBrush));} }
     private bool _nativeFrostActive;
@@ -990,7 +993,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     // Compact-island equalizer: same live bars as the expanded visualizer, but gated behind
     // its own option so the collapsed pill stays calm unless the user opts in. Q and the
     // Q-compare surface own the compact lane while active, so hide there to avoid overlap.
-    public bool ShowCompactEqualizer => Settings.ShowEqualizerInCompact && IsAudioActive && !IsQActive && !QShowCompactComparison && !IsHolePunchMode;
+    public bool ShowCompactEqualizer => Settings.ShowEqualizerInCompact && IsAudioActive && !ShowQInCompact && !QShowCompactComparison && !IsHolePunchMode;
     public double VisualizerBar0Height => VisualizerHeight(0);
     public double VisualizerBar1Height => VisualizerHeight(1);
     public double VisualizerBar2Height => VisualizerHeight(2);
@@ -1071,7 +1074,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     }
 
     // ===== Behaviour =====
-    public bool PinExpanded => KeepExpanded || (Settings.AlwaysExpanded && !IsHolePunchMode) || (VoiceBusy && Settings.QAutoExpandIsland);
+    public bool PinExpanded => KeepExpanded || (Settings.AlwaysExpanded && !IsHolePunchMode) || (VoiceBusy && Settings.QAutoExpandIsland && !CompactVoiceActive);
     public string MediaTitle => Media.HasSession ? (Media.DisplayTitle ?? "Media") : "No media playing";
     public string MediaArtist => Media.HasSession
         ? string.Join("  |  ", new[] { Media.Artist, Media.SourceAppName }.Where(x => !string.IsNullOrWhiteSpace(x)))
@@ -1558,6 +1561,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         if (snapshot.State == QRunState.Idle) _responsePresentation.Clear();
         _qSnapshot = snapshot;
         RaiseQProperties();
+        OnCompactVoiceQChanged();
         PumpNotifications();
     });
 

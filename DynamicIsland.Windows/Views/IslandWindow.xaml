@@ -1255,6 +1255,12 @@
 
                 </Grid></ScrollViewer>
 
+                <!-- Compact voice mode: the island itself becomes the Sutra Assistant voice orb (docs/voice-orb). -->
+                <views:CompactVoiceView x:Name="CompactVoice" Panel.ZIndex="480" Margin="-1"
+                                        State="{Binding CompactVoiceState}" Transcript="{Binding CompactVoiceTranscript}" Answer="{Binding CompactVoiceAnswer}"
+                                        ActionFeedback="{Binding CompactVoiceAction}" ActionFromLevel="{Binding CompactVoiceActionFrom}" ErrorText="{Binding CompactVoiceError}"
+                                        ReducedMotion="{Binding IsReducedMotion}" />
+
                 <!-- Sutra Flow: while dictating, the island's content dissolves into a dot-matrix voice display. -->
                 <!-- Same surface as the island itself so only the content changes, not the island's colour. -->
                 <Border x:Name="FlowOverlay" Panel.ZIndex="500" Margin="-1" Visibility="Collapsed" Opacity="0" IsHitTestVisible="False" CornerRadius="{Binding IslandCornerRadius}" Background="{Binding IslandSurfaceBrush}" BorderBrush="#8CB9A5FD" BorderThickness="1" AutomationProperties.Name="Sutra Flow dictation">
@@ -1267,6 +1273,14 @@
                     </Grid>
                 </Border>
             </Grid>
+        </Border>
+
+        <!-- Compact voice orb rim: a thin lavender line with a soft outer glow, outside the shell's clip. -->
+        <Border x:Name="CompactVoiceRim" Panel.ZIndex="11" IsHitTestVisible="False" Visibility="Collapsed" Opacity="0"
+                HorizontalAlignment="Center" VerticalAlignment="Top" Margin="{Binding Margin, ElementName=GlassShell}"
+                Width="{Binding ActualWidth, ElementName=GlassShell}" Height="{Binding ActualHeight, ElementName=GlassShell}"
+                CornerRadius="{Binding IslandCornerRadius}" BorderBrush="#FFB9A6FF" BorderThickness="2">
+            <Border.Effect><DropShadowEffect BlurRadius="10" ShadowDepth="0" Color="#B9A6FF" Opacity="0.8" RenderingBias="Performance" /></Border.Effect>
         </Border>
 
         <!-- Timer owns a separate presentation surface. It morphs from the active timer orb, or

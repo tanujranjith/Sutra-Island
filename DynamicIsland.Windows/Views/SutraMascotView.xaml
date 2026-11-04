@@ -10,13 +10,16 @@
             <Canvas Width="1254" Height="1254" HorizontalAlignment="Left" VerticalAlignment="Top">
                 <Canvas.RenderTransform><TranslateTransform X="-175.56" Y="-175.56" /></Canvas.RenderTransform>
                 <Image Width="1254" Height="1254" Source="{StaticResource SutraMascotArtwork}" Stretch="Fill" />
+                <!-- Compact voice errors: a grey-blue, desaturated mascot. The greyscale copy is built in code. -->
+                <Image x:Name="GreyArtwork" Width="1254" Height="1254" Stretch="Fill" Visibility="Collapsed" />
+                <Rectangle x:Name="GreyTint" Width="1254" Height="1254" Fill="#59788AA0" Visibility="Collapsed" />
                 <!-- One continuous face surface avoids raster cover seams and ghost irises at small sizes. -->
                 <Path Data="M374,622 C395,506 504,422 623,421 C755,417 875,507 872,608 C879,682 800,755 692,777 C549,751 439,697 374,622 Z">
                     <Path.Fill><RadialGradientBrush GradientOrigin="0.46,0.44" Center="0.5,0.46" RadiusX="0.66" RadiusY="0.7"><GradientStop Color="#FFFEFCFB" /><GradientStop Color="#FFFEFCFB" Offset="0.42" /><GradientStop Color="#FFE3D8E9" Offset="0.76" /><GradientStop Color="#FFB6A0CF" Offset="1" /></RadialGradientBrush></Path.Fill>
                 </Path>
                 <Canvas x:Name="Eyes" Width="1254" Height="1254">
                     <Canvas.RenderTransform><TranslateTransform x:Name="Gaze" /></Canvas.RenderTransform>
-                    <Canvas Width="1254" Height="1254">
+                    <Canvas x:Name="OpenEyes" Width="1254" Height="1254">
                         <Canvas.RenderTransform><ScaleTransform x:Name="Blink" CenterY="609" /></Canvas.RenderTransform>
                         <Rectangle Canvas.Left="489" Canvas.Top="544" Width="68" Height="130" RadiusX="34" RadiusY="34">
                             <Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#161BD2" /><GradientStop Color="#031274" Offset="0.5" /><GradientStop Color="#0051F2" Offset="1" /></LinearGradientBrush></Rectangle.Fill>
@@ -25,6 +28,11 @@
                             <Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#1820D2" /><GradientStop Color="#071370" Offset="0.5" /><GradientStop Color="#4326ED" Offset="1" /></LinearGradientBrush></Rectangle.Fill>
                         </Rectangle>
                     </Canvas>
+                    <!-- Expressions for the compact voice orb: happy closed arcs (answers, commands) and flat lines (errors). -->
+                    <Path x:Name="HappyEyes" Visibility="Collapsed" Stroke="#FF161E5C" StrokeThickness="30" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          Data="M 489,626 Q 523,566 557,626 M 697,626 Q 731,566 765,626" />
+                    <Path x:Name="FlatEyes" Visibility="Collapsed" Stroke="#FF464E60" StrokeThickness="30" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          Data="M 482,612 H 564 M 690,612 H 772" />
                 </Canvas>
             </Canvas>
         </Grid>

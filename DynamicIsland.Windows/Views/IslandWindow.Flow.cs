@@ -21,6 +21,7 @@ public partial class IslandWindow
     public void AttachAssistantVoiceDots(Func<float> level)
     {
         QVoiceDots.LevelSource = level;
+        CompactVoice.LevelSource = level;
         if (DataContext is not IslandViewModel vm) return;
         vm.PropertyChanged += (_, e) =>
         {

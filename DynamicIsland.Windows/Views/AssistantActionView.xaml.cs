@@ -79,7 +79,7 @@ public partial class AssistantActionView : UserControl
         if(IsVisible){_lastSequence=feedback.Sequence;_lastPhase=feedback.Phase;}
     }
     private static DoubleAnimation Motion(double from,double to,int milliseconds)=>new(from,to,TimeSpan.FromMilliseconds(milliseconds)){EasingFunction=new CubicEase{EasingMode=EasingMode.EaseOut},FillBehavior=FillBehavior.Stop};
-    private static string Glyph(string command)=>command.ToLowerInvariant() switch
+    internal static string Glyph(string command)=>command.ToLowerInvariant() switch
     {
         "volume" or "unmute"=>"\uE767","mute"=>"\uE74F","audiooutput" or "setoutput" or "listoutputs"=>"\uE7F5",
         "play" or "pause" or "next" or "previous" or "seek" or "openmedia"=>"\uE8D6",

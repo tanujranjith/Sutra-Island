@@ -29,6 +29,7 @@
   <ItemGroup>
     <Compile Include="..\DynamicIsland.Windows\Infrastructure\SeekMath.cs" Link="SeekMath.cs" />
     <Compile Include="..\DynamicIsland.Windows\Services\Flow\WakePhrase.cs" Link="WakePhrase.cs" />
+    <Compile Include="..\DynamicIsland.Windows\Infrastructure\CompactVoice.cs" Link="CompactVoice.cs" />
     <Compile Include="..\DynamicIsland.Windows\Services\Flow\FlowCorrections.cs" Link="FlowCorrections.cs" />
     <Compile Include="..\DynamicIsland.Windows\Services\Flow\VoiceSegmenter.cs" Link="VoiceSegmenter.cs" />
     <Compile Include="..\DynamicIsland.Windows\Infrastructure\SpectrumAnalyzer.cs" Link="SpectrumAnalyzer.cs" />

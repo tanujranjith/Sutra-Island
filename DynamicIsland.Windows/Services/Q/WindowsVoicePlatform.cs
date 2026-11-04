@@ -15,6 +15,11 @@ public class WindowsVoicePlatform(LoggingService log) : IQSpeechInputService, IW
         .FirstOrDefault(x => x.Culture.Name == "en-US") ?? SpeechRecognitionEngine.InstalledRecognizers().FirstOrDefault(x => x.Culture.TwoLetterISOLanguageName == "en");
     public bool IsAvailable { get { try { return !_disposed && Recognizer is not null; } catch { return false; } } }
     public event Action? WakeDetected;
+    /// <summary>Interim dictation hypotheses, so the compact voice orb can show words as they're spoken.</summary>
+    public event Action<string>? PartialTranscript;
+    private volatile float _level;
+    /// <summary>Microphone level (0..1) while dictating.</summary>
+    public float Level => _level;
     public static IReadOnlyList<string> GetInstalledVoices()
     {
         try { using var speaker = new SpeechSynthesizer(); return speaker.GetInstalledVoices().Where(x => x.Enabled).Select(x => x.VoiceInfo.Name).ToArray(); }
@@ -80,6 +85,8 @@ public class WindowsVoicePlatform(LoggingService log) : IQSpeechInputService, IW
             engine.EndSilenceTimeout = TimeSpan.FromMilliseconds(800);
             engine.EndSilenceTimeoutAmbiguous = TimeSpan.FromMilliseconds(1200);
             engine.LoadGrammar(new DictationGrammar());
+            engine.SpeechHypothesized += (_, e) => { var text = e.Result?.Text; if (!string.IsNullOrWhiteSpace(text)) PartialTranscript?.Invoke(text); };
+            engine.AudioLevelUpdated += (_, e) => _level = Math.Clamp(e.AudioLevel / 100f, 0f, 1f);
             var completion = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
             engine.RecognizeCompleted += (_, e) =>
             {
@@ -90,7 +97,8 @@ public class WindowsVoicePlatform(LoggingService log) : IQSpeechInputService, IW
             engine.RecognizeAsync(RecognizeMode.Single);
             using var registration = cancellationToken.Register(() =>
             { try { engine.RecognizeAsyncCancel(); } catch (InvalidOperationException) { } });
-            return await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try { return await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false); }
+            finally { _level = 0; }
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { log.Error("Windows dictation failed", ex); throw new InvalidOperationException("Check Windows microphone access and installed speech language. " + ex.Message, ex); }

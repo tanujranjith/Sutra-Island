@@ -38,6 +38,8 @@ public sealed class AppSettings
     /// <summary>"high", "normal", or "low": how readily the Whisper wake detector reacts to "Hey Sutra".</summary>
     public string AssistantWakeSensitivity { get; set; } = "normal";
     public bool VoiceReadAloud { get; set; } = true;
+    /// <summary>Voice turns play in the compact island (the voice orb) instead of opening the chat panel.</summary>
+    public bool CompactVoiceMode { get; set; } = Infrastructure.CompactVoicePolicy.DefaultEnabled;
     public string VoiceName { get; set; } = "";
     public List<string> PaletteFavorites { get; set; } = [];
     public List<string> PaletteRecents { get; set; } = [];
