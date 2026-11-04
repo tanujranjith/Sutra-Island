@@ -285,4 +285,13 @@ public sealed class FlowPipelineTests
     [Fact]
     public void MissingReleaseFocusBlocksUnverifiedPaste() =>
         Assert.False(FlowTarget.Unchanged(Field, null, Field, "a", "a", "a"));
+    [Fact]
+    public void CorrectionReading_RequiresOriginalWindowAndFieldAndRejectsPasswords()
+    {
+        Assert.True(FlowTarget.CanInspectCorrection((nint)1, (nint)1, "field", "field", false));
+        Assert.False(FlowTarget.CanInspectCorrection((nint)1, (nint)2, "field", "field", false));
+        Assert.False(FlowTarget.CanInspectCorrection((nint)1, (nint)1, "field", "other", false));
+        Assert.False(FlowTarget.CanInspectCorrection((nint)1, (nint)1, "field", "field", true));
+        Assert.False(FlowTarget.CanInspectCorrection((nint)1, (nint)1, null, null, false));
+    }
 }

@@ -33,6 +33,9 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
     private const uint INPUT_KEYBOARD = 1, KEYEVENTF_KEYUP = 0x2, KEYEVENTF_UNICODE = 0x4;
     private static readonly TimeSpan RestoreDelay = TimeSpan.FromMilliseconds(450);
 
+    public string? LastPastedElementId { get; private set; }
+    public nint LastPastedWindow { get; private set; }
+
     public FlowTarget? CaptureTarget()
     {
         var focus = FocusNow();
@@ -51,6 +54,8 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
     // On every path except success, nothing is typed and the clipboard is left exactly as it was.
     private async Task<FlowPasteResult> PasteOnUiAsync(string text, FlowTarget? target, CancellationToken token)
     {
+        LastPastedElementId = null;
+        LastPastedWindow = 0;
         token.ThrowIfCancellationRequested();
         if (target is null || !await StillFocusedAsync(target)) return FlowPasteOutcome.TargetChanged;
         if (IsElevatedBeyondUs(target.AtPress.Window)) return FlowPasteOutcome.Elevated;
@@ -67,7 +72,13 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
         {
             if (text.Contains('\n') || text.Contains('\r')) return FlowPasteOutcome.MultilineNeedsClipboard;
             if (!await StillFocusedAsync(target)) return FlowPasteOutcome.TargetChanged;
-            return TypeText(text);
+            var typed = TypeText(text);
+            if (typed.Outcome == FlowPasteOutcome.Pasted)
+            {
+                LastPastedElementId = await WithTimeout(target.ElementAtPress);
+                LastPastedWindow = target.AtPress.Window;
+            }
+            return typed;
         }
 
         if (!TrySetClipboard(Dictation(text), beforeSnapshot)) return FlowPasteOutcome.ClipboardBusy;
@@ -92,6 +103,8 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
         // Give the target app time to read the clipboard before restoring it.
         await Task.Delay(RestoreDelay);
         RestoreIfUnchanged(previous, ours);
+        LastPastedElementId = await WithTimeout(target.ElementAtPress);
+        LastPastedWindow = target.AtPress.Window;
         return FlowPasteOutcome.Pasted;
     }
 
@@ -172,13 +185,16 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
     public bool CopyForUser(string text) => TrySetClipboard(Dictation(text));
 
     /// <summary>The focused field's id and full text through UI Automation, or nulls when it doesn't expose any.</summary>
-    public static (string? Id, string? Text) ReadFocusedText()
+    public static (string? Id, string? Text) ReadFocusedText(string expectedId, nint expectedWindow)
     {
         try
         {
+            if (expectedWindow == 0 || FocusNow().Window != expectedWindow) return (null, null);
             var element = System.Windows.Automation.AutomationElement.FocusedElement;
             if (element is null) return (null, null);
             var id = string.Join(".", element.GetRuntimeId() ?? []);
+            // Never inspect a different field, or a password field, for automatic vocabulary.
+            if (!FlowTarget.CanInspectCorrection(expectedWindow, FocusNow().Window, expectedId, id, element.Current.IsPassword)) return (null, null);
             if (element.TryGetCurrentPattern(System.Windows.Automation.ValuePattern.Pattern, out var v) && v is System.Windows.Automation.ValuePattern value)
                 return (id, value.Current.Value);
             if (element.TryGetCurrentPattern(System.Windows.Automation.TextPattern.Pattern, out var t) && t is System.Windows.Automation.TextPattern text)

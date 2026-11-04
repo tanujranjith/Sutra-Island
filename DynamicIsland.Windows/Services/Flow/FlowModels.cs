@@ -146,6 +146,11 @@ public sealed class FlowTarget
     /// <summary>UI Automation id of the focused element at key-up (null if unknown).</summary>
     public Task<string?>? ElementAtRelease { get; set; }
 
+    /// <summary>Only inspect the verified original field, and never password fields.</summary>
+    public static bool CanInspectCorrection(nint expectedWindow, nint currentWindow, string? expectedId, string? currentId, bool isPassword) =>
+        expectedWindow != 0 && expectedWindow == currentWindow && !string.IsNullOrEmpty(expectedId)
+        && expectedId == currentId && !isPassword;
+
     /// <summary>
     /// Pure decision used before pasting: every focus reading must match, and every element id that
     /// is available and must match. When field identity cannot be verified, hold the text

@@ -189,7 +189,8 @@ public sealed class FlowController : IDisposable
     {
         _settings.FlowWordsDictated += words;
         _ = SaveSettingsQuietly();
-        if (_settings.FlowAutoDictionary && _lastPasted is { } pasted) _ = WatchForCorrectionsAsync(pasted);
+        if (_settings.FlowAutoDictionary && _lastPasted is { } pasted && _injector.LastPastedElementId is { } id)
+            _ = WatchForCorrectionsAsync(pasted, id, _injector.LastPastedWindow);
     }
 
     /// <summary>
@@ -197,12 +198,12 @@ public sealed class FlowController : IDisposable
     /// you retyped that closely resemble a pasted word (Cirk → Circ) are added to the vocabulary.
     /// Only fields that expose their text to UI Automation can be checked.
     /// </summary>
-    private async Task WatchForCorrectionsAsync(string pasted)
+    private async Task WatchForCorrectionsAsync(string pasted, string expectedId, nint expectedWindow)
     {
         try
         {
             await Task.Delay(500).ConfigureAwait(false);
-            var (id, before) = await Task.Run(FlowTextInjector.ReadFocusedText).ConfigureAwait(false);
+            var (id, before) = await Task.Run(() => FlowTextInjector.ReadFocusedText(expectedId, expectedWindow)).ConfigureAwait(false);
             if (id is null || string.IsNullOrEmpty(before) || before.Length > 20000) return;
             var first = FlowCorrections.Words(pasted).FirstOrDefault();
             if (first is null || !before.Contains(first, StringComparison.Ordinal)) return; // can't see our text in this field
@@ -210,7 +211,7 @@ public sealed class FlowController : IDisposable
             {
                 await Task.Delay(TimeSpan.FromSeconds(wait)).ConfigureAwait(false);
                 if (!_settings.FlowAutoDictionary) return;
-                var (nowId, after) = await Task.Run(FlowTextInjector.ReadFocusedText).ConfigureAwait(false);
+                var (nowId, after) = await Task.Run(() => FlowTextInjector.ReadFocusedText(expectedId, expectedWindow)).ConfigureAwait(false);
                 if (nowId != id || after is null) return; // you moved on
                 var learned = FlowCorrections.Find(pasted, before, after, _settings.FlowVocabulary);
                 if (learned.Count == 0) continue;
