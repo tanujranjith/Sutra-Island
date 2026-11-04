@@ -30,7 +30,7 @@ namespace DynamicIsland.Windows.Services.Flow;
 /// </summary>
 public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowPaster
 {
-    private const ushort VK_CONTROL = 0x11, VK_V = 0x56, VK_C = 0x43;
+    private const ushort VK_CONTROL = 0x11, VK_V = 0x56;
     private const uint INPUT_KEYBOARD = 1, KEYEVENTF_KEYUP = 0x2, KEYEVENTF_UNICODE = 0x4;
     private static readonly TimeSpan RestoreDelay = TimeSpan.FromMilliseconds(450);
 
@@ -40,12 +40,8 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
         return focus.Window == 0 ? null : new FlowTarget { AtPress = focus, ElementAtPress = FocusedElementIdAsync() };
     }
 
-    /// <summary>The field the latest dictation was released over (command mode copies its selection).</summary>
-    public FlowTarget? LastTarget { get; private set; }
-
     public void PinTarget(FlowTarget target)
     {
-        LastTarget = target;
         target.AtRelease = FocusNow();
         target.ElementAtRelease = FocusedElementIdAsync();
     }
@@ -170,32 +166,6 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
 
     /// <summary>Copies text the user asked for (kept out of clipboard history). UI thread only.</summary>
     public bool CopyForUser(string text) => TrySetClipboard(Dictation(text));
-
-    /// <summary>
-    /// Command mode: copies the selected text in the focused field (Ctrl+C), reads it, and puts the
-    /// clipboard back exactly as it was. Returns null when nothing is selected or it can't be read
-    /// safely. Runs after the push key is released, so no physical modifier is held.
-    /// </summary>
-    public Task<string?> CopySelectionAsync(FlowTarget? target, CancellationToken token) =>
-        ui.InvokeAsync(() => CopySelectionOnUiAsync(target, token)).Task.Unwrap();
-
-    private async Task<string?> CopySelectionOnUiAsync(FlowTarget? target, CancellationToken token)
-    {
-        if (target is null || !await StillFocusedAsync(target)) return null;
-        if (IsElevatedBeyondUs(target.AtPress.Window)) return null;
-        var previous = ClipboardSnapshot.Capture(log);
-        if (!previous.Complete) { log.Info("Sutra Flow: clipboard couldn't be saved, so command mode ignores the selection."); return null; }
-        var before = GetClipboardSequenceNumber();
-        if (SendKeys((VK_CONTROL, false), (VK_C, false), (VK_C, true), (VK_CONTROL, true)) != 4)
-        { SendKeys((VK_C, true), (VK_CONTROL, true)); return null; }
-        var waited = 0;
-        while (GetClipboardSequenceNumber() == before && waited < 400) { await Task.Delay(20, token); waited += 20; }
-        if (GetClipboardSequenceNumber() == before) return null; // nothing selected (most apps copy nothing)
-        string? text = null;
-        try { if (Clipboard.ContainsText()) text = Clipboard.GetText(); } catch (COMException) { }
-        RestoreIfUnchanged(previous, GetClipboardSequenceNumber());
-        return string.IsNullOrWhiteSpace(text) ? null : text;
-    }
 
     /// <summary>The focused field's id and full text through UI Automation, or nulls when it doesn't expose any.</summary>
     public static (string? Id, string? Text) ReadFocusedText()

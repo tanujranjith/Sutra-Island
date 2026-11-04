@@ -46,18 +46,6 @@ public sealed class FlowKeyGate(Func<bool> isDictating)
 
     public bool Held => _held;
 
-    /// <summary>How soon after a quick tap a second press still counts as a double-tap.</summary>
-    public const int DoubleTapMs = 450;
-    /// <summary>A press shorter than this is a tap (matches the pipeline's minimum hold).</summary>
-    public const int TapMs = 280;
-    private uint? _tapEndedAt;
-
-    /// <summary>
-    /// True when the current press followed a quick tap (tap, then press and hold): Sutra Flow's
-    /// command mode, which edits the selected text or writes new text from a spoken instruction.
-    /// </summary>
-    public bool CommandPress { get; private set; }
-
     /// <summary>Handles one physical (non-injected) key event; <paramref name="time"/> is the event's tick in ms.</summary>
     public Decision OnKey(int vk, bool down, uint time)
     {
@@ -65,15 +53,12 @@ public sealed class FlowKeyGate(Func<bool> isDictating)
         {
             if (down && !_held)
             {
-                CommandPress = _tapEndedAt is { } tapEnd && unchecked(time - tapEnd) <= DoubleTapMs;
-                _tapEndedAt = null;
                 _held = true; _pressedAt = time; _swallowed.Clear(); // Clear: never let a missed key-up block a key for good
                 return new(Signal.Pressed, SwallowPtt);
             }
             if (!down && _held)
             {
                 _held = false;
-                _tapEndedAt = !CommandPress && unchecked(time - _pressedAt) < TapMs ? time : null;
                 return new(Signal.Released, SwallowPtt);
             }
             return new(Signal.None, SwallowPtt); // auto-repeat, or an up after a cancel
@@ -86,7 +71,6 @@ public sealed class FlowKeyGate(Func<bool> isDictating)
         }
 
         if (_swallowed.Contains(vk)) return new(Signal.None, true); // auto-repeat of a swallowed key
-        _tapEndedAt = null; // another key between the taps: not a double-tap
         if (!_held) return new(Signal.None, false);
 
         var locked = unchecked(time - _pressedAt) >= ShortcutWindowMs && isDictating();
@@ -106,7 +90,6 @@ public sealed class FlowKeyGate(Func<bool> isDictating)
     {
         var wasHeld = _held;
         _held = false;
-        _tapEndedAt = null;
         return wasHeld;
     }
 }

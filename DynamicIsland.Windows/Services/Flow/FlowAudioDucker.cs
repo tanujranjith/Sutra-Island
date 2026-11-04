@@ -37,7 +37,8 @@ public sealed class FlowAudioDucker(LoggingService log) : IDisposable
                 var playing = sessions.Count(s => s.Active && !s.IsSystemSounds);
                 if (_ducked.Count == 0) { log.Info($"Sutra Flow: nothing to lower ({sessions.Count} session(s), {playing} playing)."); return; }
                 Save();
-                Fade(controls, _ducked.Select(d => (d.Id, d.Original, d.Lowered)));
+                // Straight down, no fade: every millisecond of loud music lands in the recording.
+                Fade(controls, _ducked.Select(d => (d.Id, d.Original, d.Lowered)), steps: 1);
                 var pids = sessions.GroupBy(s => s.Id).ToDictionary(g => g.Key, g => g.First().ProcessId);
                 lowered = _ducked.Select(d => NameOf(pids.GetValueOrDefault(d.Id))).Distinct().ToList();
                 log.Info($"Sutra Flow: lowered {string.Join(", ", lowered)} to {gain:0.####} while listening.");
@@ -92,18 +93,18 @@ public sealed class FlowAudioDucker(LoggingService log) : IDisposable
         finally { _gate.Release(); }
     }
 
-    private static void Fade(Dictionary<string, ISimpleAudioVolume> controls, IEnumerable<(string Id, float From, float To)> changes)
+    private static void Fade(Dictionary<string, ISimpleAudioVolume> controls, IEnumerable<(string Id, float From, float To)> changes, int steps = FadeSteps)
     {
         var list = changes.Where(c => controls.ContainsKey(c.Id)).ToList();
         if (list.Count == 0) return;
-        for (var step = 1; step <= FadeSteps; step++)
+        for (var step = 1; step <= steps; step++)
         {
-            var t = (float)step / FadeSteps;
+            var t = (float)step / steps;
             foreach (var (id, from, to) in list)
             {
                 try { controls[id].SetMasterVolume(Math.Clamp(from + (to - from) * t, 0f, 1f), nint.Zero); } catch { }
             }
-            if (step < FadeSteps) Thread.Sleep(FadeStepMs);
+            if (step < steps) Thread.Sleep(FadeStepMs);
         }
     }
 

@@ -58,6 +58,7 @@ public sealed class FlowController : IDisposable
         // The hook's worker calls these one at a time; each returns at once (Release hands the
         // slow work to a task after marking the session busy), so key events never queue up behind it.
         _hook.Pressed += CaptureTargetApp;
+        _hook.Pressed += DuckOnPress;
         _hook.Pressed += _pipeline.Press;
         _hook.Released += () => _ = _pipeline.Release();
         _hook.Cancelled += () => _ = _pipeline.Cancel();
@@ -99,9 +100,7 @@ public sealed class FlowController : IDisposable
         return await Task.Run(() => Engine.TranscribeAsync(recording.Samples, Vocabulary(), limit.Token, _settings.FlowExpressive), limit.Token).ConfigureAwait(false);
     }
 
-    private volatile bool _commandPress;
     private string? _lastPasted;
-    private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>Raised (UI thread) when words you corrected were added to the dictionary.</summary>
     public event EventHandler<IReadOnlyList<string>>? VocabularyLearned;
@@ -109,31 +108,9 @@ public sealed class FlowController : IDisposable
     private async Task<string> CleanAsync(string raw, CancellationToken token)
     {
         _lastPasted = null;
-        if (_commandPress) return await RunCommandAsync(raw, token).ConfigureAwait(false);
         var text = await DictationTextAsync(raw, token).ConfigureAwait(false);
         _lastPasted = text;
         return text;
-    }
-
-    /// <summary>
-    /// Command mode (double-tap and hold the push key): the words are an instruction. With text
-    /// selected, the AI rewrites the selection and the result replaces it; with nothing selected,
-    /// it writes what you asked for at the cursor.
-    /// </summary>
-    private async Task<string> RunCommandAsync(string raw, CancellationToken token)
-    {
-        var app = _targetApp;
-        var codeApp = FlowCodeText.IsCodeEditor(app) ? app : null;
-        var selection = await _injector.CopySelectionAsync(_injector.LastTarget, token).ConfigureAwait(false);
-        // Code editors copy the whole line when nothing is selected; that isn't a selection.
-        if (codeApp is not null && selection is not null && selection.EndsWith('\n') && selection.TrimEnd('\r', '\n').IndexOf('\n') < 0)
-            selection = null;
-        var instruction = FlowTextCleaner.Basic(raw);
-        _log.Info($"Sutra Flow: command mode ({(selection is null ? "no selection" : selection.Length + " selected chars")}).");
-        using var limit = CancellationTokenSource.CreateLinkedTokenSource(token);
-        limit.CancelAfter(CommandTimeout);
-        try { return await _ai.CommandAsync(instruction, selection, Vocabulary(), limit.Token, codeApp).ConfigureAwait(false); }
-        catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new FlowException("The command took too long"); }
     }
 
     private async Task<string> DictationTextAsync(string raw, CancellationToken token)
@@ -160,7 +137,6 @@ public sealed class FlowController : IDisposable
     /// <summary>Runs on the hook's event worker, not inside the hook callback.</summary>
     private void CaptureTargetApp()
     {
-        _commandPress = _settings.FlowCommandMode && _hook.IsCommandPress;
         try
         {
             var hwnd = GetForegroundWindow();
@@ -278,11 +254,27 @@ public sealed class FlowController : IDisposable
     }
 
     /// <summary>Music goes down when listening starts and comes back once the recording's tail is captured.</summary>
+    /// <summary>
+    /// Lowers other audio the moment the key goes down. Waiting for the island's Listening state
+    /// (about 0.3 s later) let the microphone record full-volume music at the start of every take,
+    /// which Whisper turned into stray words.
+    /// </summary>
+    private void DuckOnPress()
+    {
+        if (!_settings.FlowEnabled || !_settings.FlowDuckAudio || _pipeline.IsBusy) return;
+        lock (_duckGate)
+        {
+            _flowWantsDuck = true;
+            ApplyDucking();
+        }
+    }
+
     private void UpdateDucking(FlowState state)
     {
         lock (_duckGate)
         {
-            _flowWantsDuck = state == FlowState.Listening || (state == FlowState.Released && _flowWantsDuck);
+            _flowWantsDuck = (state is FlowState.Listening or FlowState.Released) && _flowWantsDuck
+                || state == FlowState.Listening && _pipeline.IsRecording;
             ApplyDucking();
         }
     }
