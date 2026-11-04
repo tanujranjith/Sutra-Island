@@ -23,3 +23,19 @@ jobs:
         run: dotnet test .\DynamicIsland.Windows.Tests\DynamicIsland.Windows.Tests.csproj -c Release -m:1
       - name: Build app
         run: dotnet build .\DynamicIsland.Windows\DynamicIsland.Windows.csproj -c Release -r win-x64
+      # One-off isolated text-box/clipboard verification; removed after the probe.
+      - name: Probe Flow paste and clipboard
+        shell: pwsh
+        run: |
+          $env:ISLAND_PREVIEW = '1'
+          $env:ISLAND_PREVIEW_DATA = Join-Path $env:RUNNER_TEMP 'sutra-flow-paste-probe'
+          $exe = Get-ChildItem .\DynamicIsland.Windows\bin\Release -Recurse -Filter DynamicIsland.Windows.exe | Select-Object -First 1
+          if (-not $exe) { throw 'Built application was not found' }
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList '--verify-flow-paste' -PassThru
+          if (-not $p.WaitForExit(45000)) { $p.Kill(); throw 'Paste probe timed out' }
+          $report = Join-Path $env:ISLAND_PREVIEW_DATA 'flow-paste-probe.txt'
+          $errorFile = Join-Path $env:ISLAND_PREVIEW_DATA 'flow-paste-error.txt'
+          if (Test-Path $report) { Get-Content $report }
+          if (Test-Path $errorFile) { Get-Content $errorFile }
+          if ($p.ExitCode -ne 0) { throw "Paste probe exited with code $($p.ExitCode)" }
+          if (-not (Test-Path $report)) { throw 'Paste probe produced no report' }
