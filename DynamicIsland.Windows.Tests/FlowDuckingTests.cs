@@ -8,7 +8,7 @@ public sealed class FlowDuckingTests
     private const uint Me = 100;
 
     [Fact]
-    public void LowersOnlyPlayingOtherApps()
+    public void LowersOtherAppsPlayingOrPaused()
     {
         var plan = FlowDucking.Plan(
         [
@@ -18,8 +18,8 @@ public sealed class FlowDuckingTests
             new("paused", 400, false, false, 1f),
             new("silent", 500, false, true, 0f),
         ], Me, 0.2f);
-        var only = Assert.Single(plan);
-        Assert.Equal("spotify", only.Id);
+        Assert.Equal(["spotify", "paused"], plan.Select(p => p.Id));
+        var only = plan[0];
         Assert.Equal(0.8f, only.Original);
         Assert.Equal(0.16f, only.Lowered, 3);
     }

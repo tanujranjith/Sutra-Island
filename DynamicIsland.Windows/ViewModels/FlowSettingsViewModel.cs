@@ -216,7 +216,7 @@ public sealed class FlowSettingsViewModel : ObservableObject
         DuckTestResult = lowered switch
         {
             null => "Finish the dictation first.",
-            { Count: 0 } => "Nothing was playing to lower. Start music, then test again.",
+            { Count: 0 } => "No other app has audio open. Start music, then test again.",
             _ => $"Lowered {string.Join(", ", lowered)} for 2.5 seconds.",
         };
     }

@@ -8,7 +8,7 @@ public sealed record FlowDuckedSession(string Id, float Original, float Lowered)
 
 /// <summary>
 /// Pure rules for lowering other apps' audio while Sutra Flow records, and for putting it back.
-/// Only playing sessions are touched (never Sutra Island itself or Windows system sounds), and a
+/// Every other app's session is touched, playing or paused (never Sutra Island itself or Windows system sounds), and a
 /// session is restored only if its volume is still what Flow set, so a change the user made
 /// while dictating is kept.
 /// </summary>
@@ -35,7 +35,9 @@ public static class FlowDucking
         var plan = new List<FlowDuckedSession>();
         foreach (var s in sessions)
         {
-            if (!s.Active || s.IsSystemSounds || s.ProcessId == ownProcessId || s.ProcessId == 0) continue;
+            // Paused or "inactive" sessions are lowered too: some players report Inactive while they play,
+            // and music that resumes mid-dictation should come in quiet. Restoring them is just as safe.
+            if (s.IsSystemSounds || s.ProcessId == ownProcessId || s.ProcessId == 0) continue;
             if (string.IsNullOrEmpty(s.Id) || s.Volume <= 0.001f) continue;
             if (plan.Any(p => p.Id == s.Id)) continue;
             var lowered = s.Volume * level;
