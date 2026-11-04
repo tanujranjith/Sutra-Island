@@ -80,7 +80,7 @@ internal static partial class UpgradeVerification
         settings.AnimationIntensity = AnimationIntensity.Reduced;
         vm.ApplySettings(); window.ApplySettings(); Deliver(1004); window.UpdateLayout();
         check(host.RevealProgress == 1 && !host.HasConnection && host.IsHitTestVisible && card.Opacity == 1,
-            "Notification motion: reduced motion shows usable final content immediately");
+            $"Notification motion: reduced motion shows usable final content immediately (visibility={host.Visibility}, progress={host.RevealProgress}, connection={host.HasConnection}, hit={host.IsHitTestVisible}, opacity={card.Opacity}, size={host.ActualWidth}x{host.ActualHeight}, reduced={vm.IsReducedMotion}, banner={vm.ShowBanner})");
         vm.DismissCurrentNotificationCommand.Execute(null);
         vm.ClearNotificationHistoryCommand.Execute(null);
     }
