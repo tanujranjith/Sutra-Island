@@ -112,7 +112,7 @@ public sealed class FlowPipelineTests
         Assert.Empty(rig.Paster.Pastes);
         Assert.Empty(rig.Held);
         Assert.False(rig.Pipeline.IsBusy);
-        Assert.Contains(rig.Statuses, s => s.State == FlowState.Error && s.Detail.Contains("three-minute limit"));
+        lock (rig.Statuses) Assert.Contains(rig.Statuses, s => s.State == FlowState.Error && s.Detail.Contains("three-minute limit"));
         await rig.Pipeline.Release();
         Assert.Equal(1, rig.Audio.Stops);
     }
