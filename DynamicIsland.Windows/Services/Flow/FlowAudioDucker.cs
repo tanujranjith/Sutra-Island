@@ -20,21 +20,38 @@ public sealed class FlowAudioDucker(LoggingService log) : IDisposable
     private static readonly string StatePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DynamicIsland.Windows", "SutraFlow", "ducked.json");
 
-    /// <summary>Lowers playing apps to <paramref name="level"/> of their volume (0..1). Returns at once.</summary>
-    public void Duck(float level) => _ = Run(() =>
+    /// <summary>Lowers playing apps to <paramref name="gain"/> of their volume (0..1). Returns at once.</summary>
+    public void Duck(float gain) => _ = DuckAsync(gain);
+
+    /// <summary>Like <see cref="Duck"/>, and reports the apps it lowered (process names), for Settings' Test button.</summary>
+    public async Task<IReadOnlyList<string>> DuckAsync(float gain)
     {
-        if (_ducked.Count > 0) return;
-        var sessions = Read(out var controls);
-        try
+        IReadOnlyList<string> lowered = [];
+        await Run(() =>
         {
-            _ducked = FlowDucking.Plan(sessions, (uint)Environment.ProcessId, level).ToList();
-            if (_ducked.Count == 0) return;
-            Save();
-            Fade(controls, _ducked.Select(d => (d.Id, d.Original, d.Lowered)));
-            log.Debug($"Sutra Flow: lowered {_ducked.Count} app(s) while listening.");
-        }
-        finally { ReleaseAll(controls); }
-    });
+            if (_ducked.Count > 0) return;
+            var sessions = Read(out var controls);
+            try
+            {
+                _ducked = FlowDucking.Plan(sessions, (uint)Environment.ProcessId, gain).ToList();
+                var playing = sessions.Count(s => s.Active && !s.IsSystemSounds);
+                if (_ducked.Count == 0) { log.Info($"Sutra Flow: nothing to lower ({sessions.Count} session(s), {playing} playing)."); return; }
+                Save();
+                Fade(controls, _ducked.Select(d => (d.Id, d.Original, d.Lowered)));
+                var pids = sessions.GroupBy(s => s.Id).ToDictionary(g => g.Key, g => g.First().ProcessId);
+                lowered = _ducked.Select(d => NameOf(pids.GetValueOrDefault(d.Id))).Distinct().ToList();
+                log.Info($"Sutra Flow: lowered {string.Join(", ", lowered)} to {gain:0.####} while listening.");
+            }
+            finally { ReleaseAll(controls); }
+        }).ConfigureAwait(false);
+        return lowered;
+    }
+
+    private static string NameOf(uint pid)
+    {
+        try { using var p = System.Diagnostics.Process.GetProcessById((int)pid); return p.ProcessName; }
+        catch { return "an app"; }
+    }
 
     /// <summary>Puts back what <see cref="Duck"/> lowered, unless the user changed it meanwhile. Returns at once.</summary>
     public void Restore() => _ = Run(RestoreNow);
@@ -90,17 +107,41 @@ public sealed class FlowAudioDucker(LoggingService log) : IDisposable
         }
     }
 
-    /// <summary>Reads every session on the default output device, keeping each one's volume control.</summary>
+    /// <summary>
+    /// Reads every session on every active output device (music on headphones while Windows' default
+    /// is the speakers still counts), keeping each one's volume control.
+    /// </summary>
     private static List<FlowAudioSession> Read(out Dictionary<string, ISimpleAudioVolume> controls)
     {
         controls = new Dictionary<string, ISimpleAudioVolume>();
         var result = new List<FlowAudioSession>();
+        var ids = CoreAudioFactory.GetRenderEndpoints().Select(e => e.Id).ToList();
+        if (ids.Count == 0) ids.Add(""); // fall back to the default device
+        foreach (var id in ids)
+        {
+            try { ReadDevice(id, controls, result); }
+            catch (COMException) { } // a device that just went away
+        }
+        return result;
+    }
+
+    private static void ReadDevice(string deviceId, Dictionary<string, ISimpleAudioVolume> controls, List<FlowAudioSession> result)
+    {
+        IMMDeviceEnumerator? enumerator = null;
         IMMDevice? device = null;
         IAudioSessionManager2? manager = null;
         IAudioSessionEnumerator? sessions = null;
         try
         {
-            (device, manager) = CoreAudioFactory.ActivateDefault<IAudioSessionManager2>();
+            if (deviceId.Length == 0) (device, manager) = CoreAudioFactory.ActivateDefault<IAudioSessionManager2>();
+            else
+            {
+                enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
+                Marshal.ThrowExceptionForHR(enumerator.GetDevice(deviceId, out device));
+                var iid = typeof(IAudioSessionManager2).GUID;
+                Marshal.ThrowExceptionForHR(device.Activate(ref iid, CoreAudioFactory.ClsctxAll, nint.Zero, out var instance));
+                manager = (IAudioSessionManager2)instance;
+            }
             Marshal.ThrowExceptionForHR(manager.GetSessionEnumerator(out sessions));
             sessions.GetCount(out var count);
             for (var i = 0; i < count; i++)
@@ -127,8 +168,8 @@ public sealed class FlowAudioDucker(LoggingService log) : IDisposable
             CoreAudioFactory.Release(sessions);
             CoreAudioFactory.Release(manager);
             CoreAudioFactory.Release(device);
+            CoreAudioFactory.Release(enumerator);
         }
-        return result;
     }
 
     private static void ReleaseAll(Dictionary<string, ISimpleAudioVolume> controls)

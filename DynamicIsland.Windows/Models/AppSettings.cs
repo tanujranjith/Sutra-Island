@@ -233,7 +233,7 @@ public sealed class AppSettings
     /// <summary>Turn other apps' audio down while Flow is listening.</summary>
     public bool FlowDuckAudio { get; set; } = true;
     /// <summary>How loud other apps stay while Flow listens, as a percent of their volume.</summary>
-    public int FlowDuckPercent { get; set; } = 20;
+    public int FlowDuckPercent { get; set; } = 10;
     // Names and terms Whisper and the cleanup should spell exactly as written.
     public List<string> FlowVocabulary { get; set; } = [];
     public long FlowWordsDictated { get; set; }

@@ -36,4 +36,19 @@ public sealed class FlowDuckingTests
         var restore = FlowDucking.Restore(ducked, current);
         Assert.Equal([("a", 0.8f)], restore);
     }
+
+    [Theory]
+    [InlineData(100, 1f)]
+    [InlineData(50, 0.25f)]
+    [InlineData(10, 0.01f)]
+    [InlineData(2, 0.0004f)]
+    [InlineData(0, 0f)]
+    public void PercentFollowsAnAudioTaper(int percent, float gain) => Assert.Equal(gain, FlowDucking.GainFor(percent), 5);
+
+    [Fact]
+    public void TwoPercentStillLowersQuietMusic()
+    {
+        var only = Assert.Single(FlowDucking.Plan([new("a", 2, false, true, 0.3f)], Me, FlowDucking.GainFor(2)));
+        Assert.True(only.Lowered < 0.001f);
+    }
 }

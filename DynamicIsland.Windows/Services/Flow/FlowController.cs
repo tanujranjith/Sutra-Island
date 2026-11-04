@@ -210,8 +210,18 @@ public sealed class FlowController : IDisposable
         if (want == _ducking) return;
         if (want && !_settings.FlowDuckAudio) return;
         _ducking = want;
-        if (want) _ducker.Duck(_settings.FlowDuckPercent / 100f);
+        if (want) _ducker.Duck(FlowDucking.GainFor(_settings.FlowDuckPercent));
         else _ducker.Restore();
+    }
+
+    /// <summary>Settings' Test button: lowers other audio for a moment, then puts it back. Returns the apps it lowered.</summary>
+    public async Task<IReadOnlyList<string>?> TestDuckingAsync()
+    {
+        if (_ducking || Status.State != FlowState.Idle) return null; // a real dictation owns the ducker
+        var lowered = await _ducker.DuckAsync(FlowDucking.GainFor(_settings.FlowDuckPercent)).ConfigureAwait(false);
+        await Task.Delay(2500).ConfigureAwait(false);
+        if (!_ducking) _ducker.Restore();
+        return lowered;
     }
 
     public void Dispose()

@@ -17,6 +17,17 @@ public static class FlowDucking
     /// <summary>How close a session's volume must be to what Flow set for Flow to restore it.</summary>
     public const float Tolerance = 0.02f;
 
+    /// <summary>
+    /// Turns the slider's percent into a volume multiplier on an audio taper (squared), so "10%" sounds
+    /// about as quiet as 10% on the Windows volume slider instead of the much louder 10% amplitude.
+    /// 2% becomes 0.0004 (about -68 dB): background music is barely there.
+    /// </summary>
+    public static float GainFor(int percent)
+    {
+        var p = Math.Clamp(percent, 0, 100) / 100f;
+        return p * p;
+    }
+
     /// <summary>The sessions to lower, to <paramref name="level"/> (0..1) of their current volume.</summary>
     public static IReadOnlyList<FlowDuckedSession> Plan(IEnumerable<FlowAudioSession> sessions, uint ownProcessId, float level)
     {

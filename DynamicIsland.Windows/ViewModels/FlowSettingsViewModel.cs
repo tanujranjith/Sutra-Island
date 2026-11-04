@@ -25,6 +25,7 @@ public sealed class FlowSettingsViewModel : ObservableObject
         CopyHeldTextCommand = new RelayCommand(() => _flow.CopyHeldText(), () => _flow.HasHeldText);
         RefreshUsageCommand = new RelayCommand(() => RaisePropertyChanged(nameof(WordsDictated)));
         ImportVocabularyCommand = new RelayCommand(ImportVocabulary);
+        TestDuckingCommand = new RelayCommand(TestDucking);
         ResetCommand = new RelayCommand(ResetFlow);
         _flow.HeldTextChanged += (_, _) => ((RelayCommand)CopyHeldTextCommand).RaiseCanExecuteChanged();
         _flow.Engine.ModelStatusChanged += (_, _) => Application.Current?.Dispatcher.BeginInvoke(() =>
@@ -186,20 +187,38 @@ public sealed class FlowSettingsViewModel : ObservableObject
         }
     }
 
-    public IReadOnlyList<string> DuckLevelOptions { get; } = ["Mute", "10%", "20%", "30%", "50%"];
-
-    /// <summary>How loud other apps stay while listening.</summary>
-    public string DuckLevel
+    /// <summary>How loud other apps stay while listening, 0 (mute) to 100, on the same feel as the Windows volume slider.</summary>
+    public double DuckPercent
     {
-        get => _settings.FlowDuckPercent <= 0 ? "Mute" : $"{_settings.FlowDuckPercent}%";
+        get => _settings.FlowDuckPercent;
         set
         {
-            var percent = value == "Mute" ? 0 : int.TryParse(value?.TrimEnd('%'), out var p) ? Math.Clamp(p, 0, 100) : 20;
+            var percent = (int)Math.Round(Math.Clamp(value, 0, 100));
             if (percent == _settings.FlowDuckPercent) return;
             _settings.FlowDuckPercent = percent;
             RaisePropertyChanged();
+            RaisePropertyChanged(nameof(DuckLevel));
             Save();
         }
+    }
+
+    public string DuckLevel => _settings.FlowDuckPercent <= 0 ? "Mute" : $"{_settings.FlowDuckPercent}%";
+
+    private string _duckTestResult = "";
+    /// <summary>What the Test button did, so a setup where nothing gets lowered is visible.</summary>
+    public string DuckTestResult { get => _duckTestResult; private set { _duckTestResult = value; RaisePropertyChanged(); } }
+    public ICommand TestDuckingCommand { get; private set; } = null!;
+
+    private async void TestDucking()
+    {
+        DuckTestResult = "Testing… play some music first.";
+        var lowered = await _flow.TestDuckingAsync();
+        DuckTestResult = lowered switch
+        {
+            null => "Finish the dictation first.",
+            { Count: 0 } => "Nothing was playing to lower. Start music, then test again.",
+            _ => $"Lowered {string.Join(", ", lowered)} for 2.5 seconds.",
+        };
     }
 
     public IReadOnlyList<string> CleanupOptions { get; } = ["Off", "Basic (on this PC)", "AI (your chosen provider)"];
@@ -319,7 +338,7 @@ public sealed class FlowSettingsViewModel : ObservableObject
     public void Refresh()
     {
         foreach (var name in new[] { nameof(Enabled), nameof(PushKey), nameof(PushKeyNote), nameof(MicrophoneOptions), nameof(Microphone), nameof(Language),
-                     nameof(Sounds), nameof(SmartFormatting), nameof(CreatorMode), nameof(CodeVariables), nameof(FileTagging), nameof(DuckAudio), nameof(DuckLevel), nameof(Expressive), nameof(Cleanup), nameof(CleanupNote), nameof(Vocabulary), nameof(ModelStatus), nameof(ModelReady), nameof(WordsDictated) })
+                     nameof(Sounds), nameof(SmartFormatting), nameof(CreatorMode), nameof(CodeVariables), nameof(FileTagging), nameof(DuckAudio), nameof(DuckPercent), nameof(DuckLevel), nameof(Expressive), nameof(Cleanup), nameof(CleanupNote), nameof(Vocabulary), nameof(ModelStatus), nameof(ModelReady), nameof(WordsDictated) })
             RaisePropertyChanged(name);
         RaiseAi(); // keys and the Assistant's provider can change on other settings pages
     }
