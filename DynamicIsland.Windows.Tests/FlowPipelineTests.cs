@@ -39,10 +39,10 @@ public sealed class FlowPipelineTests
     private sealed class FakePaster : IFlowPaster
     {
         public nint Window = 42;
-        public int Pins;
+        public int Pins, Captures;
         public FlowPasteResult Outcome = FlowPasteOutcome.Pasted;
         public List<(string Text, nint Target)> Pastes = [];
-        public FlowTarget? CaptureTarget() => new() { AtPress = new FlowFocus(Window, 0, 0, 0, 0) };
+        public FlowTarget? CaptureTarget() { Captures++; return new() { AtPress = new FlowFocus(Window, 0, 0, 0, 0) }; }
         public void PinTarget(FlowTarget target) => Pins++;
         public Task<FlowPasteResult> PasteAsync(string text, FlowTarget? target, CancellationToken token)
         {
@@ -92,6 +92,18 @@ public sealed class FlowPipelineTests
         Assert.Equal(2, rig.Words);
         Assert.Contains(rig.Statuses, s => s.State == FlowState.Pasted);
         Assert.False(rig.Pipeline.IsBusy);
+    }
+
+    [Fact]
+    public async Task CapturedKeyDownTargetIsNotReplacedByLaterWorkerFocus()
+    {
+        var rig = new Rig();
+        var keyDownTarget = rig.Paster.CaptureTarget();
+        rig.Paster.Window = 99; // the worker runs after foreground focus moved
+        rig.Pipeline.PressCaptured(keyDownTarget);
+        await rig.Pipeline.Release();
+        Assert.Equal(1, rig.Paster.Captures);
+        Assert.Equal((nint)42, rig.Paster.Pastes.Single().Target);
     }
 
     [Fact]

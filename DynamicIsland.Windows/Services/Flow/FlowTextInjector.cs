@@ -39,13 +39,14 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
     public FlowTarget? CaptureTarget()
     {
         var focus = FocusNow();
-        return focus.Window == 0 ? null : new FlowTarget { AtPress = focus, ElementAtPress = FocusedElementIdAsync() };
+        return focus.Window == 0 ? null : new FlowTarget { AtPress = focus, ElementAtPress = FocusedElementIdAsync(focus) };
     }
 
     public void PinTarget(FlowTarget target)
     {
-        target.AtRelease = FocusNow();
-        target.ElementAtRelease = FocusedElementIdAsync();
+        var focus = FocusNow();
+        target.AtRelease = focus;
+        target.ElementAtRelease = FocusedElementIdAsync(focus);
     }
 
     public Task<FlowPasteResult> PasteAsync(string text, FlowTarget? target, CancellationToken token) =>
@@ -117,7 +118,7 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
             return Moved("window or caret");
         var press = await WithTimeout(target.ElementAtPress);
         var release = await WithTimeout(target.ElementAtRelease);
-        var current = await WithTimeout(FocusedElementIdAsync());
+        var current = await WithTimeout(FocusedElementIdAsync(now));
         // Re-read the window last so the gap between this check and the keystrokes stays tiny.
         if (!FlowTarget.Unchanged(target.AtPress, target.AtRelease, FocusNow(), press, release, current)) return Moved("field");
         return true;
@@ -140,12 +141,14 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
             : new FlowFocus(RootOf(foreground), 0, 0, 0, 0);
     }
 
-    private static Task<string?> FocusedElementIdAsync() => Task.Run(() =>
+    private static Task<string?> FocusedElementIdAsync(FlowFocus expected) => Task.Run(() =>
     {
         try
         {
+            if (!expected.SamePlaceAs(FocusNow())) return null;
             var element = System.Windows.Automation.AutomationElement.FocusedElement;
             var id = element?.GetRuntimeId();
+            if (!expected.SamePlaceAs(FocusNow())) return null;
             return id is { Length: > 0 } ? string.Join(".", id) : null;
         }
         catch { return (string?)null; }

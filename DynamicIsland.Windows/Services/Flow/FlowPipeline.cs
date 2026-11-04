@@ -62,14 +62,19 @@ public sealed class FlowPipeline : IDisposable
     public float Level => IsRecording ? _audio.Level : 0f;
 
     /// <summary>The push-to-talk key went down.</summary>
-    public void Press()
+    public void Press() => PressCore(null, capturedAtKeyDown: false);
+
+    /// <summary>Use a target captured synchronously with the keyboard event, even when unavailable.</summary>
+    public void PressCaptured(FlowTarget? target) => PressCore(target, capturedAtKeyDown: true);
+
+    private void PressCore(FlowTarget? captured, bool capturedAtKeyDown)
     {
         int generation;
         CancellationToken token;
         lock (_gate)
         {
             if (_disposed || _phase != Phase.Idle || !_enabled()) return;
-            _target = _paster.CaptureTarget();
+            _target = capturedAtKeyDown ? captured : _paster.CaptureTarget();
             _pressedAt = DateTime.UtcNow;
             try { _audio.Start(); }
             catch (FlowException ex)

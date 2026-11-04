@@ -29,8 +29,10 @@ public sealed class FlowHotkeyHook : IDisposable
     private readonly FlowKeyGate _gate;
     private readonly object _keyGateLock = new();
 
-    /// <summary>The push-to-talk key went down (on the hook thread; marshal before touching UI).</summary>
-    public event Action? Pressed;
+    /// <summary>The key-down target snapshot is delivered on the serial worker, not the hook thread.</summary>
+    public event Action<FlowTarget?>? Pressed;
+    /// <summary>Captures only quick native focus data and schedules UIA, on the key-down callback.</summary>
+    public Func<FlowTarget?>? CaptureTargetAtPress { get; set; }
     /// <summary>The push-to-talk key came up after a clean hold.</summary>
     public event Action? Released;
     /// <summary>A shortcut during the hold, or Esc during a dictation: discard it.</summary>
@@ -102,7 +104,16 @@ public sealed class FlowHotkeyHook : IDisposable
                             decision = _gate.OnKey((int)data.vkCode, down, data.time);
                             switch (decision.Signal)
                             {
-                                case FlowKeyGate.Signal.Pressed: Raise(Pressed); break;
+                                case FlowKeyGate.Signal.Pressed:
+                                    var handler = Pressed;
+                                    if (handler is not null)
+                                    {
+                                        FlowTarget? target = null;
+                                        try { target = CaptureTargetAtPress?.Invoke(); } catch { /* fail closed */ }
+                                        var captured = target;
+                                        Raise(() => handler(captured));
+                                    }
+                                    break;
                                 case FlowKeyGate.Signal.Released: Raise(Released); break;
                                 case FlowKeyGate.Signal.Cancelled: Raise(Cancelled); break;
                             }

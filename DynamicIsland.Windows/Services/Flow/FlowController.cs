@@ -57,9 +57,8 @@ public sealed class FlowController : IDisposable
             TranscribeAsync, CleanAsync, Publish, OnPasted, Hold, (message, ex) => _log.Error(message, ex));
         // The hook's worker calls these one at a time; each returns at once (Release hands the
         // slow work to a task after marking the session busy), so key events never queue up behind it.
-        _hook.Pressed += CaptureTargetApp;
-        _hook.Pressed += DuckOnPress;
-        _hook.Pressed += _pipeline.Press;
+        _hook.CaptureTargetAtPress = _injector.CaptureTarget;
+        _hook.Pressed += target => { CaptureTargetApp(target); DuckOnPress(); _pipeline.PressCaptured(target); };
         _hook.Released += () => _ = _pipeline.Release();
         _hook.Cancelled += () => _ = _pipeline.Cancel();
     }
@@ -135,11 +134,11 @@ public sealed class FlowController : IDisposable
     }
 
     /// <summary>Runs on the hook's event worker, not inside the hook callback.</summary>
-    private void CaptureTargetApp()
+    private void CaptureTargetApp(FlowTarget? target)
     {
         try
         {
-            var hwnd = GetForegroundWindow();
+            var hwnd = target?.AtPress.Window ?? 0;
             GetWindowThreadProcessId(hwnd, out var pid);
             using var process = pid == 0 ? null : System.Diagnostics.Process.GetProcessById((int)pid);
             _targetApp = process?.ProcessName;
@@ -147,7 +146,6 @@ public sealed class FlowController : IDisposable
         catch { _targetApp = null; }
     }
 
-    [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint hwnd, out uint processId);
 
     /// <summary>Show "Dictating with Sutra Flow" on the island while listening.</summary>
