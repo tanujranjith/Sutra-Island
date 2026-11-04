@@ -29,6 +29,17 @@ internal static class FlowPasteVerification
             var target = injector.CaptureTarget() ?? throw new InvalidOperationException("No focused target was available in the isolated CI desktop.");
             injector.PinTarget(target);
             var result = await injector.PasteAsync("Sutra pasted fixture", target, CancellationToken.None);
+            var coldOutcome = result.Outcome;
+            if (result.Outcome == FlowPasteOutcome.TargetChanged)
+            {
+                if (first.Text.Length != 0 || Clipboard.GetText() != "Sutra original clipboard fixture")
+                    throw new InvalidOperationException("Cold unverified target changed the test field or clipboard.");
+                // A missing first accessibility ID must fail closed. Exercise a fresh,
+                // warmed attempt rather than treating a later ID as the original target.
+                target = injector.CaptureTarget() ?? throw new InvalidOperationException("No target after accessibility warm-up.");
+                injector.PinTarget(target);
+                result = await injector.PasteAsync("Sutra pasted fixture", target, CancellationToken.None);
+            }
             if (result.Outcome != FlowPasteOutcome.Pasted)
             {
                 var current = injector.CaptureTarget();
@@ -47,7 +58,7 @@ internal static class FlowPasteVerification
             if (rejected.Outcome != FlowPasteOutcome.TargetChanged || second.Text.Length != 0)
                 throw new InvalidOperationException("Changed-target paste was not rejected.");
             Directory.CreateDirectory(AppDataPaths.Root);
-            File.WriteAllText(Path.Combine(AppDataPaths.Root, "flow-paste-probe.txt"), "PASS paste, clipboard text restore, and changed-target rejection");
+            File.WriteAllText(Path.Combine(AppDataPaths.Root, "flow-paste-probe.txt"), $"PASS cold outcome={coldOutcome}; warmed paste, clipboard text restore, and changed-target rejection");
         }
         finally { window.Close(); }
     }
