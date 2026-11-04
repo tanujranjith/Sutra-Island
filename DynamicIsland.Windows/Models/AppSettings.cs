@@ -227,7 +227,7 @@ public sealed class AppSettings
     /// <summary>Show "Dictating with Sutra Flow" on the island while listening.</summary>
     public bool FlowCreatorMode { get; set; }
     /// <summary>Words you retype right after a paste are added to the vocabulary.</summary>
-    public bool FlowAutoDictionary { get; set; } = true;
+    public bool FlowAutoDictionary { get; set; }
     /// <summary>In code editors: spoken casing ("camel case user id") and identifier-aware AI cleanup.</summary>
     public bool FlowCodeVariables { get; set; } = true;
     /// <summary>In Cursor and Windsurf: "at index dot tsx" becomes @index.tsx.</summary>

@@ -46,7 +46,8 @@ The whisper.cpp native libraries are embedded in the exe and extracted on first 
 ## Privacy
 
 - Audio never leaves your PC. Recording starts only while Right Ctrl is held and stops when you let go. Recordings are kept in memory and discarded after transcription.
-- With AI cleanup, only the transcribed text is sent to the provider you chose in Sutra Assistant, using the key already saved there.
+- With AI cleanup, the transcript, cleanup instructions and up to 60 vocabulary entries are sent to the selected provider using its configured key. The code-editor name is also included when code-aware cleanup is active. Local basic cleanup does not send that request.
+- Auto-add corrected words is off for new settings. If enabled, it reads the original non-password field through Windows accessibility after dictation, skips fields over 20,000 characters, compares later edits, and saves learned words to local vocabulary. Vocabulary may be included in AI cleanup requests. Existing explicit settings are preserved.
 - Text only goes where you were dictating. The window, focused control, and caret must match at key-down, key-up, and right before the paste. Windows UI Automation must identify the same focused field at all three points. If focus changes or the field cannot be verified, nothing is typed and the text is held for you to copy.
 - When Flow can't paste safely, your clipboard is left alone. The text is held in memory for two minutes: click the notification, or use **Copy** under Settings → Sutra Flow → Last undelivered dictation. It is never saved to disk.
 - Known limits: apps that do not expose a stable focused field through UI Automation cannot be verified safely; dictation is held for you to copy instead of being pasted automatically. In apps like Chrome, the first dictation after launch may be held while accessibility wakes up.
@@ -149,4 +150,4 @@ When **Lower other audio while listening** is on (the default), Flow turns other
 
 The target app is the foreground process when the key goes down. `FlowCodeText` is pure and covered by `FlowCodeTextTests`.
 
-Not built yet: command mode (speak an edit to selected text), auto-add corrected words to the dictionary, an always-on Flow bar, and a taskbar icon option. Launch at login already exists under Shortcuts & behavior.
+Not built yet: command mode (speak an edit to selected text), an always-on Flow bar, and a taskbar icon option. Launch at login already exists under Shortcuts & behavior.
