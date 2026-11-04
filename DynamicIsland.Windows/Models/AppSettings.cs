@@ -212,6 +212,22 @@ public sealed class AppSettings
     public string FlowAiModel { get; set; } = "";
     /// <summary>Reasoning effort for AI cleanup; sent only when the provider and model support it, otherwise auto.</summary>
     public string FlowAiEffort { get; set; } = "low";
+    /// <summary>Push-to-talk key: RightCtrl, RightAlt or RightShift.</summary>
+    public string FlowPushKey { get; set; } = "RightCtrl";
+    /// <summary>Microphone name as Windows lists it; empty follows the Windows default input.</summary>
+    public string FlowMicrophone { get; set; } = "";
+    /// <summary>Whisper language code ("en", "auto", "es", ...). Anything but English uses the multilingual model.</summary>
+    public string FlowLanguage { get; set; } = "en";
+    /// <summary>Soft start and stop sounds.</summary>
+    public bool FlowSounds { get; set; } = true;
+    /// <summary>Automatic punctuation, capitals and lists. Off keeps only what you say out loud.</summary>
+    public bool FlowSmartFormatting { get; set; } = true;
+    /// <summary>Show "Dictating with Sutra Flow" on the island while listening.</summary>
+    public bool FlowCreatorMode { get; set; }
+    /// <summary>In code editors: spoken casing ("camel case user id") and identifier-aware AI cleanup.</summary>
+    public bool FlowCodeVariables { get; set; } = true;
+    /// <summary>In Cursor and Windsurf: "at index dot tsx" becomes @index.tsx.</summary>
+    public bool FlowFileTagging { get; set; } = true;
     /// <summary>Expressive mode: keep uhs, ohs, hmms and drawn-out sounds instead of cleaning them away.</summary>
     public bool FlowExpressive { get; set; }
     /// <summary>Turn other apps' audio down while Flow is listening.</summary>

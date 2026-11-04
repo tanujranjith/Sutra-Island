@@ -18,7 +18,28 @@ public sealed class FlowKeyGate(Func<bool> isDictating)
     public enum Signal { None, Pressed, Released, Cancelled }
     public readonly record struct Decision(Signal Signal, bool Swallow);
 
-    private readonly int _pttKey = 0xA3; // Right Ctrl
+    public const int VkRightCtrl = 0xA3, VkRightAlt = 0xA5, VkRightShift = 0xA1;
+
+    private int _pttKey = VkRightCtrl;
+
+    /// <summary>
+    /// The push-to-talk key. Right Alt's own press and release are swallowed, because on its own
+    /// Alt would open the focused app's menu bar when you let go.
+    /// </summary>
+    public int PttKey
+    {
+        get => _pttKey;
+        set { if (value == _pttKey) return; _pttKey = value; _held = false; }
+    }
+
+    private bool SwallowPtt => _pttKey == VkRightAlt;
+
+    public static int KeyFor(string? name) => name switch
+    {
+        "RightAlt" => VkRightAlt,
+        "RightShift" => VkRightShift,
+        _ => VkRightCtrl,
+    };
     private readonly HashSet<int> _swallowed = [];
     private bool _held;
     private uint _pressedAt;
@@ -30,9 +51,9 @@ public sealed class FlowKeyGate(Func<bool> isDictating)
     {
         if (vk == _pttKey)
         {
-            if (down && !_held) { _held = true; _pressedAt = time; _swallowed.Clear(); return new(Signal.Pressed, false); } // Clear: never let a missed key-up block a key for good
-            if (!down && _held) { _held = false; return new(Signal.Released, false); }
-            return new(Signal.None, false); // auto-repeat, or an up after a cancel
+            if (down && !_held) { _held = true; _pressedAt = time; _swallowed.Clear(); return new(Signal.Pressed, SwallowPtt); } // Clear: never let a missed key-up block a key for good
+            if (!down && _held) { _held = false; return new(Signal.Released, SwallowPtt); }
+            return new(Signal.None, SwallowPtt); // auto-repeat, or an up after a cancel
         }
 
         if (!down)

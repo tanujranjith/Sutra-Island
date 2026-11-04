@@ -73,4 +73,8 @@ public sealed class FlowTextCleanerTests
     [Fact]
     public void NormalModeStillDropsDrawnOutFillers() =>
         Assert.Equal("I dont know maybe tomorrow.", FlowTextCleaner.Basic("uhhhhhh i dont know maybe tomorrow"));
+
+    [Fact]
+    public void PlainFormattingAddsNoCapitalsOrPeriod() =>
+        Assert.Equal("so I think we should meet at three", FlowTextCleaner.Basic("um so i think we should meet at three", smartFormatting: false));
 }

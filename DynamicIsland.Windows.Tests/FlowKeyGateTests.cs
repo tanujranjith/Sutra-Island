@@ -75,4 +75,23 @@ public sealed class FlowKeyGateTests
         Assert.True(gate.Reset());
         Assert.False(gate.Reset());
     }
+
+    [Fact]
+    public void PushKeyIsConfigurable()
+    {
+        var gate = Gate();
+        gate.PttKey = FlowKeyGate.KeyFor("RightShift");
+        Assert.Equal(Signal.None, gate.OnKey(RCtrl, true, 1000).Signal); // Right Ctrl is just a key now
+        Assert.Equal(new Decision(Signal.Pressed, false), gate.OnKey(0xA1, true, 1000));
+        Assert.Equal(new Decision(Signal.Released, false), gate.OnKey(0xA1, false, 2000));
+    }
+
+    [Fact]
+    public void RightAltIsSwallowedSoMenusDontOpen()
+    {
+        var gate = Gate();
+        gate.PttKey = FlowKeyGate.KeyFor("RightAlt");
+        Assert.Equal(new Decision(Signal.Pressed, true), gate.OnKey(0xA5, true, 1000));
+        Assert.Equal(new Decision(Signal.Released, true), gate.OnKey(0xA5, false, 2000));
+    }
 }

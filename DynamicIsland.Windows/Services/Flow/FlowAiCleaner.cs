@@ -40,6 +40,19 @@ public sealed class FlowAiCleaner(AppSettings settings, IQProviderRegistry provi
         Punctuate around them naturally (commas, ellipses, exclamation marks) without removing them.
         """;
 
+    private const string PlainFormattingRule = """
+        PLAIN FORMATTING: ignore rules 6 and 7. Add no punctuation, capitals, or lists the speaker did not say out loud;
+        only turn spoken punctuation names into marks.
+        """;
+
+    private const string LanguageRule = "The dictation may be in any language. Keep it in the language it was spoken; never translate it.";
+
+    private static string CodeRule(string app) => $"""
+        CODE EDITOR: the speaker is dictating into {app}. When they clearly name a code identifier (a variable,
+        function, class, file, or command), write it the way code spells it (getUserById, user_id, AuthService,
+        npm run dev) and keep existing identifiers exactly. Never invent code or wrap prose in backticks.
+        """;
+
     private static readonly (string Raw, string Clean)[] ExpressiveExamples =
     [
         ("uhhhhh i dont know maybe at 3 actually 4", "Uhhhhh, I don't know... maybe at 4."),
@@ -99,19 +112,25 @@ public sealed class FlowAiCleaner(AppSettings settings, IQProviderRegistry provi
     }
 
     /// <summary>Returns the AI-cleaned text, or null to fall back to local cleanup.</summary>
-    public async Task<string?> CleanAsync(string text, IReadOnlyList<string> vocabulary, CancellationToken token)
+    /// <param name="codeApp">The code editor being dictated into, or null.</param>
+    public async Task<string?> CleanAsync(string text, IReadOnlyList<string> vocabulary, CancellationToken token, string? codeApp = null)
     {
         if (Unavailable() is { } reason) { log.Debug($"Sutra Flow: AI cleanup skipped ({reason})."); return null; }
         var provider = providers.Find(ProviderId)!;
         var isOllama = string.Equals(provider.Info.Id, "ollama", StringComparison.OrdinalIgnoreCase);
         var history = new List<QMessage>();
         var expressive = settings.FlowExpressive;
-        foreach (var (raw, clean) in expressive ? Examples.Skip(1).Concat(ExpressiveExamples) : Examples)
+        var examples = expressive ? Examples.Skip(1).Concat(ExpressiveExamples) : Examples.AsEnumerable();
+        if (!settings.FlowSmartFormatting) examples = examples.Where(e => !e.Clean.Contains('\n')); // no list example
+        foreach (var (raw, clean) in examples)
         {
             history.Add(new QMessage("user", raw));
             history.Add(new QMessage("assistant", clean));
         }
         var system = expressive ? Instructions + "\n" + ExpressiveRule : Instructions;
+        if (!settings.FlowSmartFormatting) system += "\n" + PlainFormattingRule;
+        if (!string.Equals(settings.FlowLanguage, "en", StringComparison.OrdinalIgnoreCase)) system += "\n" + LanguageRule;
+        if (codeApp is not null) system += "\n" + CodeRule(codeApp);
         if (vocabulary.Count > 0) system += "\nVocabulary: " + string.Join(", ", vocabulary.Take(60));
         var request = new QRequest(QMode.Say, text, null, history,
             string.IsNullOrWhiteSpace(ModelId) ? provider.Info.DefaultModel : ModelId,

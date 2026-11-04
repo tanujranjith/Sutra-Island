@@ -22,6 +22,8 @@ public partial class IslandWindow
         var reduced = (DataContext as IslandViewModel)?.IsReducedMotion ?? false;
         FlowDots.ReducedMotion = reduced;
         FlowOverlay.ToolTip = string.IsNullOrEmpty(status.Detail) ? null : status.Detail;
+        FlowCreatorLabel.Visibility = _flow?.CreatorMode == true && status.State is FlowState.Listening or FlowState.Released or FlowState.Polishing
+            ? Visibility.Visible : Visibility.Collapsed;
         AutomationPropertiesHelper.SetName(FlowOverlay, status.State switch
         {
             FlowState.Listening => "Sutra Flow listening",

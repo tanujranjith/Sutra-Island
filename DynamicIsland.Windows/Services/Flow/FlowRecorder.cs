@@ -39,6 +39,27 @@ public sealed class FlowRecorder : IFlowAudio, IDisposable
         public float Peak;
     }
 
+    /// <summary>Microphone names as Windows lists them (WinMM truncates them to 31 characters).</summary>
+    public static IReadOnlyList<string> Microphones()
+    {
+        var names = new List<string>();
+        try { for (var i = 0; i < WaveInEvent.DeviceCount; i++) names.Add(WaveInEvent.GetCapabilities(i).ProductName); }
+        catch { }
+        return names;
+    }
+
+    /// <summary>The microphone to record from; empty or unknown follows the Windows default.</summary>
+    public Func<string>? PreferredDevice { get; set; }
+
+    private static int DeviceNumberFor(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return -1;
+        var names = Microphones();
+        for (var i = 0; i < names.Count; i++)
+            if (string.Equals(names[i], name, StringComparison.OrdinalIgnoreCase)) return i;
+        return -1; // unplugged: fall back to the default rather than fail
+    }
+
     /// <summary>Opens the microphone. Throws <see cref="FlowException"/> with a short reason on failure.</summary>
     public void Start()
     {
@@ -49,7 +70,7 @@ public sealed class FlowRecorder : IFlowAudio, IDisposable
             _level = 0;
             var wave = new WaveInEvent
             {
-                DeviceNumber = -1, // WAVE_MAPPER: follows the Windows default input device
+                DeviceNumber = DeviceNumberFor(PreferredDevice?.Invoke()), // -1 = WAVE_MAPPER: the Windows default input
                 WaveFormat = new WaveFormat(SampleRate, 16, 1),
                 BufferMilliseconds = 30,
                 NumberOfBuffers = 3,

@@ -39,7 +39,8 @@ public static partial class FlowTextCleaner
     /// Basic cleanup: fillers, stutters, spoken punctuation, "scratch that", capitals.
     /// <paramref name="expressive"/> keeps fillers and drawn-out sounds ("uhhhh", "OOOOHhhh") as heard.
     /// </summary>
-    public static string Basic(string raw, bool expressive = false)
+    /// <param name="smartFormatting">False keeps only spoken punctuation: no automatic capitals or closing period.</param>
+    public static string Basic(string raw, bool expressive = false, bool smartFormatting = true)
     {
         if (string.IsNullOrWhiteSpace(raw)) return "";
         var t = " " + raw.Trim() + " ";
@@ -69,9 +70,9 @@ public static partial class FlowTextCleaner
         t = LeadingPunct().Replace(t, "");
         t = t.Trim(' ', ',');
 
-        t = Capitalize(t);
+        if (smartFormatting) t = Capitalize(t);
         t = StandaloneI().Replace(t, "I");
-        if (t.Length > 0 && char.IsLetterOrDigit(t[^1]) && WordCount(t) >= 4) t += ".";
+        if (smartFormatting && t.Length > 0 && char.IsLetterOrDigit(t[^1]) && WordCount(t) >= 4) t += ".";
         return t;
     }
 

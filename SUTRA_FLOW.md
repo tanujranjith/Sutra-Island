@@ -130,3 +130,23 @@ When **Lower other audio while listening** is on (the default), Flow turns other
 - Whisper gets a prompt written in that style ("Umm, uhhh... hmm. Ohhh, okay..."), which nudges it to write the sounds down rather than drop them. Whisper decides how many letters a drawn-out sound gets, so the exact length isn't guaranteed.
 - Basic cleanup skips filler removal and still fixes repeated words, spoken punctuation, and capitals.
 - AI cleanup adds an EXPRESSIVE MODE rule that keeps those sounds exactly as written. It uses expressive examples in place of the filler-removal one.
+
+
+## Settings added Nov 3 (Wispr-style settings pass)
+
+| Setting | Key | Default | What it does |
+|---|---|---|---|
+| Push-to-talk key | `FlowPushKey` | Right Ctrl | Right Ctrl, Right Alt, or Right Shift. Right Alt's own press and release are swallowed so the app menu bar doesn't open, which means AltGr characters won't type while it's selected. |
+| Microphone | `FlowMicrophone` | Windows default | Picks a WinMM input by name and falls back to the default if that mic is unplugged. |
+| Language | `FlowLanguage` | English | English uses `ggml-base.en`. Auto-detect and other languages download `ggml-base.bin` (148 MB) once. AI cleanup is told never to translate. |
+| Smart formatting | `FlowSmartFormatting` | on | Off: no automatic capitals, closing period, or lists. Spoken punctuation still works. |
+| Dictation sounds | `FlowSounds` | on | Synthesized cues: start, stop (played after the mic's tail), and error. |
+| Variable recognition | `FlowCodeVariables` | on | In VS Code, Cursor, Windsurf, and other editors: "camel/snake/pascal/kebab/constant case …" becomes an identifier, and AI cleanup gets a code-editor rule. |
+| File tagging | `FlowFileTagging` | on | In Cursor and Windsurf: "at index dot tsx" becomes `@index.tsx` (known extensions only, single-word names). |
+| Creator mode | `FlowCreatorMode` | off | "Dictating with Sutra Flow" shows on the island while dictating. |
+| Vocabulary import | — | — | .txt or .csv files, one term per line or comma-separated. Up to 300 terms; Whisper uses the first 60. |
+| Reset Sutra Flow | — | — | Resets every `Flow*` setting except the word count. The model stays on disk. |
+
+The target app is the foreground process when the key goes down. `FlowCodeText` is pure and covered by `FlowCodeTextTests`.
+
+Not built yet: command mode (speak an edit to selected text), auto-add corrected words to the dictionary, an always-on Flow bar, and a taskbar icon option. Launch at login already exists under Shortcuts & behavior.

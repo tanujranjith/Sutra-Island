@@ -24,6 +24,8 @@ public sealed class FlowSettingsViewModel : ObservableObject
         DownloadModelCommand = new RelayCommand(() => _ = _flow.Engine.EnsureModelAsync(), () => !_flow.Engine.IsModelInstalled && !_flow.Engine.IsDownloading);
         CopyHeldTextCommand = new RelayCommand(() => _flow.CopyHeldText(), () => _flow.HasHeldText);
         RefreshUsageCommand = new RelayCommand(() => RaisePropertyChanged(nameof(WordsDictated)));
+        ImportVocabularyCommand = new RelayCommand(ImportVocabulary);
+        ResetCommand = new RelayCommand(ResetFlow);
         _flow.HeldTextChanged += (_, _) => ((RelayCommand)CopyHeldTextCommand).RaiseCanExecuteChanged();
         _flow.Engine.ModelStatusChanged += (_, _) => Application.Current?.Dispatcher.BeginInvoke(() =>
         {
@@ -43,6 +45,119 @@ public sealed class FlowSettingsViewModel : ObservableObject
             RaisePropertyChanged();
             Save();
         }
+    }
+
+    // ---- General -------------------------------------------------------------------------
+
+    private static readonly (string Label, string Value)[] PushKeys =
+        [("Right Ctrl", "RightCtrl"), ("Right Alt", "RightAlt"), ("Right Shift", "RightShift")];
+    public IReadOnlyList<string> PushKeyOptions { get; } = PushKeys.Select(k => k.Label).ToArray();
+    public string PushKey
+    {
+        get => PushKeys.FirstOrDefault(k => k.Value == _settings.FlowPushKey).Label ?? "Right Ctrl";
+        set
+        {
+            var key = PushKeys.FirstOrDefault(k => k.Label == value).Value;
+            if (key is null || key == _settings.FlowPushKey) return;
+            _settings.FlowPushKey = key;
+            RaisePropertyChanged();
+            RaisePropertyChanged(nameof(PushKeyNote));
+            Save();
+        }
+    }
+    public string PushKeyNote => $"Hold {PushKey} and speak. A quick tap or a quick shortcut ({PushKey}+C) still works as normal."
+        + (_settings.FlowPushKey == "RightAlt" ? " Right Alt is reserved for Flow, so AltGr characters won't type while it's selected." : "");
+
+    private const string DefaultMic = "Windows default";
+    public IReadOnlyList<string> MicrophoneOptions => [DefaultMic, .. FlowRecorder.Microphones()];
+    public string Microphone
+    {
+        get => string.IsNullOrWhiteSpace(_settings.FlowMicrophone) ? DefaultMic : _settings.FlowMicrophone;
+        set
+        {
+            var name = value == DefaultMic || value is null ? "" : value;
+            if (name == _settings.FlowMicrophone) return;
+            _settings.FlowMicrophone = name;
+            RaisePropertyChanged();
+            Save();
+        }
+    }
+
+    private static readonly (string Label, string Code)[] Languages =
+    [
+        ("English (fastest)", "en"), ("Auto-detect (99 languages)", "auto"), ("Spanish", "es"), ("Tamil", "ta"), ("Hindi", "hi"),
+        ("French", "fr"), ("German", "de"), ("Portuguese", "pt"), ("Chinese", "zh"), ("Japanese", "ja"), ("Korean", "ko"), ("Arabic", "ar"),
+    ];
+    public IReadOnlyList<string> LanguageOptions { get; } = Languages.Select(l => l.Label).ToArray();
+    public string Language
+    {
+        get => Languages.FirstOrDefault(l => l.Code == _settings.FlowLanguage).Label ?? "English (fastest)";
+        set
+        {
+            var code = Languages.FirstOrDefault(l => l.Label == value).Code;
+            if (code is null || code == _settings.FlowLanguage) return;
+            _settings.FlowLanguage = code;
+            RaisePropertyChanged();
+            RaisePropertyChanged(nameof(ModelStatus));
+            RaisePropertyChanged(nameof(ModelReady));
+            ((RelayCommand)DownloadModelCommand).RaiseCanExecuteChanged();
+            Save(); // starts the multilingual model download when needed
+        }
+    }
+
+    // ---- Sound & extras --------------------------------------------------------------------
+
+    public bool Sounds { get => _settings.FlowSounds; set => Set(value, _settings.FlowSounds, v => _settings.FlowSounds = v); }
+    public bool SmartFormatting { get => _settings.FlowSmartFormatting; set => Set(value, _settings.FlowSmartFormatting, v => _settings.FlowSmartFormatting = v); }
+    public bool CreatorMode { get => _settings.FlowCreatorMode; set => Set(value, _settings.FlowCreatorMode, v => _settings.FlowCreatorMode = v); }
+    public bool CodeVariables { get => _settings.FlowCodeVariables; set => Set(value, _settings.FlowCodeVariables, v => _settings.FlowCodeVariables = v); }
+    public bool FileTagging { get => _settings.FlowFileTagging; set => Set(value, _settings.FlowFileTagging, v => _settings.FlowFileTagging = v); }
+
+    private void Set(bool value, bool current, Action<bool> apply, [System.Runtime.CompilerServices.CallerMemberName] string? name = null)
+    {
+        if (value == current) return;
+        apply(value);
+        RaisePropertyChanged(name);
+        Save();
+    }
+
+    // ---- Data ------------------------------------------------------------------------------
+
+    public ICommand ImportVocabularyCommand { get; }
+    public ICommand ResetCommand { get; }
+
+    /// <summary>Adds terms from a .txt or .csv file to the vocabulary (duplicates skipped).</summary>
+    private void ImportVocabulary()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog { Title = "Import vocabulary", Filter = "Word lists (*.txt;*.csv)|*.txt;*.csv|All files (*.*)|*.*" };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            var terms = FlowCodeText.ParseVocabulary(System.IO.File.ReadAllText(dialog.FileName));
+            var before = _settings.FlowVocabulary.Count;
+            Vocabulary = string.Join(", ", _settings.FlowVocabulary.Concat(terms));
+            var added = _settings.FlowVocabulary.Count - before;
+            System.Windows.MessageBox.Show($"Added {added} new term{(added == 1 ? "" : "s")} to your vocabulary.", "Sutra Flow", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            System.Windows.MessageBox.Show("Couldn't read that file: " + ex.Message, "Sutra Flow", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+        }
+    }
+
+    /// <summary>Puts every Sutra Flow setting back to its default. Usage and the downloaded model are kept.</summary>
+    private void ResetFlow()
+    {
+        if (System.Windows.MessageBox.Show("Reset every Sutra Flow setting to its default? Your vocabulary is cleared; your word count and the downloaded speech model are kept.",
+                "Reset Sutra Flow", System.Windows.MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning) != System.Windows.MessageBoxResult.OK) return;
+        var defaults = new AppSettings();
+        foreach (var property in typeof(AppSettings).GetProperties())
+        {
+            if (!property.Name.StartsWith("Flow", StringComparison.Ordinal) || property.Name == nameof(AppSettings.FlowWordsDictated) || !property.CanWrite) continue;
+            property.SetValue(_settings, property.GetValue(defaults));
+        }
+        Save();
+        Refresh();
     }
 
     /// <summary>Keep uhs, ohs and drawn-out sounds.</summary>
@@ -185,7 +300,7 @@ public sealed class FlowSettingsViewModel : ObservableObject
         set
         {
             var words = (value ?? "").Split([',', '\n', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Distinct(StringComparer.OrdinalIgnoreCase).Take(100).ToList();
+                .Distinct(StringComparer.OrdinalIgnoreCase).Take(300).ToList();
             if (words.SequenceEqual(_settings.FlowVocabulary)) return;
             _settings.FlowVocabulary = words;
             RaisePropertyChanged();
@@ -203,7 +318,8 @@ public sealed class FlowSettingsViewModel : ObservableObject
 
     public void Refresh()
     {
-        foreach (var name in new[] { nameof(Enabled), nameof(DuckAudio), nameof(DuckLevel), nameof(Expressive), nameof(Cleanup), nameof(CleanupNote), nameof(Vocabulary), nameof(ModelStatus), nameof(ModelReady), nameof(WordsDictated) })
+        foreach (var name in new[] { nameof(Enabled), nameof(PushKey), nameof(PushKeyNote), nameof(MicrophoneOptions), nameof(Microphone), nameof(Language),
+                     nameof(Sounds), nameof(SmartFormatting), nameof(CreatorMode), nameof(CodeVariables), nameof(FileTagging), nameof(DuckAudio), nameof(DuckLevel), nameof(Expressive), nameof(Cleanup), nameof(CleanupNote), nameof(Vocabulary), nameof(ModelStatus), nameof(ModelReady), nameof(WordsDictated) })
             RaisePropertyChanged(name);
         RaiseAi(); // keys and the Assistant's provider can change on other settings pages
     }

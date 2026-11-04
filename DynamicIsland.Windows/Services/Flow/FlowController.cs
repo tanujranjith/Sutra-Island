@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Windows.Threading;
 using DynamicIsland.Windows.Models;
 
@@ -22,6 +23,9 @@ public sealed class FlowController : IDisposable
     private readonly FlowPipeline _pipeline;
     private readonly FlowTextInjector _injector;
     private readonly FlowAudioDucker _ducker;
+    private readonly FlowSounds _sounds;
+    /// <summary>The app that was in front when the push-to-talk key went down (process name).</summary>
+    private volatile string? _targetApp;
     private bool _ducking;
     private string? _heldText;
     private DispatcherTimer? _heldTimer;
@@ -42,9 +46,10 @@ public sealed class FlowController : IDisposable
         _settingsService = settingsService;
         _ui = ui;
         _log = log;
-        Engine = new WhisperEngine(log);
+        Engine = new WhisperEngine(log, () => _settings.FlowLanguage);
         _hook = new FlowHotkeyHook(log, () => _pipeline?.IsRecording == true);
-        _recorder = new FlowRecorder(log);
+        _recorder = new FlowRecorder(log) { PreferredDevice = () => _settings.FlowMicrophone };
+        _sounds = new FlowSounds(log);
         _ai = new FlowAiCleaner(settings, providers, secrets, log);
         _injector = new FlowTextInjector(log, ui);
         _ducker = new FlowAudioDucker(log);
@@ -52,6 +57,7 @@ public sealed class FlowController : IDisposable
             TranscribeAsync, CleanAsync, Publish, OnPasted, Hold, (message, ex) => _log.Error(message, ex));
         // The hook's worker calls these one at a time; each returns at once (Release hands the
         // slow work to a task after marking the session busy), so key events never queue up behind it.
+        _hook.Pressed += CaptureTargetApp;
         _hook.Pressed += _pipeline.Press;
         _hook.Released += () => _ = _pipeline.Release();
         _hook.Cancelled += () => _ = _pipeline.Cancel();
@@ -71,7 +77,7 @@ public sealed class FlowController : IDisposable
     /// <summary>Call after Flow settings change. Turning Flow off abandons a dictation in progress.</summary>
     public void ApplySettings()
     {
-        _hook.Configure(_settings.FlowEnabled);
+        _hook.Configure(_settings.FlowEnabled, FlowKeyGate.KeyFor(_settings.FlowPushKey));
         if (_settings.FlowEnabled) _ = Engine.EnsureModelAsync();
         else _pipeline.Disable();
     }
@@ -95,14 +101,43 @@ public sealed class FlowController : IDisposable
 
     private async Task<string> CleanAsync(string raw, CancellationToken token)
     {
+        var app = _targetApp;
+        var inEditor = _settings.FlowCodeVariables && FlowCodeText.IsCodeEditor(app);
+        var text = await CleanTextAsync(raw, inEditor ? app : null, token).ConfigureAwait(false);
+        if (inEditor) text = FlowCodeText.ApplySpokenCasing(text);
+        if (_settings.FlowFileTagging && FlowCodeText.TakesFileTags(app)) text = FlowCodeText.TagFiles(text);
+        return text;
+    }
+
+    private async Task<string> CleanTextAsync(string raw, string? codeApp, CancellationToken token)
+    {
         if (_settings.FlowCleanup == FlowCleanupMode.Off) return raw;
-        var text = FlowTextCleaner.Basic(raw, _settings.FlowExpressive);
+        var text = FlowTextCleaner.Basic(raw, _settings.FlowExpressive, _settings.FlowSmartFormatting);
         if (_settings.FlowCleanup != FlowCleanupMode.Ai) return text;
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(token);
         limit.CancelAfter(AiTimeout);
-        try { return await _ai.CleanAsync(text, Vocabulary(), limit.Token).ConfigureAwait(false) ?? text; }
+        try { return await _ai.CleanAsync(text, Vocabulary(), limit.Token, codeApp).ConfigureAwait(false) ?? text; }
         catch (OperationCanceledException) when (!token.IsCancellationRequested) { return text; } // AI too slow: keep Basic
     }
+
+    /// <summary>Runs on the hook's event worker, not inside the hook callback.</summary>
+    private void CaptureTargetApp()
+    {
+        try
+        {
+            var hwnd = GetForegroundWindow();
+            GetWindowThreadProcessId(hwnd, out var pid);
+            using var process = pid == 0 ? null : System.Diagnostics.Process.GetProcessById((int)pid);
+            _targetApp = process?.ProcessName;
+        }
+        catch { _targetApp = null; }
+    }
+
+    [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint hwnd, out uint processId);
+
+    /// <summary>Show "Dictating with Sutra Flow" on the island while listening.</summary>
+    public bool CreatorMode => _settings.FlowCreatorMode;
 
     /// <summary>True while a dictation that couldn't be pasted is waiting for the user to copy it.</summary>
     public bool HasHeldText => _heldText is not null;
@@ -152,10 +187,20 @@ public sealed class FlowController : IDisposable
     {
         if (!_ui.CheckAccess()) { _ui.BeginInvoke(() => Publish(status)); return; }
         if (Status == status) return;
+        var previous = Status.State;
         Status = status;
         UpdateDucking(status.State);
+        PlayCue(previous, status.State);
         _log.Debug($"Sutra Flow: {status.State} {status.Detail}");
         StatusChanged?.Invoke(this, status);
+    }
+
+    private void PlayCue(FlowState from, FlowState to)
+    {
+        if (!_settings.FlowSounds || from == to) return;
+        if (to == FlowState.Listening) _sounds.PlayStart();
+        else if (to == FlowState.Polishing && from is FlowState.Listening or FlowState.Released) _sounds.PlayStop(); // after the mic's tail, so it isn't recorded
+        else if (to == FlowState.Error) _sounds.PlayError();
     }
 
     /// <summary>Music goes down when listening starts and comes back once the recording's tail is captured.</summary>

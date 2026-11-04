@@ -13,23 +13,37 @@ namespace DynamicIsland.Windows.Services.Flow;
 /// </summary>
 public sealed class WhisperEngine : IDisposable
 {
-    public const string ModelFileName = "ggml-base.en.bin";
-    private const string ModelUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin";
+    private const string EnglishModel = "ggml-base.en.bin";
+    private const string MultilingualModel = "ggml-base.bin";
+    private const string ModelBaseUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
     private const long MinModelBytes = 100L * 1024 * 1024;
     private static readonly string[] NativeFiles = ["ggml-base-whisper.dll", "ggml-cpu-whisper.dll", "ggml-whisper.dll", "whisper.dll"];
 
     private readonly LoggingService _log;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly Func<string> _language;
     private WhisperFactory? _factory;
+    private string? _factoryPath;
     private Task? _download;
     private double _downloadProgress = -1;
 
     public event EventHandler? ModelStatusChanged;
 
-    public WhisperEngine(LoggingService log) => _log = log;
+    /// <param name="language">The Whisper language code to dictate in ("en", "auto", "es", ...).</param>
+    public WhisperEngine(LoggingService log, Func<string>? language = null)
+    {
+        _log = log;
+        _language = language ?? (() => "en");
+    }
+
+    /// <summary>The language code in use; English gets the faster English-only model.</summary>
+    public string Language => string.IsNullOrWhiteSpace(_language()) ? "en" : _language().Trim().ToLowerInvariant();
+    public bool Multilingual => Language != "en";
+    public string ModelFileName => Multilingual ? MultilingualModel : EnglishModel;
+    private string ModelName => Multilingual ? "Whisper base (multilingual)" : "Whisper base.en";
 
     public static string Folder => Path.Combine(Infrastructure.AppDataPaths.Root, "SutraFlow");
-    public static string ModelPath => Path.Combine(Folder, "models", ModelFileName);
+    public string ModelPath => Path.Combine(Folder, "models", ModelFileName);
     public bool IsModelInstalled => File.Exists(ModelPath) && new FileInfo(ModelPath).Length >= MinModelBytes;
     public bool IsDownloading => _download is { IsCompleted: false };
     /// <summary>0..1 while downloading, otherwise -1.</summary>
@@ -38,9 +52,9 @@ public sealed class WhisperEngine : IDisposable
 
     public string ModelStatusText => IsDownloading
         ? $"Downloading speech model… {Math.Max(0, _downloadProgress) * 100:0}%"
-        : IsModelInstalled ? "Whisper base.en · installed"
+        : IsModelInstalled ? $"{ModelName} · installed"
         : LastDownloadError is { } error ? $"Download failed: {error}"
-        : "Speech model not installed (148 MB)";
+        : $"{ModelName} not installed (148 MB)";
 
     /// <summary>Starts the model download if it is missing. Safe to call repeatedly.</summary>
     public Task EnsureModelAsync()
@@ -59,13 +73,15 @@ public sealed class WhisperEngine : IDisposable
         LastDownloadError = null;
         _downloadProgress = 0;
         Raise();
-        var part = ModelPath + ".part";
+        var modelPath = ModelPath;
+        var url = ModelBaseUrl + ModelFileName;
+        var part = modelPath + ".part";
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(ModelPath)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
             using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(20) };
             http.DefaultRequestHeaders.UserAgent.ParseAdd("SutraIsland/1.3 (+https://github.com/tanujranjith/Sutra-Island)");
-            using var response = await http.GetAsync(ModelUrl, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+            using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             var total = response.Content.Headers.ContentLength ?? 147_964_211L;
             await using (var input = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
@@ -85,7 +101,7 @@ public sealed class WhisperEngine : IDisposable
                 if (read < MinModelBytes || (response.Content.Headers.ContentLength is long expected && read != expected))
                     throw new IOException("the download was incomplete");
             }
-            File.Move(part, ModelPath, overwrite: true);
+            File.Move(part, modelPath, overwrite: true);
             _log.Info("Sutra Flow: speech model downloaded.");
         }
         catch (Exception ex)
@@ -113,7 +129,7 @@ public sealed class WhisperEngine : IDisposable
         {
             var factory = GetFactory();
             var builder = factory.CreateBuilder()
-                .WithLanguage("en")
+                .WithLanguage(Language)
                 .WithThreads(Math.Clamp(Environment.ProcessorCount - 1, 2, 8))
                 .WithNoContext()
                 .WithSingleSegment();
@@ -136,11 +152,15 @@ public sealed class WhisperEngine : IDisposable
 
     private WhisperFactory GetFactory()
     {
-        if (_factory is not null) return _factory;
+        var path = ModelPath;
+        if (_factory is not null && _factoryPath == path) return _factory;
+        _factory?.Dispose(); // the language changed between English and multilingual
+        _factory = null;
         ExtractNatives();
         try
         {
-            _factory = WhisperFactory.FromPath(ModelPath);
+            _factory = WhisperFactory.FromPath(path);
+            _factoryPath = path;
         }
         catch (Exception ex)
         {

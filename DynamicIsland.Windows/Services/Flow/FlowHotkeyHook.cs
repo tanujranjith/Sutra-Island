@@ -43,8 +43,9 @@ public sealed class FlowHotkeyHook : IDisposable
         _pump = Task.Run(PumpAsync);
     }
 
-    public void Configure(bool enabled)
+    public void Configure(bool enabled, int pushKey = FlowKeyGate.VkRightCtrl)
     {
+        if (_gate.PttKey != pushKey) { if (_gate.Reset()) Raise(Cancelled); _gate.PttKey = pushKey; }
         _enabled = enabled;
         if (!enabled && _gate.Reset()) Raise(Cancelled);
     }

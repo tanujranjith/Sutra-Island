@@ -8,6 +8,7 @@
 - Match the Flow overlay to the island's own motion and surface: it uses the island surface colour, fades in over 180 ms with the same 0.82→1 spring as other compact content, and leaves with a short ease-in fade. No existing island animation was changed.
 - Flow keeps recording for 150 ms after release and keeps the device's final buffers, so the last word isn't clipped.
 - A stray key no longer stops a dictation. After the first 0.3 seconds, other keys are ignored while you talk, and Esc cancels.
+- Sutra Flow settings: push-to-talk key, microphone, language (auto-detect and 11 others), sounds, smart formatting, creator mode, code variable recognition, Cursor/Windsurf @file tagging, vocabulary import, reset
 - Sutra Flow Expressive mode keeps the uhhhs, ohhhs and drawn-out sounds
 - Sutra Flow lowers music and other apps while you dictate, then restores them
 - Sutra Flow has its own AI cleanup provider, model, and reasoning level in Settings → Sutra Flow, separate from Sutra Assistant. It uses the API keys you already saved.
