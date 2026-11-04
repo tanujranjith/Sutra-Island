@@ -79,14 +79,6 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             catch(Exception ex){Directory.CreateDirectory(Infrastructure.AppDataPaths.Root);File.WriteAllText(Path.Combine(Infrastructure.AppDataPaths.Root,"verification-error.txt"),ex.ToString());Shutdown(1);}
             return;
         }
-        if (e.Args.Contains("--verify-flow-paste"))
-        {
-            ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            if (!Infrastructure.AppDataPaths.IsPreview) { Shutdown(2); return; }
-            try { await Infrastructure.FlowPasteVerification.RunAsync(); Shutdown(0); }
-            catch (Exception ex) { Directory.CreateDirectory(Infrastructure.AppDataPaths.Root); File.WriteAllText(Path.Combine(Infrastructure.AppDataPaths.Root, "flow-paste-error.txt"), ex.ToString()); Shutdown(1); }
-            return;
-        }
         Infrastructure.GraphiteMenuSupport.Initialize();
         if (e.Args.Contains("--verify-notification-motion") || e.Args.Contains("--verify-graphite") || e.Args.Contains("--verify-mascot-bulb") || e.Args.Contains("--verify-composer-keys") || e.Args.Contains("--verify-command-panels") || e.Args.Contains("--verify-sutra-update") || e.Args.Contains("--verify-upgrades") || e.Args.Contains("--verify-q-providers") || e.Args.Contains("--verify-q-compare") || e.Args.Contains("--verify-notification-click"))
         {
