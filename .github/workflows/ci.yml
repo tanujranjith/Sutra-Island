@@ -23,3 +23,19 @@ jobs:
         run: dotnet test .\DynamicIsland.Windows.Tests\DynamicIsland.Windows.Tests.csproj -c Release -m:1
       - name: Build app
         run: dotnet build .\DynamicIsland.Windows\DynamicIsland.Windows.csproj -c Release -r win-x64
+      # One-off WPF fixture probe; removed after the result is captured.
+      - name: Probe isolated WPF verification harness
+        shell: pwsh
+        run: |
+          $env:ISLAND_PREVIEW = '1'
+          $env:ISLAND_PREVIEW_DATA = Join-Path $env:RUNNER_TEMP 'sutra-wpf-fixture'
+          $exe = Get-ChildItem .\DynamicIsland.Windows\bin\Release -Recurse -Filter DynamicIsland.Windows.exe | Select-Object -First 1
+          if (-not $exe) { throw 'Built application was not found' }
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList '--verify-sutra-update' -PassThru
+          if (-not $p.WaitForExit(180000)) { $p.Kill(); throw 'WPF verification timed out' }
+          $report = Join-Path $env:ISLAND_PREVIEW_DATA 'captures\sutra-checks.txt'
+          $errorFile = Join-Path $env:ISLAND_PREVIEW_DATA 'verification-error.txt'
+          if (Test-Path $report) { Get-Content $report }
+          if (Test-Path $errorFile) { Get-Content $errorFile }
+          if ($p.ExitCode -ne 0) { throw "WPF fixture exited with code $($p.ExitCode)" }
+          if (-not (Test-Path $report)) { throw 'WPF verification produced no report' }
