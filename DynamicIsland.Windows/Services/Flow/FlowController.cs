@@ -235,7 +235,9 @@ public sealed class FlowController : IDisposable
     private void Publish(FlowStatus status)
     {
         if (!_ui.CheckAccess()) { _ui.BeginInvoke(() => Publish(status)); return; }
-        if (Status == status) return;
+        // A tap or a quick shortcut publishes Idle while Status is already Idle; ducking still has
+        // to be re-evaluated, or the audio lowered at key-down would stay lowered.
+        if (Status == status) { UpdateDucking(status.State); return; }
         var previous = Status.State;
         Status = status;
         UpdateDucking(status.State);
