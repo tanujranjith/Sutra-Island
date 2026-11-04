@@ -24,8 +24,8 @@ namespace DynamicIsland.Windows.Services.Flow;
 /// - Restores the previous clipboard only if nothing else has written to it since. If any format on
 ///   the clipboard can't be saved and restored exactly, it leaves the clipboard alone and types
 ///   single-line text as Unicode keystrokes (never Enter or other control keys).
-/// - If anything fails, nothing is typed and the clipboard is unchanged; the controller holds the
-///   text so the user can copy it on purpose.
+/// - When delivery fails, the controller holds undelivered text for the user to copy. A partial
+///   keystroke sequence or clipboard restore failure may still leave partial changes.
 /// </summary>
 public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowPaster
 {
@@ -51,7 +51,7 @@ public sealed class FlowTextInjector(LoggingService log, Dispatcher ui) : IFlowP
     public Task<FlowPasteResult> PasteAsync(string text, FlowTarget? target, CancellationToken token) =>
         ui.InvokeAsync(() => PasteOnUiAsync(text, target, token)).Task.Unwrap();
 
-    // On every path except success, nothing is typed and the clipboard is left exactly as it was.
+    // Hold undelivered text on failure; restore is best-effort if the clipboard is still ours.
     private async Task<FlowPasteResult> PasteOnUiAsync(string text, FlowTarget? target, CancellationToken token)
     {
         LastPastedElementId = null;
