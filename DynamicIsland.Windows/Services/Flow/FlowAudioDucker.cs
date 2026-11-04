@@ -36,7 +36,12 @@ public sealed class FlowAudioDucker(LoggingService log) : IDisposable
                 _ducked = FlowDucking.Plan(sessions, (uint)Environment.ProcessId, gain).ToList();
                 var playing = sessions.Count(s => s.Active && !s.IsSystemSounds);
                 if (_ducked.Count == 0) { log.Info($"Sutra Flow: nothing to lower ({sessions.Count} session(s), {playing} playing)."); return; }
-                Save();
+                if (!FlowDucking.TrySaveRecovery(StatePath, _ducked))
+                {
+                    log.Info("Sutra Flow: audio was not lowered because recovery state could not be saved.");
+                    _ducked = [];
+                    return;
+                }
                 // Straight down, no fade: every millisecond of loud music lands in the recording.
                 Fade(controls, _ducked.Select(d => (d.Id, d.Original, d.Lowered)), steps: 1);
                 var pids = sessions.GroupBy(s => s.Id).ToDictionary(g => g.Key, g => g.First().ProcessId);
@@ -176,16 +181,6 @@ public sealed class FlowAudioDucker(LoggingService log) : IDisposable
     private static void ReleaseAll(Dictionary<string, ISimpleAudioVolume> controls)
     {
         foreach (var c in controls.Values) CoreAudioFactory.Release(c);
-    }
-
-    private void Save()
-    {
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(StatePath)!);
-            File.WriteAllText(StatePath, JsonSerializer.Serialize(_ducked));
-        }
-        catch { }
     }
 
     private static void Clear()

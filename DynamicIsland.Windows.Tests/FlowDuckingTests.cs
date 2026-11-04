@@ -8,6 +8,24 @@ public sealed class FlowDuckingTests
     private const uint Me = 100;
 
     [Fact]
+    public void RecoveryPlanIsPersistedBeforeDucking()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "flow-recovery-" + Guid.NewGuid());
+        var path = Path.Combine(directory, "ducked.json");
+        try
+        {
+            var plan = new[] { new FlowDuckedSession("music", 0.8f, 0.1f) };
+            Assert.True(FlowDucking.TrySaveRecovery(path, plan));
+            var restored = System.Text.Json.JsonSerializer.Deserialize<FlowDuckedSession[]>(File.ReadAllText(path));
+            Assert.Equal(plan, restored);
+            Assert.Single(Directory.GetFiles(directory));
+            // An existing file cannot serve as the parent directory; the operation fails closed.
+            Assert.False(FlowDucking.TrySaveRecovery(Path.Combine(path, "invalid.json"), plan));
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    [Fact]
     public void LowersOtherAppsPlayingOrPaused()
     {
         var plan = FlowDucking.Plan(

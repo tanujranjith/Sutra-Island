@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace DynamicIsland.Windows.Services.Flow;
 
 /// <summary>One app's audio session as Flow sees it when deciding what to turn down.</summary>
@@ -14,6 +16,28 @@ public sealed record FlowDuckedSession(string Id, float Original, float Lowered)
 /// </summary>
 public static class FlowDucking
 {
+    /// <summary>Persist a complete recovery plan before changing any audio volume.</summary>
+    public static bool TrySaveRecovery(string path, IReadOnlyList<FlowDuckedSession> sessions)
+    {
+        var temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                JsonSerializer.Serialize(stream, sessions);
+                stream.Flush(flushToDisk: true);
+            }
+            File.Move(temporary, path, overwrite: true);
+            return true;
+        }
+        catch
+        {
+            try { File.Delete(temporary); } catch { }
+            return false;
+        }
+    }
+
     /// <summary>How close a session's volume must be to what Flow set for Flow to restore it.</summary>
     public const float Tolerance = 0.02f;
 
