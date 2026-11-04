@@ -212,6 +212,8 @@ public sealed class AppSettings
     public string FlowAiModel { get; set; } = "";
     /// <summary>Reasoning effort for AI cleanup; sent only when the provider and model support it, otherwise auto.</summary>
     public string FlowAiEffort { get; set; } = "low";
+    /// <summary>Expressive mode: keep uhs, ohs, hmms and drawn-out sounds instead of cleaning them away.</summary>
+    public bool FlowExpressive { get; set; }
     /// <summary>Turn other apps' audio down while Flow is listening.</summary>
     public bool FlowDuckAudio { get; set; } = true;
     /// <summary>How loud other apps stay while Flow listens, as a percent of their volume.</summary>

@@ -35,8 +35,11 @@ public static partial class FlowTextCleaner
         return voicedSeconds < 0.25 && SilencePhrases.Contains(t);
     }
 
-    /// <summary>Basic cleanup: fillers, stutters, spoken punctuation, "scratch that", capitals.</summary>
-    public static string Basic(string raw)
+    /// <summary>
+    /// Basic cleanup: fillers, stutters, spoken punctuation, "scratch that", capitals.
+    /// <paramref name="expressive"/> keeps fillers and drawn-out sounds ("uhhhh", "OOOOHhhh") as heard.
+    /// </summary>
+    public static string Basic(string raw, bool expressive = false)
     {
         if (string.IsNullOrWhiteSpace(raw)) return "";
         var t = " " + raw.Trim() + " ";
@@ -54,7 +57,7 @@ public static partial class FlowTextCleaner
         t = SpokenMark(t, "colon", ":");
 
         // Fillers. "like" and "you know" carry meaning too often to remove safely here.
-        t = Fillers().Replace(t, " ");
+        if (!expressive) t = Fillers().Replace(t, " ");
         // Stutters: "the the team" -> "the team" (not "bye bye", which is short and deliberate).
         t = Stutter().Replace(t, "$1");
 

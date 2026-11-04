@@ -45,6 +45,19 @@ public sealed class FlowSettingsViewModel : ObservableObject
         }
     }
 
+    /// <summary>Keep uhs, ohs and drawn-out sounds.</summary>
+    public bool Expressive
+    {
+        get => _settings.FlowExpressive;
+        set
+        {
+            if (_settings.FlowExpressive == value) return;
+            _settings.FlowExpressive = value;
+            RaisePropertyChanged();
+            Save();
+        }
+    }
+
     /// <summary>Lower other apps' audio while listening.</summary>
     public bool DuckAudio
     {
@@ -190,7 +203,7 @@ public sealed class FlowSettingsViewModel : ObservableObject
 
     public void Refresh()
     {
-        foreach (var name in new[] { nameof(Enabled), nameof(DuckAudio), nameof(DuckLevel), nameof(Cleanup), nameof(CleanupNote), nameof(Vocabulary), nameof(ModelStatus), nameof(ModelReady), nameof(WordsDictated) })
+        foreach (var name in new[] { nameof(Enabled), nameof(DuckAudio), nameof(DuckLevel), nameof(Expressive), nameof(Cleanup), nameof(CleanupNote), nameof(Vocabulary), nameof(ModelStatus), nameof(ModelReady), nameof(WordsDictated) })
             RaisePropertyChanged(name);
         RaiseAi(); // keys and the Assistant's provider can change on other settings pages
     }

@@ -32,6 +32,21 @@ public sealed class FlowAiCleaner(AppSettings settings, IQProviderRegistry provi
         or opinions. Never summarize, reorder, or change tone, names, numbers, dates, quotes, code, or URLs.
         """;
 
+    /// <summary>Replaces rules 1 and 2 in expressive mode: the sounds are the point, so they stay.</summary>
+    private const string ExpressiveRule = """
+        EXPRESSIVE MODE: keep every filler, hesitation, interjection, and drawn-out sound exactly as written
+        (uhhhh, ummm, hmm, ohhh, OOOOHHhhhh, ahh, wow), with the same letters, repeats, and capitalization.
+        Ignore rules 1 and 2 for these sounds; you may still collapse an accidental repeated word ("the the").
+        Punctuate around them naturally (commas, ellipses, exclamation marks) without removing them.
+        """;
+
+    private static readonly (string Raw, string Clean)[] ExpressiveExamples =
+    [
+        ("uhhhhh i dont know maybe at 3 actually 4", "Uhhhhh, I don't know... maybe at 4."),
+        ("OOOOOHHhhhhhh thats so cool", "OOOOOHHhhhhhh, that's so cool!"),
+        ("hmm what's the capital of france", "Hmm, what's the capital of France?"),
+    ];
+
     private static readonly (string Raw, string Clean)[] Examples =
     [
         ("um so i think we should uh meet at 2 actually 3 period does that work question mark", "So I think we should meet at 3. Does that work?"),
@@ -90,12 +105,14 @@ public sealed class FlowAiCleaner(AppSettings settings, IQProviderRegistry provi
         var provider = providers.Find(ProviderId)!;
         var isOllama = string.Equals(provider.Info.Id, "ollama", StringComparison.OrdinalIgnoreCase);
         var history = new List<QMessage>();
-        foreach (var (raw, clean) in Examples)
+        var expressive = settings.FlowExpressive;
+        foreach (var (raw, clean) in expressive ? Examples.Skip(1).Concat(ExpressiveExamples) : Examples)
         {
             history.Add(new QMessage("user", raw));
             history.Add(new QMessage("assistant", clean));
         }
-        var system = vocabulary.Count > 0 ? Instructions + "\nVocabulary: " + string.Join(", ", vocabulary.Take(60)) : Instructions;
+        var system = expressive ? Instructions + "\n" + ExpressiveRule : Instructions;
+        if (vocabulary.Count > 0) system += "\nVocabulary: " + string.Join(", ", vocabulary.Take(60));
         var request = new QRequest(QMode.Say, text, null, history,
             string.IsNullOrWhiteSpace(ModelId) ? provider.Info.DefaultModel : ModelId,
             IncludeImage: false, MaxResponseTokens: Math.Clamp(text.Length, 256, 4096),

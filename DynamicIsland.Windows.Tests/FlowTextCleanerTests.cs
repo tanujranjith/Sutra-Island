@@ -62,4 +62,15 @@ public sealed class FlowTextCleanerTests
     [InlineData("It costs 3.50 dollars.", "It costs 3.50 dollars.")]
     public void SeparatesGluedWhisperSegments(string raw, string expected) =>
         Assert.Equal(expected, FlowTextCleaner.StripWhisperArtifacts(raw));
+
+    [Theory]
+    [InlineData("uhhhhhh i dont know maybe tomorrow", "Uhhhhhh I dont know maybe tomorrow.")]
+    [InlineData("OOOOOHHhhhhhh that is so cool", "OOOOOHHhhhhhh that is so cool.")]
+    [InlineData("um so we should uh meet at three", "Um so we should uh meet at three.")]
+    public void ExpressiveKeepsTheSounds(string raw, string expected) =>
+        Assert.Equal(expected, FlowTextCleaner.Basic(raw, expressive: true));
+
+    [Fact]
+    public void NormalModeStillDropsDrawnOutFillers() =>
+        Assert.Equal("I dont know maybe tomorrow.", FlowTextCleaner.Basic("uhhhhhh i dont know maybe tomorrow"));
 }

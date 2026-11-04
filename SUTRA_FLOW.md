@@ -121,3 +121,12 @@ When **Lower other audio while listening** is on (the default), Flow turns other
 - A session is restored only if it's still at the volume Flow set, so a change you make mid-dictation is kept.
 - The volumes Flow lowered are written to `%LOCALAPPDATA%\DynamicIsland.Windows\SutraFlow\ducked.json` until they're restored. If the island exits unexpectedly, the next launch restores them.
 - The rules are in `FlowDucking` (pure, covered by `FlowDuckingTests`). The Core Audio work is in `FlowAudioDucker`, on a background queue with a 120 ms fade.
+
+
+## Expressive mode
+
+**Expressive mode** (`FlowExpressive`, off by default) keeps hesitations and drawn-out sounds such as "uhhhh", "hmm", and "OOOOHHhhhh" instead of cleaning them away.
+
+- Whisper gets a prompt written in that style ("Umm, uhhh... hmm. Ohhh, okay..."), which nudges it to write the sounds down rather than drop them. Whisper decides how many letters a drawn-out sound gets, so the exact length isn't guaranteed.
+- Basic cleanup skips filler removal and still fixes repeated words, spoken punctuation, and capitals.
+- AI cleanup adds an EXPRESSIVE MODE rule that keeps those sounds exactly as written. It uses expressive examples in place of the filler-removal one.

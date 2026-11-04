@@ -90,13 +90,13 @@ public sealed class FlowController : IDisposable
         }
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(token);
         limit.CancelAfter(TimeSpan.FromSeconds(60));
-        return await Task.Run(() => Engine.TranscribeAsync(recording.Samples, Vocabulary(), limit.Token), limit.Token).ConfigureAwait(false);
+        return await Task.Run(() => Engine.TranscribeAsync(recording.Samples, Vocabulary(), limit.Token, _settings.FlowExpressive), limit.Token).ConfigureAwait(false);
     }
 
     private async Task<string> CleanAsync(string raw, CancellationToken token)
     {
         if (_settings.FlowCleanup == FlowCleanupMode.Off) return raw;
-        var text = FlowTextCleaner.Basic(raw);
+        var text = FlowTextCleaner.Basic(raw, _settings.FlowExpressive);
         if (_settings.FlowCleanup != FlowCleanupMode.Ai) return text;
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(token);
         limit.CancelAfter(AiTimeout);
