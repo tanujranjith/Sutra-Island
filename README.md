@@ -117,6 +117,7 @@ A source update or local build does not automatically publish a GitHub Release. 
 - `DynamicIsland.Windows.Tests/` — xUnit tests for app logic.
 - `scripts/` — release packaging and verification helpers.
 - `media/` — screenshots used in this README.
+- `site/` — the Sutra Island landing page (static `index.html`, `styles.css`, `script.js` and images; open `index.html` to preview).
 - [RELEASE_NOTES.md](RELEASE_NOTES.md), [Q.md](Q.md), [SUTRA_FLOW.md](SUTRA_FLOW.md), and [CUSTOM_THEME.md](CUSTOM_THEME.md) — release history and additional guides.
 
 ## License
