@@ -19,6 +19,7 @@ public sealed class WhisperVoiceInput : IDisposable
     private readonly WhisperEngine _engine;
     private readonly AppSettings _settings;
     private readonly object _gate = new();
+    private readonly WakeSessionEpoch _wakeEpoch = new();
     private WaveInEvent? _wakeMic;
     private VoiceSegmenter? _wakeSegmenter;
     private int _checking;
@@ -69,6 +70,7 @@ public sealed class WhisperVoiceInput : IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (_wakeMic is not null) return;
+            var epoch = _wakeEpoch.Next();
             var segmenter = new VoiceSegmenter(Rate, TimeSpan.FromMilliseconds(450), TimeSpan.FromSeconds(7), TimeSpan.FromMilliseconds(300))
             { ThresholdDb = WakePhrase.SensitivityThreshold(_settings.AssistantWakeSensitivity) };
             _wakeSegmenter = segmenter;
@@ -79,12 +81,12 @@ public sealed class WhisperVoiceInput : IDisposable
                 var utterance = segmenter.Push(frame);
                 if (utterance is null || utterance.Length > Rate * 7) return;
                 if (Interlocked.Exchange(ref _checking, 1) == 1) return; // still checking the last burst
-                _ = Task.Run(() => CheckWakeAsync(utterance));
+                _ = Task.Run(() => CheckWakeAsync(utterance, epoch));
             });
         }
     }
 
-    private async Task CheckWakeAsync(float[] utterance)
+    private async Task CheckWakeAsync(float[] utterance, int epoch)
     {
         try
         {
@@ -92,9 +94,15 @@ public sealed class WhisperVoiceInput : IDisposable
             var text = await _engine.TranscribeAsync(utterance, Vocabulary(), limit.Token, hint: WakeHint).ConfigureAwait(false);
             var match = WakePhrase.Check(text, strict: string.Equals(_settings.AssistantWakeSensitivity, "low", StringComparison.OrdinalIgnoreCase));
             if (!match.Woke) return;
-            _log.Info("Sutra Assistant: wake word heard.");
-            lock (_gate) _stash = match.Command.Length > 0 ? (FlowTextCleaner.Basic(match.Command), DateTime.UtcNow) : null;
-            WakeDetected?.Invoke();
+            lock (_gate)
+            {
+                // Transcription can complete after StopWake and even after a new
+                // listener starts. Never deliver audio from an older session.
+                if (_disposed || _wakeMic is null || !_wakeEpoch.IsCurrent(epoch)) return;
+                _log.Info("Sutra Assistant: wake word heard.");
+                _stash = match.Command.Length > 0 ? (FlowTextCleaner.Basic(match.Command), DateTime.UtcNow) : null;
+                WakeDetected?.Invoke();
+            }
         }
         catch (Exception ex) when (ex is OperationCanceledException or FlowException) { }
         catch (Exception ex) { _log.Error("Sutra Assistant: wake check failed.", ex); }
@@ -104,7 +112,7 @@ public sealed class WhisperVoiceInput : IDisposable
     public void StopWake()
     {
         WaveInEvent? mic;
-        lock (_gate) { mic = _wakeMic; _wakeMic = null; _wakeSegmenter = null; }
+        lock (_gate) { _wakeEpoch.Next(); mic = _wakeMic; _wakeMic = null; _wakeSegmenter = null; }
         if (mic is null) return;
         try { mic.StopRecording(); } catch { }
         mic.Dispose();

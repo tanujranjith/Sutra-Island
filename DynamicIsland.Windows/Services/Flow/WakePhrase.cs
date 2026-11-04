@@ -2,6 +2,14 @@ using System.Text.RegularExpressions;
 
 namespace DynamicIsland.Windows.Services.Flow;
 
+/// <summary>Identifies the current listening session; callers synchronize access.</summary>
+public sealed class WakeSessionEpoch
+{
+    private int _value;
+    public int Next() => ++_value;
+    public bool IsCurrent(int value) => value == _value;
+}
+
 /// <summary>
 /// Decides whether a Whisper transcript is someone saying "Hey Sutra", allowing the near
 /// misses Whisper produces for an unfamiliar name ("hey sutro", "hey sue tra", "a sutra").

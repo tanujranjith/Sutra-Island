@@ -5,6 +5,19 @@ namespace DynamicIsland.Windows.Tests;
 
 public sealed class AssistantWakeTests
 {
+    [Fact]
+    public void StoppedOrRestartedWakeSessionRejectsLateTranscription()
+    {
+        var epoch = new WakeSessionEpoch();
+        var first = epoch.Next();
+        Assert.True(epoch.IsCurrent(first));
+        epoch.Next(); // stop
+        Assert.False(epoch.IsCurrent(first));
+        var next = epoch.Next(); // restart
+        Assert.False(epoch.IsCurrent(first));
+        Assert.True(epoch.IsCurrent(next));
+    }
+
     [Theory]
     [InlineData("Hey Sutra.", "")]
     [InlineData("hey sutro", "")]
