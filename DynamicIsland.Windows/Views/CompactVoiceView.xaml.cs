@@ -28,6 +28,7 @@ public partial class CompactVoiceView : UserControl
     public static readonly DependencyProperty ActionFromLevelProperty = DependencyProperty.Register(nameof(ActionFromLevel), typeof(double?), typeof(CompactVoiceView), new PropertyMetadata(null));
     public static readonly DependencyProperty ErrorTextProperty = DependencyProperty.Register(nameof(ErrorText), typeof(string), typeof(CompactVoiceView), new PropertyMetadata("", (d, e) => ((CompactVoiceView)d).ErrorMessageText.Text = (string?)e.NewValue ?? ""));
     public static readonly DependencyProperty ReducedMotionProperty = DependencyProperty.Register(nameof(ReducedMotion), typeof(bool), typeof(CompactVoiceView), new PropertyMetadata(false));
+    public static readonly DependencyProperty PaletteProperty = DependencyProperty.Register(nameof(Palette), typeof(ThemePalette), typeof(CompactVoiceView), new PropertyMetadata(ThemePalette.Dark, (d, _) => ((CompactVoiceView)d).RefreshTranscriptColor()));
     /// <summary>The compact island height the orb lays out against (the answer grows below it).</summary>
     public static readonly DependencyProperty BaseHeightProperty = DependencyProperty.Register(nameof(BaseHeight), typeof(double), typeof(CompactVoiceView), new PropertyMetadata(62d, (d, _) => ((CompactVoiceView)d).ApplyMetrics()));
     private static readonly DependencyProperty DisplayedLevelProperty = DependencyProperty.Register("DisplayedLevel", typeof(double), typeof(CompactVoiceView), new PropertyMetadata(0d, (d, e) => ((CompactVoiceView)d).RenderLevel((double)e.NewValue)));
@@ -39,6 +40,7 @@ public partial class CompactVoiceView : UserControl
     public double? ActionFromLevel { get => (double?)GetValue(ActionFromLevelProperty); set => SetValue(ActionFromLevelProperty, value); }
     public string ErrorText { get => (string)GetValue(ErrorTextProperty); set => SetValue(ErrorTextProperty, value); }
     public bool ReducedMotion { get => (bool)GetValue(ReducedMotionProperty); set => SetValue(ReducedMotionProperty, value); }
+    public ThemePalette Palette { get => (ThemePalette)GetValue(PaletteProperty); set => SetValue(PaletteProperty, value); }
     public double BaseHeight { get => (double)GetValue(BaseHeightProperty); set => SetValue(BaseHeightProperty, value); }
     /// <summary>The microphone RMS level, 0..1.</summary>
     public Func<float>? LevelSource { get; set; }
@@ -50,8 +52,15 @@ public partial class CompactVoiceView : UserControl
     internal bool HasLoopMotion { get; private set; }
     internal bool BarsRunning => _barsTimer?.IsEnabled == true;
 
-    private static readonly Color White = Color.FromRgb(0xFF, 0xFF, 0xFF);
-    private static readonly Color ThinkingGrey = Color.FromRgb(0x82, 0x8A, 0x9C);
+    private Color TranscriptColor
+    {
+        get
+        {
+            var color = ThemeColor.Parse(State == CompactVoiceState.Thinking ? Palette.Muted : Palette.Text);
+            return Color.FromRgb(color.R, color.G, color.B);
+        }
+    }
+    private void RefreshTranscriptColor() => SetTranscriptColor(TranscriptColor, animate: false);
     private static readonly double[] BarWeights = [0.6, 0.85, 1, 0.85, 0.6];
     private readonly Rectangle[] _bars;
     private readonly Dictionary<UIElement, int> _fades = [];
@@ -178,7 +187,7 @@ public partial class CompactVoiceView : UserControl
         Fade(AnswerLayer, to == CompactVoiceState.Answer ? 1 : 0, fadeMs, to == CompactVoiceState.Answer && !ReducedMotion ? 120 : 0);
         Fade(ActionLayer, to == CompactVoiceState.Action ? 1 : 0, fadeMs);
         Fade(ErrorLayer, to == CompactVoiceState.Error ? 1 : 0, fadeMs);
-        SetTranscriptColor(to == CompactVoiceState.Thinking ? ThinkingGrey : White, animate: !ReducedMotion);
+        SetTranscriptColor(TranscriptColor, animate: !ReducedMotion);
         UpdateTranscript();
 
         if (to is CompactVoiceState.Wake or CompactVoiceState.Listening) StartBars();
@@ -319,7 +328,7 @@ public partial class CompactVoiceView : UserControl
         {
             TranscriptText.Inlines.Clear(); _runs.Clear(); _words = [];
         }
-        var color = State == CompactVoiceState.Thinking ? ThinkingGrey : White;
+        var color = TranscriptColor;
         // Fix the separator of the previous last word before appending.
         if (_runs.Count > 0 && words.Length > _runs.Count) _runs[^1].Run.Text = _words[^1] + " ";
         for (var i = _runs.Count; i < words.Length; i++)
@@ -394,7 +403,6 @@ public partial class CompactVoiceView : UserControl
         var level = CompactVoicePolicy.ShowsLevel(action);
         LevelRow.Visibility = ActionValue.Visibility = level ? Visibility.Visible : Visibility.Collapsed;
         ActionConfirm.Visibility = level ? Visibility.Collapsed : Visibility.Visible;
-        ActionIcon.Foreground = new SolidColorBrush(action.Phase == AssistantActionPhase.Failed ? Color.FromRgb(0xE6, 0xB6, 0x8B) : White);
         if (!level)
         {
             BeginAnimation(DisplayedLevelProperty, null);

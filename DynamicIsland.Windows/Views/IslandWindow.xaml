@@ -1259,7 +1259,7 @@
                 <views:CompactVoiceView x:Name="CompactVoice" Panel.ZIndex="480" Margin="-1"
                                         State="{Binding CompactVoiceState}" Transcript="{Binding CompactVoiceTranscript}" Answer="{Binding CompactVoiceAnswer}"
                                         ActionFeedback="{Binding CompactVoiceAction}" ActionFromLevel="{Binding CompactVoiceActionFrom}" ErrorText="{Binding CompactVoiceError}"
-                                        ReducedMotion="{Binding IsReducedMotion}" />
+                                        ReducedMotion="{Binding IsReducedMotion}" Palette="{Binding QThemePalette}" />
 
                 <!-- Sutra Flow: while dictating, the island's content dissolves into a dot-matrix voice display. -->
                 <!-- Same surface as the island itself so only the content changes, not the island's colour. -->

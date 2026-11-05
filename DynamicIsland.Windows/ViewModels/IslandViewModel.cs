@@ -199,7 +199,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         _qAutoCloseTimer.Tick += (_, _) =>
         {
             _qAutoCloseTimer.Stop();
-            if (Settings.QAutoCloseAfterResponse && QState == QRunState.Complete) ClearQ();
+            if (CompactVoicePolicy.AllowPanelAutoClose(Settings.QAutoCloseAfterResponse, VoiceBusy, CompactVoiceActive, QState)) ClearQ();
         };
         LaunchCommand = new RelayCommand<string>(LaunchApp);
         OpenMeetingCommand = new RelayCommand(() => { if (!string.IsNullOrWhiteSpace(_meeting?.JoinUrl)) OpenUrl(_meeting!.JoinUrl); });
@@ -1582,7 +1582,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private void UpdateQAutoCloseTimer()
     {
         _qAutoCloseTimer.Stop();
-        if (!Settings.QAutoCloseAfterResponse || VoiceBusy || QState != QRunState.Complete) return;
+        if (!CompactVoicePolicy.AllowPanelAutoClose(Settings.QAutoCloseAfterResponse, VoiceBusy, CompactVoiceActive, QState)) return;
         _qAutoCloseTimer.Interval = TimeSpan.FromSeconds(Math.Clamp(Settings.QAutoCloseDelaySeconds, 1, 300));
         _qAutoCloseTimer.Start();
     }

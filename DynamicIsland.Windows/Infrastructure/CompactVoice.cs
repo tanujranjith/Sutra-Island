@@ -74,6 +74,13 @@ public static class CompactVoicePolicy
     /// <summary>Whether a voice turn should expand the island into the chat panel (the old behavior).</summary>
     public static bool ExpandPanelForVoice(bool compactTurn, bool autoExpandSetting) => !compactTurn && autoExpandSetting;
 
+    /// <summary>The orb owns its conversation until exit; the panel's timer must not clear a pinned answer.</summary>
+    public static bool AllowPanelAutoClose(bool enabled, bool voiceBusy, bool compactActive, QRunState state)
+        => enabled && !voiceBusy && !compactActive && state == QRunState.Complete;
+
+    public static bool CanStopSpeech(CompactVoiceState state, bool speaking)
+        => speaking && state is CompactVoiceState.Answer or CompactVoiceState.Action;
+
     /// <summary>The orb is ~38% wider than the compact island (500 → 690 in the mock) and keeps its height,
     /// with floors so small or hole-punch islands still fit the mascot and a line of text.</summary>
     public static (double Width, double Height) Size(double compactWidth, double compactHeight, bool tall)
@@ -157,6 +164,7 @@ public sealed class CompactVoicePresenter
     private bool _speaking;
     private bool _hovered;
     private bool _answerTyped;
+    private bool _qTurnStarted;
 
     public CompactVoiceState State { get; private set; } = CompactVoiceState.Idle;
     public string Transcript { get; private set; } = "";
@@ -181,7 +189,7 @@ public sealed class CompactVoicePresenter
         CompactVoiceState.Wake => CompactVoiceTimings.Wake,
         CompactVoiceState.Answer when _speaking || _hovered => null,
         CompactVoiceState.Answer => CompactVoiceTimings.AnswerHold + (_answerTyped ? TimeSpan.Zero : CompactVoiceTimings.Typing(Answer, ReducedMotion)),
-        CompactVoiceState.Action when _hovered || Action is null || Action.Phase == AssistantActionPhase.Working => null,
+        CompactVoiceState.Action when _speaking || _hovered || Action is null || Action.Phase == AssistantActionPhase.Working => null,
         CompactVoiceState.Action => CompactVoiceTimings.ActionSettle + CompactVoiceTimings.ActionHold,
         CompactVoiceState.Error when _hovered => null,
         CompactVoiceState.Error => CompactVoiceTimings.ErrorHold,
@@ -238,7 +246,7 @@ public sealed class CompactVoicePresenter
                 _speaking = false;
                 if (State is CompactVoiceState.Wake or CompactVoiceState.Listening) Go(CompactVoiceState.Exit); // nothing heard, or cancelled
                 else if (State == CompactVoiceState.Thinking) Go(CompactVoiceState.Exit); // cancelled before a reply
-                else if (State == CompactVoiceState.Answer && wasSpeaking) { _answerTyped = true; Restart(); } // hold ~3 s after speech
+                else if (State is (CompactVoiceState.Answer or CompactVoiceState.Action) && wasSpeaking) { _answerTyped = true; Restart(); } // hold ~3 s after speech
                 break;
         }
     }
@@ -253,6 +261,10 @@ public sealed class CompactVoicePresenter
             if (action is not null) _staleSequence = Math.Max(_staleSequence, action.Sequence);
             return;
         }
+        // SubmitAsync first republishes the previous snapshot with its Action cleared. A retained
+        // Complete response is not this turn's answer until the new request has actually started.
+        if (state is QRunState.Capturing or QRunState.Thinking or QRunState.Streaming) _qTurnStarted = true;
+        if (!_qTurnStarted) return;
         if (action is not null && action.Sequence <= _staleSequence) action = null;
         if (action is not null)
         {
@@ -298,7 +310,7 @@ public sealed class CompactVoicePresenter
                 Go(_voice == AssistantVoiceState.Listening ? CompactVoiceState.Listening : CompactVoiceState.Exit);
                 break;
             case CompactVoiceState.Answer or CompactVoiceState.Action or CompactVoiceState.Error:
-                if (_hovered || (State == CompactVoiceState.Answer && _speaking)) return;
+                if (_hovered || (State is (CompactVoiceState.Answer or CompactVoiceState.Action) && _speaking)) return;
                 Go(CompactVoiceState.Exit);
                 break;
             case CompactVoiceState.Exit:
@@ -339,7 +351,7 @@ public sealed class CompactVoicePresenter
 
     private void ClearTurn()
     {
-        Transcript = ""; Answer = ""; ErrorMessage = ""; Action = null; ActionFromLevel = null; _answerTyped = false;
+        Transcript = ""; Answer = ""; ErrorMessage = ""; Action = null; ActionFromLevel = null; _answerTyped = false; _qTurnStarted = false;
     }
 
     private void Go(CompactVoiceState next)

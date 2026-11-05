@@ -60,11 +60,11 @@
             <Grid x:Name="TextArea" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                 <!-- Listening / Thinking: the live transcript, one line, the tail kept visible. -->
                 <Grid x:Name="ListenLayer" Opacity="0" Visibility="Collapsed" VerticalAlignment="Top">
-                    <TextBlock x:Name="Placeholder" Text="Listening…" Foreground="#FF787F96" FontWeight="Medium" VerticalAlignment="Center" Opacity="0" />
+                    <TextBlock x:Name="Placeholder" Text="Listening…" Foreground="{Binding QThemePalette.Muted}" FontWeight="Medium" VerticalAlignment="Center" Opacity="0" />
                     <ScrollViewer x:Name="TranscriptScroll" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" CanContentScroll="False" Focusable="False" IsHitTestVisible="False" VerticalAlignment="Center">
                         <Grid>
-                            <TextBlock x:Name="TranscriptText" FontWeight="Medium" TextWrapping="NoWrap" Foreground="#FFFFFFFF" />
-                            <TextBlock x:Name="ShimmerText" FontWeight="Medium" TextWrapping="NoWrap" Foreground="#F0FFFFFF" Opacity="0">
+                            <TextBlock x:Name="TranscriptText" FontWeight="Medium" TextWrapping="NoWrap" Foreground="{Binding QThemePalette.Text}" />
+                            <TextBlock x:Name="ShimmerText" FontWeight="Medium" TextWrapping="NoWrap" Foreground="{Binding QThemePalette.Text}" Opacity="0">
                                 <TextBlock.OpacityMask>
                                     <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
                                         <LinearGradientBrush.RelativeTransform><TranslateTransform x:Name="ShimmerShift" X="-1" /></LinearGradientBrush.RelativeTransform>
@@ -82,36 +82,36 @@
 
                 <!-- Answer: at most two lines, then a muted "Open in chat" link. -->
                 <Grid x:Name="AnswerLayer" Opacity="0" Visibility="Collapsed">
-                    <TextBlock x:Name="AnswerText" Foreground="#FFFFFFFF" TextWrapping="Wrap" TextTrimming="WordEllipsis" VerticalAlignment="Top" LineStackingStrategy="BlockLineHeight" />
-                    <TextBlock x:Name="OpenInChatLink" Text="Open in chat" Foreground="#FF8E93A6" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="Hand" Opacity="0"
+                    <TextBlock x:Name="AnswerText" Foreground="{Binding QThemePalette.Text}" TextWrapping="Wrap" TextTrimming="WordEllipsis" VerticalAlignment="Top" LineStackingStrategy="BlockLineHeight" />
+                    <TextBlock x:Name="OpenInChatLink" Text="Open in chat" Foreground="{Binding QThemePalette.Muted}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="Hand" Opacity="0"
                                MouseLeftButtonUp="OpenInChat_MouseLeftButtonUp" AutomationProperties.Name="Open in chat" />
                 </Grid>
 
                 <!-- System command: a live control row (level commands) or an icon and one-line confirmation. -->
                 <Grid x:Name="ActionLayer" Opacity="0" Visibility="Collapsed" VerticalAlignment="Top">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <TextBlock x:Name="ActionIcon" FontFamily="Segoe Fluent Icons" Foreground="#FFFFFFFF" VerticalAlignment="Center" Text="&#xE995;" />
+                    <TextBlock x:Name="ActionIcon" FontFamily="Segoe Fluent Icons" Foreground="{Binding QThemePalette.Text}" VerticalAlignment="Center" Text="&#xE995;" />
                     <Grid x:Name="LevelRow" Grid.Column="1" VerticalAlignment="Center">
                         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock x:Name="ActionLabel" Text="Volume" Foreground="#FFFFFFFF" FontWeight="SemiBold" VerticalAlignment="Bottom" />
-                            <TextBlock x:Name="ActionDetail" Text="Speakers · System output" Foreground="#FF8E93A6" VerticalAlignment="Bottom" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="ActionLabel" Text="Volume" Foreground="{Binding QThemePalette.Text}" FontWeight="SemiBold" VerticalAlignment="Bottom" />
+                            <TextBlock x:Name="ActionDetail" Text="Speakers · System output" Foreground="{Binding QThemePalette.Muted}" VerticalAlignment="Bottom" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                         <Canvas x:Name="SliderCanvas" Grid.Row="1" ClipToBounds="False" HorizontalAlignment="Stretch">
-                            <Border x:Name="SliderTrack" Background="#FF3C3E4A" />
-                            <Border x:Name="SliderFill" Background="#FFB9A6FF" />
-                            <Ellipse x:Name="SliderKnob" Fill="#FFFFFFFF" />
+                            <Border x:Name="SliderTrack" Background="{Binding QThemePalette.Border}" />
+                            <Border x:Name="SliderFill" Background="{Binding QThemePalette.Accent}" />
+                            <Ellipse x:Name="SliderKnob" Fill="{Binding QThemePalette.Text}" />
                         </Canvas>
                     </Grid>
-                    <TextBlock x:Name="ActionConfirm" Grid.Column="1" Foreground="#FFFFFFFF" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Visibility="Collapsed" />
-                    <TextBlock x:Name="ActionValue" Grid.Column="2" Foreground="#FFFFFFFF" FontWeight="SemiBold" VerticalAlignment="Center" TextAlignment="Right" />
+                    <TextBlock x:Name="ActionConfirm" Grid.Column="1" Foreground="{Binding QThemePalette.Text}" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Visibility="Collapsed" />
+                    <TextBlock x:Name="ActionValue" Grid.Column="2" Foreground="{Binding QThemePalette.Text}" FontWeight="SemiBold" VerticalAlignment="Center" TextAlignment="Right" />
                 </Grid>
 
-                <!-- Error: a white message and a muted "Fix" link. -->
+                <!-- Error: a message and a muted "Fix" link. -->
                 <Grid x:Name="ErrorLayer" Opacity="0" Visibility="Collapsed" VerticalAlignment="Top">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <TextBlock x:Name="ErrorMessageText" Foreground="#FFFFFFFF" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                    <TextBlock x:Name="FixLink" Grid.Column="1" Text="Fix" Foreground="#FF8E93A6" VerticalAlignment="Center" Cursor="Hand" MouseLeftButtonUp="Fix_MouseLeftButtonUp" AutomationProperties.Name="Fix" />
+                    <TextBlock x:Name="ErrorMessageText" Foreground="{Binding QThemePalette.Text}" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="FixLink" Grid.Column="1" Text="Fix" Foreground="{Binding QThemePalette.Muted}" VerticalAlignment="Center" Cursor="Hand" MouseLeftButtonUp="Fix_MouseLeftButtonUp" AutomationProperties.Name="Fix" />
                 </Grid>
             </Grid>
 

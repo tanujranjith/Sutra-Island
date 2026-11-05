@@ -20,6 +20,7 @@ public sealed class CompactVoiceTests
         presenter.Expire();
         presenter.OnPrompt(prompt);
         presenter.OnVoice(AssistantVoiceState.Thinking, "Sutra is responding…", null, true);
+        presenter.OnQ(QRunState.Thinking, "", null);
         return presenter;
     }
 
@@ -94,8 +95,33 @@ public sealed class CompactVoiceTests
         presenter.OnQ(QRunState.Complete, "Volume is now 5%.", presenter.Action);
         presenter.OnVoice(AssistantVoiceState.Speaking, "Speaking…", null, true);
         Assert.Equal(CompactVoiceState.Action, presenter.State);
+        Assert.Null(presenter.Deadline);
+        presenter.Expire();
+        Assert.Equal(CompactVoiceState.Action, presenter.State);
+
+        presenter.OnVoice(AssistantVoiceState.WakeListening, "", null, true);
         presenter.Expire();
         Assert.Equal(CompactVoiceState.Exit, presenter.State);
+    }
+
+    [Fact]
+    public async Task QuickFollowUpShowsTheNewSessionAnswerInsteadOfThePreviousCompletion()
+    {
+        var presenter = Wake();
+        using var session = new QSessionController(new QProviderRegistry([new EchoProvider()]));
+        session.Changed += snapshot => presenter.OnQ(snapshot.State, snapshot.Response, snapshot.Action);
+
+        foreach (var prompt in new[] { "first answer", "second answer" })
+        {
+            presenter.OnVoice(AssistantVoiceState.Listening, "", null, true);
+            presenter.OnPrompt(prompt);
+            presenter.OnVoice(AssistantVoiceState.Thinking, "", null, true);
+            await session.SubmitAsync(prompt, QMode.Ask, "echo", "demo", null, null, false);
+            Assert.Equal(CompactVoiceState.Answer, presenter.State);
+            Assert.Equal(session.Snapshot.Response, presenter.Answer);
+            Assert.Equal(prompt, presenter.Answer);
+            presenter.OnVoice(AssistantVoiceState.Off, "", null, true);
+        }
     }
 
     [Fact]
@@ -171,6 +197,24 @@ public sealed class CompactVoiceTests
         presenter.SetHovered(false);
         Assert.Equal(CompactVoiceTimings.AnswerHold, presenter.Deadline);
     }
+
+    [Theory]
+    [InlineData(true, false, true, QRunState.Complete, false)] // pinned/silent orb owns the conversation
+    [InlineData(true, true, false, QRunState.Complete, false)] // speech owns it
+    [InlineData(true, false, false, QRunState.Complete, true)] // panel behavior stays enabled
+    [InlineData(false, false, false, QRunState.Complete, false)]
+    [InlineData(true, false, false, QRunState.Thinking, false)]
+    public void PanelAutoCloseWaitsUntilTheOrbHandsOffItsConversation(bool enabled, bool busy, bool compact, QRunState state, bool expected)
+        => Assert.Equal(expected, CompactVoicePolicy.AllowPanelAutoClose(enabled, busy, compact, state));
+
+    [Theory]
+    [InlineData(CompactVoiceState.Answer, true, true)]
+    [InlineData(CompactVoiceState.Action, true, true)]
+    [InlineData(CompactVoiceState.Action, false, false)]
+    [InlineData(CompactVoiceState.Thinking, true, false)]
+    [InlineData(CompactVoiceState.Idle, true, false)]
+    public void MascotStopsSpeechForAnswersAndSystemCommandResults(CompactVoiceState state, bool speaking, bool expected)
+        => Assert.Equal(expected, CompactVoicePolicy.CanStopSpeech(state, speaking));
 
     [Fact]
     public void SettingOffKeepsTheOldPanelBehavior()
@@ -253,5 +297,20 @@ public sealed class CompactVoiceTests
         Assert.Equal("Muted", CompactVoicePolicy.ActionConfirmation(new AssistantActionFeedback(1, "Mute", "", AssistantActionPhase.Succeeded, "Audio muted.")));
         Assert.Equal("ms-settings:privacy-microphone", CompactVoicePolicy.FixTarget(CompactVoicePolicy.ErrorMessage("Voice unavailable", "Check Windows microphone access.")));
         Assert.Null(CompactVoicePolicy.FixTarget(CompactVoicePolicy.ErrorMessage("Voice unavailable", "The provider returned 401")));
+    }
+
+    private sealed class EchoProvider : IQProvider
+    {
+        public QProviderInfo Info { get; } = new("echo", "Echo", QProviderCapabilities.Text | QProviderCapabilities.Streaming, "demo");
+        public Task<IReadOnlyList<QModelInfo>> GetModelsAsync(string? credential, CancellationToken cancellationToken, string? baseUrl = null)
+            => Task.FromResult<IReadOnlyList<QModelInfo>>([]);
+        public async IAsyncEnumerable<QStreamEvent> StreamAsync(QRequest request, string? credential, string? baseUrl,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            yield return new QStreamEvent.Started();
+            await Task.Yield();
+            yield return new QStreamEvent.Text(request.Prompt);
+            yield return new QStreamEvent.Completed();
+        }
     }
 }

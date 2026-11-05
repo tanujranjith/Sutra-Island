@@ -80,6 +80,7 @@ public sealed partial class IslandViewModel
         // The view reads the content first, then the state, so each state change finds its text in place.
         RaiseMany(nameof(CompactVoiceTranscript), nameof(CompactVoiceAnswer), nameof(CompactVoiceError), nameof(CompactVoiceAction), nameof(CompactVoiceActionFrom));
         if (state == previous) return;
+        UpdateQAutoCloseTimer();
         RaiseMany(nameof(CompactVoiceState), nameof(CompactVoiceActive), nameof(CompactVoiceVisible), nameof(CompactVoiceWide), nameof(CompactVoiceTall), nameof(PinExpanded));
         if (state == CompactVoiceState.Idle || previous == CompactVoiceState.Idle)
             RaiseMany(nameof(ShowCompactMediaContent), nameof(ShowCompactQContent), nameof(QShowCompactSingle), nameof(ShowCompactHolePunchQOutput), nameof(ShowCompactArtSurface), nameof(ShowCompactEqualizer));
@@ -111,7 +112,7 @@ public sealed partial class IslandViewModel
     /// <summary>Clicking the mascot while it speaks stops the speech; the answer stays up.</summary>
     public void StopCompactVoiceSpeech()
     {
-        if (_compactVoice.State == CompactVoiceState.Answer && AssistantSpeaking) _voice?.Stop();
+        if (CompactVoicePolicy.CanStopSpeech(_compactVoice.State, AssistantSpeaking)) _voice?.Stop();
     }
 
     /// <summary>"Open in chat": the existing chat panel takes over with this conversation.</summary>

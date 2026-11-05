@@ -30,6 +30,9 @@ needs accepting. Typed chat always uses the panel.
 | Error | Grey-blue desaturated mascot, flat eyes, a red dot, a short message ("Mic is blocked") and a muted "Fix" link (microphone or speech settings, otherwise Sutra Assistant settings). | auto-dismisses after 4 s |
 | Exit | Content fades; the mascot fades, shrinks to 0.8 and slides 12 px left with one blink; the island returns to its size; the rim fades; the island content fades back in. | mascot 450 ms; content returns from 350 ms; done at 800 ms |
 
+Text and slider colors follow the active theme. Spoken command results stay open through speech,
+then hold for 3 s before exiting. The panel's auto-close timer waits while the orb owns the conversation.
+
 ## Interaction
 
 - **Esc** cancels at any point (stops listening, the response, and speech) and runs the exit. It is a
