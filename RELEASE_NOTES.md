@@ -1,3 +1,11 @@
+# Sutra Island v1.3.2
+
+- Make screenshot selection more responsive by caching the shaded desktop once and repainting only changed selection areas while dragging.
+- Keep native Windows cursor tracking and coalesce pointer updates without adding animation delays.
+- Preserve exact release coordinates and clear old shade, outlines, and labels through reverse drags, mode changes, and multi-monitor clipping.
+- Add pixel-by-pixel overlay regression checks and a repeatable offscreen paint benchmark.
+
+---
 # Sutra Island v1.3.1
 
 - Keep Sutra Flow, local Whisper recognition, and compact voice mode from the latest cloud source in the desktop build.

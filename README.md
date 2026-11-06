@@ -2,7 +2,7 @@
 
 Sutra Island is a Windows desktop companion: a compact, always-on-top island that expands into media controls, system information, timers, and other live activities. It also includes Sutra Assistant and a searchable command palette.
 
-Built with C#, WPF, and .NET 10. The current source version is **1.3.1**. See [release notes](RELEASE_NOTES.md) for changes, [Sutra Assistant](Q.md) for provider setup and privacy details, and [Sutra Flow](SUTRA_FLOW.md) for dictation.
+Built with C#, WPF, and .NET 10. The current source version is **1.3.2**. See [release notes](RELEASE_NOTES.md) for changes, [Sutra Assistant](Q.md) for provider setup and privacy details, and [Sutra Flow](SUTRA_FLOW.md) for dictation.
 
 ![Current graphite island with fixture media](media/graphite-island.png)
 

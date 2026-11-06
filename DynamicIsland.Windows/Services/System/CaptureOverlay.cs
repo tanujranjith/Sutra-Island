@@ -28,6 +28,7 @@ internal sealed class CaptureOverlay : Forms.Form
     private readonly uint _dpi;
     private readonly Drawing.Font _hintFont;
     private readonly Drawing.Font _labelFont;
+    private readonly Drawing.Bitmap _selectionBackdrop;
     private readonly TaskCompletionSource<CaptureRequest?> _result = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private Drawing.Point? _start;
@@ -52,6 +53,7 @@ internal sealed class CaptureOverlay : Forms.Form
         _dpi = CursorDpi();
         _hintFont = new Drawing.Font("Segoe UI Variable Text", Scale(14), Drawing.FontStyle.Regular, Drawing.GraphicsUnit.Pixel);
         _labelFont = new Drawing.Font("Segoe UI Variable Text", Scale(12), Drawing.FontStyle.Regular, Drawing.GraphicsUnit.Pixel);
+        _selectionBackdrop = CreateSelectionBackdrop(background);
 
         AutoScaleMode = Forms.AutoScaleMode.None;
         FormBorderStyle = Forms.FormBorderStyle.None;
@@ -61,6 +63,9 @@ internal sealed class CaptureOverlay : Forms.Form
         ShowInTaskbar = false;
         KeyPreview = true;
         DoubleBuffered = true;
+        // Every dirty pixel is restored by OnPaint. Avoid the framework drawing
+        // the full BackgroundImage again before our own opaque backdrop pass.
+        SetStyle(Forms.ControlStyles.Opaque | Forms.ControlStyles.AllPaintingInWmPaint, true);
         BackColor = Drawing.Color.Black;
         BackgroundImage = background;
         BackgroundImageLayout = Forms.ImageLayout.None;
@@ -153,6 +158,42 @@ internal sealed class CaptureOverlay : Forms.Form
 
     private int Scale(int value) => CaptureOverlayGeometry.ScaleForDpi(value, _dpi);
 
+    private static bool HasArea(Drawing.Rectangle rectangle) => rectangle.Width > 0 && rectangle.Height > 0;
+
+    private static Drawing.Bitmap CreateSelectionBackdrop(Drawing.Bitmap background)
+    {
+        // One owned buffer, shared by region and window selection. Alpha blending
+        // the entire desktop once is much cheaper than doing it on every move.
+        var backdrop = new Drawing.Bitmap(background.Width, background.Height,
+            Drawing.Imaging.PixelFormat.Format32bppPArgb);
+        try
+        {
+            using var graphics = Drawing.Graphics.FromImage(backdrop);
+            graphics.Clear(Drawing.Color.Black);
+            graphics.DrawImage(background, new Drawing.Rectangle(0, 0, background.Width, background.Height),
+                0, 0, background.Width, background.Height, Drawing.GraphicsUnit.Pixel);
+            using var shade = new Drawing.SolidBrush(Drawing.Color.FromArgb(110, 0, 0, 0));
+            graphics.FillRectangle(shade, 0, 0, backdrop.Width, backdrop.Height);
+            return backdrop;
+        }
+        catch { backdrop.Dispose(); throw; }
+    }
+
+    private void InvalidateSelectionChange(Drawing.Rectangle previous, Drawing.Rectangle next)
+    {
+        if (HasArea(previous) != HasArea(next))
+        {
+            // Idle and selected states use different shade strengths. Repaint
+            // once on this transition so untouched pixels cannot retain old shade.
+            Invalidate();
+            return;
+        }
+        if (!HasArea(previous) && !HasArea(next)) return;
+        var dirty = Drawing.Rectangle.Inflate(Drawing.Rectangle.Union(previous, next), Scale(8), Scale(8));
+        dirty.Intersect(ClientRectangle);
+        if (HasArea(dirty)) Invalidate(dirty);
+    }
+
     protected override bool ProcessCmdKey(ref Forms.Message msg, Forms.Keys keyData)
     {
         if (HandleCaptureKey(keyData)) return true;
@@ -201,11 +242,11 @@ internal sealed class CaptureOverlay : Forms.Form
         }
 
         _start = e.Location;
-        if (!_selection.IsEmpty)
+        if (HasArea(_selection))
         {
             var dirty = _selection;
             _selection = Drawing.Rectangle.Empty;
-            Invalidate(Drawing.Rectangle.Inflate(dirty, Scale(4), Scale(4)));
+            InvalidateSelectionChange(dirty, _selection);
         }
         Capture = true;
     }
@@ -218,11 +259,11 @@ internal sealed class CaptureOverlay : Forms.Form
         {
             var next = CaptureOverlayGeometry.NormalizeSelection(start, e.Location, ClientRectangle);
             if (next == _selection) return;
+            var previous = _selection;
             _selection = next;
-            // The outside shade is composited over the entire frozen desktop. A
-            // clipped repaint can leave stale shade blocks behind as the clear
-            // region moves, so redraw the full overlay for each changed selection.
-            Invalidate();
+            // Invalidate queues/coalesces the latest geometry without blocking
+            // mouse input in a synchronous Refresh or a delayed animation.
+            InvalidateSelectionChange(previous, next);
         }
         else if (_mode == WindowMode)
         {
@@ -239,14 +280,16 @@ internal sealed class CaptureOverlay : Forms.Form
         Capture = false;
         if (region.Width > 2 && region.Height > 2)
         {
+            var previous = _selection;
             _selection = region;
+            if (previous != region) InvalidateSelectionChange(previous, region);
             Complete(RegionMode, region);
             return;
         }
 
         var old = _selection;
         _selection = Drawing.Rectangle.Empty;
-        if (!old.IsEmpty) Invalidate(Drawing.Rectangle.Inflate(old, Scale(6), Scale(6)));
+        InvalidateSelectionChange(old, _selection);
     }
 
     protected override void OnMouseLeave(EventArgs e)
@@ -256,7 +299,7 @@ internal sealed class CaptureOverlay : Forms.Form
         var old = _hover;
         _hover = Drawing.Rectangle.Empty;
         _hoverTitle = "";
-        Invalidate(Drawing.Rectangle.Inflate(old, Scale(6), Scale(6)));
+        InvalidateSelectionChange(old, _hover);
     }
 
     private void UpdateHover(Drawing.Point clientPoint)
@@ -278,10 +321,10 @@ internal sealed class CaptureOverlay : Forms.Form
         var title = hit?.Title ?? "";
         if (next == _hover && string.Equals(title, _hoverTitle, StringComparison.Ordinal)) return;
 
-        var dirty = Drawing.Rectangle.Union(_hover, next);
+        var previous = _hover;
         _hover = next;
         _hoverTitle = title;
-        Invalidate(Drawing.Rectangle.Inflate(dirty, Scale(8), Scale(8)));
+        InvalidateSelectionChange(previous, next);
     }
 
     private void CompleteFullScreen()
@@ -298,28 +341,32 @@ internal sealed class CaptureOverlay : Forms.Form
         // animation; the owner (ScreenshotTool) disposes this window afterwards.
     }
 
+    protected override void OnPaintBackground(Forms.PaintEventArgs e)
+    {
+        // OnPaint owns the entire dirty clip, including restoring pixels below
+        // the old outline and labels. No second background pass is necessary.
+    }
+
     protected override void OnPaint(Forms.PaintEventArgs e)
     {
         base.OnPaint(e);
         var graphics = e.Graphics;
+        var clear = _mode == WindowMode ? _hover : _mode == RegionMode ? _selection : Drawing.Rectangle.Empty;
+        PaintBackdrop(graphics, e.ClipRectangle, clear);
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
 
-        if (_mode == WindowMode && !_hover.IsEmpty)
+        if (_mode == WindowMode && HasArea(_hover))
         {
-            ShadeOutside(graphics, _hover);
             DrawOutline(graphics, _hover, Drawing.Color.FromArgb(210, 185, 165, 253), Scale(2));
             DrawWindowTitle(graphics);
         }
-        else if (_mode == RegionMode && !_selection.IsEmpty)
+        else if (_mode == RegionMode && HasArea(_selection))
         {
-            ShadeOutside(graphics, _selection);
             DrawOutline(graphics, _selection, Drawing.Color.FromArgb(210, 185, 165, 253), Scale(2));
             DrawSizeLabel(graphics);
         }
         else
         {
-            using var shade = new Drawing.SolidBrush(Drawing.Color.FromArgb(_mode == ScreenMode ? 45 : 70, 0, 0, 0));
-            graphics.FillRectangle(shade, ClientRectangle);
             if (_mode == ScreenMode)
             {
                 var border = ClientRectangle;
@@ -331,12 +378,32 @@ internal sealed class CaptureOverlay : Forms.Form
         DrawHint(graphics);
     }
 
-    private void ShadeOutside(Drawing.Graphics graphics, Drawing.Rectangle clear)
+    private void PaintBackdrop(Drawing.Graphics graphics, Drawing.Rectangle clip, Drawing.Rectangle clear)
     {
-        using var shade = new Drawing.SolidBrush(Drawing.Color.FromArgb(110, 0, 0, 0));
-        using var outside = new Drawing.Region(ClientRectangle);
-        outside.Exclude(clear);
-        graphics.FillRegion(shade, outside);
+        clip.Intersect(ClientRectangle);
+        if (!HasArea(clip) || BackgroundImage is not { } background) return;
+        var selected = HasArea(clear);
+        graphics.SmoothingMode = SmoothingMode.None;
+        graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+        graphics.PixelOffsetMode = PixelOffsetMode.None;
+        // Always overwrite the dirty clip before restoring the clear selection.
+        // This erases old labels/edges and prevents cumulative alpha/shade blocks.
+        graphics.CompositingMode = CompositingMode.SourceCopy;
+        using (var black = new Drawing.SolidBrush(Drawing.Color.Black)) graphics.FillRectangle(black, clip);
+        var source = Drawing.Rectangle.Intersect(clip, new Drawing.Rectangle(0, 0, background.Width, background.Height));
+        if (HasArea(source))
+            graphics.DrawImage(selected ? _selectionBackdrop : background, source, source, Drawing.GraphicsUnit.Pixel);
+        if (selected)
+        {
+            var revealed = Drawing.Rectangle.Intersect(source, clear);
+            if (HasArea(revealed)) graphics.DrawImage(background, revealed, revealed, Drawing.GraphicsUnit.Pixel);
+        }
+        graphics.CompositingMode = CompositingMode.SourceOver;
+        if (!selected)
+        {
+            using var shade = new Drawing.SolidBrush(Drawing.Color.FromArgb(_mode == ScreenMode ? 45 : 70, 0, 0, 0));
+            graphics.FillRectangle(shade, clip);
+        }
     }
 
     private void DrawOutline(Drawing.Graphics graphics, Drawing.Rectangle rect, Drawing.Color color, int width)
@@ -374,6 +441,7 @@ internal sealed class CaptureOverlay : Forms.Form
         var measured = graphics.MeasureString(title, _labelFont);
         var width = Math.Min(maxWidth, (int)Math.Ceiling(measured.Width) + Scale(16));
         var height = (int)Math.Ceiling(measured.Height) + Scale(8);
+        if (_hover.Height < height + Scale(20)) return;
         var label = new Drawing.Rectangle(_hover.Left + Scale(10), _hover.Top + Scale(10), width, height);
         FillRounded(graphics, label, Scale(6), Drawing.Color.FromArgb(220, 18, 19, 24));
 
@@ -429,6 +497,7 @@ internal sealed class CaptureOverlay : Forms.Form
     {
         if (disposing)
         {
+            _selectionBackdrop.Dispose();
             _hintFont.Dispose();
             _labelFont.Dispose();
         }

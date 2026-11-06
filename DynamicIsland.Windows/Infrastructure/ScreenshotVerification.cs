@@ -5,6 +5,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using DynamicIsland.Windows.Services;
 using DynamicIsland.Windows.Views;
+using Drawing = System.Drawing;
+using Forms = System.Windows.Forms;
 
 namespace DynamicIsland.Windows.Infrastructure;
 
@@ -76,7 +78,11 @@ internal static class ScreenshotVerification
         var toolbar=new CaptureToolbarWindow {Opacity=0,ShowActivated=false,Topmost=false};
         try
         {
-            toolbar.PresentFromIsland(new Rect(-1800,20,180,40),new Rect(-1920,0,1920,1080),false);
+            // WPF may suspend clocks for a window wholly outside every real
+            // monitor. Animate on the real work area; check negative placement
+            // separately without depending on offscreen compositor frames.
+            var toolbarWorkArea=SystemParameters.WorkArea;
+            toolbar.PresentFromIsland(new Rect(toolbarWorkArea.Left+100,toolbarWorkArea.Top+20,180,40),toolbarWorkArea,false);
             var toolbarDeadline=DateTime.UtcNow.AddSeconds(4);
             while(toolbar.RevealProgress<1 && DateTime.UtcNow<toolbarDeadline)await Task.Delay(20);
             Check(toolbar.ActiveMode==CaptureOverlay.RegionMode,"The capture toolbar starts with Region selected");
@@ -86,6 +92,8 @@ internal static class ScreenshotVerification
             toolbar.SetMode(CaptureOverlay.WindowMode);
             Check(toolbar.ActiveMode==CaptureOverlay.WindowMode,"Toolbar synchronization returns to window mode without raising a second request");
             toolbar.SetMode(CaptureOverlay.RegionMode);
+            toolbar.PresentFromIsland(new Rect(-1800,20,180,40),new Rect(-1920,0,1920,1080),true);
+            Check(toolbar.Left>=-1920&&toolbar.Left+toolbar.ActualWidth<=0&&toolbar.RevealProgress==1,"The toolbar supports negative-coordinate placement independently of compositor animation timing");
         }
         finally{toolbar.Close();}
         using(var background=new System.Drawing.Bitmap(100,80))
@@ -105,6 +113,141 @@ internal static class ScreenshotVerification
             overlay.Cancel();
             Check(await selection is null,"Escape-style cancellation resolves without a capture request");
         }
+        await VerifyOverlayDirtyRenderingAsync(Check);
         var directory=System.IO.Path.Combine(AppDataPaths.Root,"captures");System.IO.Directory.CreateDirectory(directory);System.IO.File.WriteAllLines(System.IO.Path.Combine(directory,"screenshot-checks.txt"),report);
+    }
+
+    private static async Task VerifyOverlayDirtyRenderingAsync(Action<bool,string> check)
+    {
+        const int width=960,height=720;
+        using var background=new Drawing.Bitmap(width,height,Drawing.Imaging.PixelFormat.Format32bppArgb);
+        var sourcePixels=new byte[width*height*4];
+        for(var y=0;y<height;y++)for(var x=0;x<width;x++)
+        {
+            var offset=(y*width+x)*4;
+            sourcePixels[offset]=(byte)(30+(x*3+y)%190);
+            sourcePixels[offset+1]=(byte)(25+(x+y*5)%200);
+            sourcePixels[offset+2]=(byte)(45+(x*7+y*2)%180);
+            sourcePixels[offset+3]=255;
+        }
+        var sourceData=background.LockBits(new Drawing.Rectangle(0,0,width,height),Drawing.Imaging.ImageLockMode.WriteOnly,Drawing.Imaging.PixelFormat.Format32bppArgb);
+        try{System.Runtime.InteropServices.Marshal.Copy(sourcePixels,0,sourceData.Scan0,sourcePixels.Length);}
+        finally{background.UnlockBits(sourceData);}
+
+        var bounds=new Drawing.Rectangle(-800,-120,width,height);
+        CaptureWindow[] windows=
+        [
+            new(11,"A long window title that must disappear when hover moves",new Drawing.Rectangle(-740,-60,390,280)),
+            new(12,"Second window",new Drawing.Rectangle(-340,200,350,310)),
+            new(13,"Clipped edge window",new Drawing.Rectangle(-900,-180,300,220)),
+            new(14,"Very short window title",new Drawing.Rectangle(-120,450,240,12))
+        ];
+        using(var overlay=new CaptureOverlay(bounds,background,windows){Opacity=0,TopMost=false})
+        {
+            var result=overlay.SelectAsync();
+            var dirty=new List<Drawing.Rectangle>();
+            overlay.Invalidated+=(_,args)=>dirty.Add(Drawing.Rectangle.Intersect(args.InvalidRect,overlay.ClientRectangle));
+            using var incremental=new Drawing.Bitmap(width,height,Drawing.Imaging.PixelFormat.Format32bppArgb);
+            PaintOverlay(overlay,incremental,overlay.ClientRectangle);
+            void Mouse(string method,int x,int y,Forms.MouseButtons button=Forms.MouseButtons.Left) =>
+                typeof(Forms.Form).GetMethod(method,System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance)!
+                    .Invoke(overlay,[new Forms.MouseEventArgs(button,1,x,y,0)]);
+            void RepaintAndCompare(string label,bool partial=false)
+            {
+                var regions=dirty.Where(rect=>rect.Width>0&&rect.Height>0).ToArray();dirty.Clear();
+                foreach(var region in regions)PaintOverlay(overlay,incremental,region);
+                using var fresh=new Drawing.Bitmap(width,height,Drawing.Imaging.PixelFormat.Format32bppArgb);
+                PaintOverlay(overlay,fresh,overlay.ClientRectangle);
+                var equal=BitmapPixels(incremental).SequenceEqual(BitmapPixels(fresh));
+                if(!equal)
+                {
+                    var output=System.IO.Path.Combine(AppDataPaths.Root,"captures");System.IO.Directory.CreateDirectory(output);
+                    incremental.Save(System.IO.Path.Combine(output,"overlay-dirty-failure.png"),Drawing.Imaging.ImageFormat.Png);
+                    fresh.Save(System.IO.Path.Combine(output,"overlay-full-expected.png"),Drawing.Imaging.ImageFormat.Png);
+                }
+                check(equal,label+" matches a fresh full render without stale shade, outlines, or labels");
+                if(partial)check(regions.Length>0&&regions.All(rect=>(long)rect.Width*rect.Height<width*height/2),
+                    "Small selection movement repaints bounded dirty regions instead of the full desktop");
+            }
+
+            Mouse("OnMouseDown",430,310);Mouse("OnMouseMove",800,620);
+            RepaintAndCompare("A large forward drag on a negative-coordinate desktop");
+            var clearPixel=incremental.GetPixel(500,400);var clearOriginal=background.GetPixel(500,400);
+            var shadedPixel=incremental.GetPixel(20,300);var shadedOriginal=background.GetPixel(20,300);
+            check(clearPixel==clearOriginal&&shadedPixel.R<shadedOriginal.R&&shadedPixel.G<shadedOriginal.G&&shadedPixel.B<shadedOriginal.B,
+                "The selected region preserves original desktop pixels while its outside remains visibly dimmed");
+            Mouse("OnMouseMove",790,610);RepaintAndCompare("A small drag update",partial:true);
+            Mouse("OnMouseMove",460,340);RepaintAndCompare("Shrinking below the size-label threshold");
+            Mouse("OnMouseMove",90,70);RepaintAndCompare("Reversing the drag across its anchor");
+            Mouse("OnMouseMove",-80,-40);RepaintAndCompare("Dragging outside the top-left desktop bounds");
+            Mouse("OnMouseMove",730,510);RepaintAndCompare("Returning from a clipped reverse selection");
+            Mouse("OnMouseUp",431,311);RepaintAndCompare("Discarding a tiny release after a large drag");
+            check(!result.IsCompleted,"A tiny release leaves the overlay available for a new region");
+
+            overlay.SetMode(CaptureOverlay.WindowMode);RepaintAndCompare("Switching from region to window mode");
+            Mouse("OnMouseMove",300,180,Forms.MouseButtons.None);RepaintAndCompare("Hovering a titled window");
+            Mouse("OnMouseMove",850,575,Forms.MouseButtons.None);RepaintAndCompare("Hovering a window too short to contain its title");
+            Mouse("OnMouseMove",300,180,Forms.MouseButtons.None);RepaintAndCompare("Moving from a short window without leaving title pixels below it");
+            Mouse("OnMouseMove",600,450,Forms.MouseButtons.None);RepaintAndCompare("Moving to a differently titled window");
+            Mouse("OnMouseMove",20,20,Forms.MouseButtons.None);RepaintAndCompare("Hovering a window clipped by the negative desktop origin");
+            Mouse("OnMouseMove",920,690,Forms.MouseButtons.None);RepaintAndCompare("Leaving every window hover target");
+            Mouse("OnMouseMove",300,180,Forms.MouseButtons.None);
+            typeof(Forms.Form).GetMethod("OnMouseLeave",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance)!
+                .Invoke(overlay,[EventArgs.Empty]);
+            RepaintAndCompare("Leaving the overlay erases the previous window title");
+            overlay.SetMode(CaptureOverlay.ScreenMode);RepaintAndCompare("Switching to full-screen shade and outline");
+            overlay.SetMode(CaptureOverlay.RegionMode);RepaintAndCompare("Returning to empty region mode");
+
+            Mouse("OnMouseDown",440,330);
+            for(var index=0;index<512;index++)Mouse("OnMouseMove",100+(index*17)%720,90+(index*11)%540);
+            RepaintAndCompare("A burst of 512 pointer movements before a repaint");
+            Mouse("OnMouseMove",777,555);RepaintAndCompare("The most recent pointer position after a movement burst");
+            Mouse("OnMouseUp",-20,780);RepaintAndCompare("A release beyond the desktop after the last pointer event");
+            var request=await result;
+            check(request is {Mode:CaptureOverlay.RegionMode}&&request.Value.Region==new Drawing.Rectangle(0,330,440,390),
+                "Rapid movement captures the exact final release coordinates, reverse direction, and desktop clipping");
+            var captureDirectory=System.IO.Path.Combine(AppDataPaths.Root,"captures");System.IO.Directory.CreateDirectory(captureDirectory);
+            incremental.Save(System.IO.Path.Combine(captureDirectory,"overlay-dirty-render.png"),Drawing.Imaging.ImageFormat.Png);
+        }
+        check(BitmapPixels(background).SequenceEqual(sourcePixels),
+            "Overlay caches and disposal preserve the caller-owned frozen desktop pixels");
+        using var secondOverlay=new CaptureOverlay(bounds,background,windows){Opacity=0,TopMost=false};
+        using var reused=new Drawing.Bitmap(width,height,Drawing.Imaging.PixelFormat.Format32bppArgb);
+        PaintOverlay(secondOverlay,reused,secondOverlay.ClientRectangle);
+        check(BitmapPixels(reused).Any(value=>value!=0),"The same frozen desktop remains usable by a second overlay after cached scenes are disposed");
+        var fullScreenResult=secondOverlay.SelectAsync();secondOverlay.SetMode(CaptureOverlay.ScreenMode);secondOverlay.Confirm();
+        var fullScreen=await fullScreenResult;
+        check(fullScreen is {Mode:CaptureOverlay.ScreenMode}&&fullScreen.Value.Region==new Drawing.Rectangle(0,0,width,height),
+            "Full-screen confirmation returns physical bitmap bounds on a negative-coordinate desktop");
+        using var windowOverlay=new CaptureOverlay(bounds,background,windows){Opacity=0,TopMost=false};
+        var windowResult=windowOverlay.SelectAsync();windowOverlay.SetMode(CaptureOverlay.WindowMode);
+        typeof(Forms.Form).GetMethod("OnMouseDown",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance)!
+            .Invoke(windowOverlay,[new Forms.MouseEventArgs(Forms.MouseButtons.Left,1,20,20,0)]);
+        var selectedWindow=await windowResult;
+        check(selectedWindow is {Mode:CaptureOverlay.WindowMode}&&selectedWindow.Value.Region==new Drawing.Rectangle(0,0,200,160),
+            "Window capture clips negative screen coordinates into exact frozen-bitmap pixels");
+    }
+
+    private static void PaintOverlay(CaptureOverlay overlay,Drawing.Bitmap target,Drawing.Rectangle clip)
+    {
+        using var graphics=Drawing.Graphics.FromImage(target);graphics.SetClip(clip);
+        using var args=new Forms.PaintEventArgs(graphics,clip);
+        const System.Reflection.BindingFlags flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
+        typeof(CaptureOverlay).GetMethod("OnPaintBackground",flags)!.Invoke(overlay,[args]);
+        typeof(CaptureOverlay).GetMethod("OnPaint",flags)!.Invoke(overlay,[args]);
+    }
+
+    private static byte[] BitmapPixels(Drawing.Bitmap bitmap)
+    {
+        var rect=new Drawing.Rectangle(0,0,bitmap.Width,bitmap.Height);
+        var data=bitmap.LockBits(rect,Drawing.Imaging.ImageLockMode.ReadOnly,Drawing.Imaging.PixelFormat.Format32bppArgb);
+        try
+        {
+            var bytes=new byte[bitmap.Width*bitmap.Height*4];
+            for(var row=0;row<bitmap.Height;row++)
+                System.Runtime.InteropServices.Marshal.Copy(nint.Add(data.Scan0,row*data.Stride),bytes,row*bitmap.Width*4,bitmap.Width*4);
+            return bytes;
+        }
+        finally{bitmap.UnlockBits(data);}
     }
 }
