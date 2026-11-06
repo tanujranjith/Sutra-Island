@@ -28,7 +28,7 @@ public sealed partial class IslandViewModel
     public bool QShowSingleTranscript => !QCompareEnabled || QNeedsConsent;
     public bool QShowComparison => QCompareEnabled && !QNeedsConsent;
     public bool QShowCompactComparison => IsQActive && QCompareEnabled;
-    public System.Windows.Media.Brush IslandBaseSurfaceBrush => IsExpanded && ShowQSurface
+    public System.Windows.Media.Brush IslandBaseSurfaceBrush => CompactVoiceVisible ? FrozenBrush(QThemePalette.Surface) : IsExpanded && ShowQSurface
         ? System.Windows.Media.Brushes.Transparent : IsExpanded && IsDarkTheme
             ? Settings.Theme == ThemeMode.Graphite && NativeFrostActive ? Infrastructure.FrostedMaterial.WithOpaqueCaps(FrozenBrush("#DC191B20"),NativeFrostInset) : FrozenBrush("#FF191B20") : IslandSurfaceBrush;
     public bool QShowCompactSingle => ShowCompactQContent && !QCompareEnabled;

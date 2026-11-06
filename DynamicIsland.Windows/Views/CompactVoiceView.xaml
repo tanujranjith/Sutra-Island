@@ -1,0 +1,130 @@
+<UserControl x:Class="DynamicIsland.Windows.Views.CompactVoiceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:DynamicIsland.Windows.Views"
+             Focusable="False" Visibility="Collapsed" FontFamily="Segoe UI Variable Text"
+             AutomationProperties.Name="Sutra Assistant voice" AutomationProperties.LiveSetting="Polite">
+    <!-- The compact voice orb: the island itself becomes the voice UI (docs/voice-orb). Every layer is
+         driven from code-behind by State; nothing animates while the orb is idle and collapsed. -->
+    <Grid x:Name="Root" ClipToBounds="True">
+        <!-- Voice text needs an opaque backing, independent of the island's acrylic material. -->
+        <Border x:Name="Surface" Opacity="0" IsHitTestVisible="False"
+                Background="{Binding Palette.Surface, RelativeSource={RelativeSource AncestorType={x:Type views:CompactVoiceView}}}"
+                CornerRadius="{Binding IslandCornerRadius}" />
+
+        <Grid x:Name="OrbContent">
+            <Canvas x:Name="MascotLayer" ClipToBounds="False">
+                <Grid x:Name="MascotHost" Width="40" Height="40" Opacity="0" RenderTransformOrigin="0.5,0.5" ClipToBounds="False">
+                    <Grid.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform x:Name="MascotScale" ScaleX="0.72" ScaleY="0.72" />
+                            <ScaleTransform x:Name="MascotBreath" ScaleX="1" ScaleY="1" />
+                            <TranslateTransform x:Name="MascotShift" X="-16" />
+                        </TransformGroup>
+                    </Grid.RenderTransform>
+                    <!-- Answer: a soft violet glow pulses behind the mascot. -->
+                    <Ellipse x:Name="AnswerGlow" Margin="-14" Opacity="0" IsHitTestVisible="False">
+                        <Ellipse.Fill>
+                            <RadialGradientBrush>
+                                <GradientStop Color="#A08C64FF" Offset="0" />
+                                <GradientStop Color="#508C64FF" Offset="0.55" />
+                                <GradientStop Color="#008C64FF" Offset="1" />
+                            </RadialGradientBrush>
+                        </Ellipse.Fill>
+                    </Ellipse>
+                    <!-- Listening: two thin cyan ripple rings. -->
+                    <Ellipse x:Name="Ripple1" Stroke="#FF50D7FF" StrokeThickness="1.5" Opacity="0" IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5" Margin="-2">
+                        <Ellipse.RenderTransform><ScaleTransform x:Name="Ripple1Scale" /></Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Ellipse x:Name="Ripple2" Stroke="#FF50D7FF" StrokeThickness="1.5" Opacity="0" IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5" Margin="-2">
+                        <Ellipse.RenderTransform><ScaleTransform x:Name="Ripple2Scale" /></Ellipse.RenderTransform>
+                    </Ellipse>
+                    <!-- Thinking: a cyan-to-violet arc with a fading tail orbits the mascot. -->
+                    <Viewbox x:Name="OrbitBox" Margin="-6" Opacity="0" IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5">
+                        <Viewbox.RenderTransform><RotateTransform x:Name="OrbitAngle" /></Viewbox.RenderTransform>
+                        <Canvas Width="100" Height="100">
+                            <Path x:Name="OrbitArc" StrokeThickness="7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 50,4 A 46,46 0 0 1 96,50 A 46,46 0 0 1 50,96">
+                                <Path.Stroke>
+                                    <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                                        <GradientStop Color="#0046DCFF" Offset="0" />
+                                        <GradientStop Color="#FF46DCFF" Offset="0.45" />
+                                        <GradientStop Color="#FF9664FF" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Path.Stroke>
+                            </Path>
+                        </Canvas>
+                    </Viewbox>
+                    <views:SutraMascotView x:Name="Mascot" Cursor="Hand" MouseLeftButtonUp="Mascot_MouseLeftButtonUp" AutomationProperties.Name="Sutra Assistant" />
+                    <Ellipse x:Name="ErrorDot" Width="8" Height="8" Fill="#FFFF5A5F" Stroke="#FF15161B" StrokeThickness="1.2" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-1,-1,0" Visibility="Collapsed" IsHitTestVisible="False" />
+                </Grid>
+            </Canvas>
+
+            <Grid x:Name="TextArea" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                <!-- Listening / Thinking: the live transcript, one line, the tail kept visible. -->
+                <Grid x:Name="ListenLayer" Opacity="0" Visibility="Collapsed" VerticalAlignment="Top">
+                    <TextBlock x:Name="Placeholder" Text="Listening…" Foreground="{Binding QThemePalette.Muted}" FontWeight="Medium" VerticalAlignment="Center" Opacity="0" />
+                    <ScrollViewer x:Name="TranscriptScroll" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" CanContentScroll="False" Focusable="False" IsHitTestVisible="False" VerticalAlignment="Center">
+                        <Grid>
+                            <TextBlock x:Name="TranscriptText" FontWeight="Medium" TextWrapping="NoWrap" Foreground="{Binding QThemePalette.Text}" />
+                            <TextBlock x:Name="ShimmerText" FontWeight="Medium" TextWrapping="NoWrap" Foreground="{Binding QThemePalette.Text}" Opacity="0">
+                                <TextBlock.OpacityMask>
+                                    <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                        <LinearGradientBrush.RelativeTransform><TranslateTransform x:Name="ShimmerShift" X="-1" /></LinearGradientBrush.RelativeTransform>
+                                        <GradientStop Color="#00FFFFFF" Offset="0" />
+                                        <GradientStop Color="#00FFFFFF" Offset="0.38" />
+                                        <GradientStop Color="#B0FFFFFF" Offset="0.5" />
+                                        <GradientStop Color="#00FFFFFF" Offset="0.62" />
+                                        <GradientStop Color="#00FFFFFF" Offset="1" />
+                                    </LinearGradientBrush>
+                                </TextBlock.OpacityMask>
+                            </TextBlock>
+                        </Grid>
+                    </ScrollViewer>
+                </Grid>
+
+                <!-- Answer: at most two lines, then a muted "Open in chat" link. -->
+                <Grid x:Name="AnswerLayer" Opacity="0" Visibility="Collapsed">
+                    <TextBlock x:Name="AnswerText" Foreground="{Binding QThemePalette.Text}" TextWrapping="Wrap" TextTrimming="WordEllipsis" VerticalAlignment="Top" LineStackingStrategy="BlockLineHeight" />
+                    <TextBlock x:Name="OpenInChatLink" Text="Open in chat" Foreground="{Binding QThemePalette.Muted}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="Hand" Opacity="0"
+                               MouseLeftButtonUp="OpenInChat_MouseLeftButtonUp" AutomationProperties.Name="Open in chat" />
+                </Grid>
+
+                <!-- System command: a live control row (level commands) or an icon and one-line confirmation. -->
+                <Grid x:Name="ActionLayer" Opacity="0" Visibility="Collapsed" VerticalAlignment="Top">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBlock x:Name="ActionIcon" FontFamily="Segoe Fluent Icons" Foreground="{Binding QThemePalette.Text}" VerticalAlignment="Center" Text="&#xE995;" />
+                    <Grid x:Name="LevelRow" Grid.Column="1" VerticalAlignment="Center">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="ActionLabel" Text="Volume" Foreground="{Binding QThemePalette.Text}" FontWeight="SemiBold" VerticalAlignment="Bottom" />
+                            <TextBlock x:Name="ActionDetail" Text="Speakers · System output" Foreground="{Binding QThemePalette.Muted}" VerticalAlignment="Bottom" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <Canvas x:Name="SliderCanvas" Grid.Row="1" ClipToBounds="False" HorizontalAlignment="Stretch">
+                            <Border x:Name="SliderTrack" Background="{Binding QThemePalette.Border}" />
+                            <Border x:Name="SliderFill" Background="{Binding QThemePalette.Accent}" />
+                            <Ellipse x:Name="SliderKnob" Fill="{Binding QThemePalette.Text}" />
+                        </Canvas>
+                    </Grid>
+                    <TextBlock x:Name="ActionConfirm" Grid.Column="1" Foreground="{Binding QThemePalette.Text}" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Visibility="Collapsed" />
+                    <TextBlock x:Name="ActionValue" Grid.Column="2" Foreground="{Binding QThemePalette.Text}" FontWeight="SemiBold" VerticalAlignment="Center" TextAlignment="Right" />
+                </Grid>
+
+                <!-- Error: a message and a muted "Fix" link. -->
+                <Grid x:Name="ErrorLayer" Opacity="0" Visibility="Collapsed" VerticalAlignment="Top">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBlock x:Name="ErrorMessageText" Foreground="{Binding QThemePalette.Text}" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="FixLink" Grid.Column="1" Text="Fix" Foreground="{Binding QThemePalette.Muted}" VerticalAlignment="Center" Cursor="Hand" MouseLeftButtonUp="Fix_MouseLeftButtonUp" AutomationProperties.Name="Fix" />
+                </Grid>
+            </Grid>
+
+            <!-- Listening: five rounded voice bars driven by the real microphone level. -->
+            <Canvas x:Name="Bars" HorizontalAlignment="Right" VerticalAlignment="Top" Opacity="0" Visibility="Collapsed" IsHitTestVisible="False">
+                <Rectangle x:Name="Bar0" Fill="#FF46DCFF" />
+                <Rectangle x:Name="Bar1" Fill="#FF50BEFF" />
+                <Rectangle x:Name="Bar2" Fill="#FF6496FF" />
+                <Rectangle x:Name="Bar3" Fill="#FF8278FF" />
+                <Rectangle x:Name="Bar4" Fill="#FF9664FF" />
+            </Canvas>
+        </Grid>
+    </Grid>
+</UserControl>

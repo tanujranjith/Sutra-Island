@@ -20,7 +20,9 @@ public sealed class SpeechInputService : IQSpeechInputService, IWakeWordInput, I
     public event Action? WakeDetected;
     /// <summary>Which recognizer listens right now, for the settings page.</summary>
     public string EngineName => UseWhisper ? "Whisper (local, shared with Sutra Flow)" : "Windows speech recognition";
-    public float Level => _whisper?.Level ?? 0f;
+    public float Level => UseWhisper ? _whisper!.Level : _windows.Level;
+    /// <summary>Interim words while dictating (the Windows recognizer provides them; Whisper reports the final text only).</summary>
+    public event Action<string>? PartialTranscript;
     private bool UseWhisper => _whisper?.IsReady == true;
 
     public SpeechInputService(LoggingService log)
@@ -28,6 +30,7 @@ public sealed class SpeechInputService : IQSpeechInputService, IWakeWordInput, I
         _log = log;
         _windows = new WindowsVoicePlatform(log);
         _windows.WakeDetected += () => WakeDetected?.Invoke();
+        _windows.PartialTranscript += text => PartialTranscript?.Invoke(text);
     }
 
     /// <summary>Called once Sutra Flow (and its Whisper model) exists.</summary>

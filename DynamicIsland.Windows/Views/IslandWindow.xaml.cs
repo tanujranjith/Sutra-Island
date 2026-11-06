@@ -159,6 +159,7 @@ public partial class IslandWindow : Window
         LostMouseCapture += (_, _) => _viewModel.InteractionProtected = _timerPanelOpen || IsKeyboardFocusWithin;
         InputManager.Current.PreProcessInput += OnOutputPickerInput;
         _viewModel.PropertyChanged += ViewModelOnPropertyChanged;
+        InitializeCompactVoice();
         _viewModel.NotificationGroupOpenRequested += OnNotificationGroupOpen;
         _timerViewModel.PropertyChanged += TimerViewModelOnPropertyChanged;
         _timerViewModel.ShowAlarmTabRequested += TimerViewModel_ShowAlarmTabRequested;
@@ -759,6 +760,9 @@ public partial class IslandWindow : Window
         // both states, so adjusting the mini island could distort the expanded layout.
         var compactWidth = Math.Clamp(_viewModel.Settings.IslandWidth, 72d, 360d);
         var compactHeight = Math.Clamp(_viewModel.Settings.IslandHeight, 38d, 90d);
+        // Compact voice orb: the island widens (and grows taller for an answer) without expanding.
+        if (_viewModel.CompactVoiceWide)
+            (compactWidth, compactHeight) = Infrastructure.CompactVoicePolicy.Size(compactWidth, compactHeight, _viewModel.CompactVoiceTall);
         if (_viewModel.QShowCompactComparison)
         {
             compactWidth = Math.Min(Math.Max(compactWidth, 480), Math.Max(72, AvailableWorkArea.Width - 24));
@@ -1024,18 +1028,28 @@ public partial class IslandWindow : Window
         var currentWidth = Math.Max(1d, GlassShell.ActualWidth);
         var currentHeight = Math.Max(1d, GlassShell.ActualHeight);
 
+        // A compact voice orb morph already heading to this compact size keeps running; a layout pass
+        // (for example the voice session starting) must not snap it to the end.
+        var keepVoiceMorph = !expanded && IsCompactVoiceMorphTo(targetW, targetH);
+        if (!keepVoiceMorph) _compactVoiceMorphing = false;
         if (!animate || reduced)
         {
-            _frostBackdrop.SetSuspended(false);
+            _frostBackdrop.SetSuspended(keepVoiceMorph);
             SetPillAnimationCache(enabled: false, compactContent);
-            GlassShell.BeginAnimation(WidthProperty, null);
-            GlassShell.BeginAnimation(HeightProperty, null);
+            if (!keepVoiceMorph)
+            {
+                GlassShell.BeginAnimation(WidthProperty, null);
+                GlassShell.BeginAnimation(HeightProperty, null);
+            }
             GlassShell.BeginAnimation(UIElement.OpacityProperty, null);
             PillScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
             PillScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
             PillScale.ScaleX = PillScale.ScaleY = 1d;
-            GlassShell.Width = targetW;
-            GlassShell.Height = targetH;
+            if (!keepVoiceMorph)
+            {
+                GlassShell.Width = targetW;
+                GlassShell.Height = targetH;
+            }
             GlassShell.Opacity = 1d;
             ApplyVisualMode();
             _expandAnimating = false;
@@ -1538,12 +1552,16 @@ public partial class IslandWindow : Window
         _collapseTimer.Stop();
         _idleTimer.Stop();
         SetDimmed(false);
+        // Hovering the compact voice orb pins it open; it never expands the island into the panel.
+        if (_viewModel.CompactVoiceVisible) { _viewModel.SetCompactVoiceHovered(true); return; }
         if (!_timerPanelOpen && _viewModel.Settings.ExpandOnHover && !_viewModel.Settings.ClickThroughWhenCompact)
             RequestMainExpansion();
     }
 
     private void Pill_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        _viewModel.SetCompactVoiceHovered(false);
+        if (_viewModel.CompactVoiceVisible) return; // the orb manages its own hold; never dim it
         if (_timerPanelOpen || OutputDevicePopup.IsOpen || _openIslandMenus.Count > 0) return;
         _collapseTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(100, _viewModel.Settings.CollapseDelayMilliseconds));
         _collapseTimer.Start();
@@ -1849,6 +1867,7 @@ public partial class IslandWindow : Window
 
     private void Pill_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (_viewModel.CompactVoiceVisible) { e.Handled = true; return; }
         if (!_timerPanelOpen && _viewModel.IsCompact)
         {
             RequestMainExpansion();

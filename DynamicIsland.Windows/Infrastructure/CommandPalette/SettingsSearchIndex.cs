@@ -13,6 +13,7 @@ public static class SettingsSearchIndex
         new("WakeListeningEnabled", "Hey Sutra wake listening", "Enable local microphone wake detection"),
         new("WakeSensitivity", "Wake sensitivity", "How readily Sutra Assistant reacts to Hey Sutra"),
         new("VoiceReadAloud", "Read voice replies aloud", "Speak replies to voice questions"),
+        new("CompactVoiceMode", "Compact voice mode", "Voice turns stay in the compact island instead of the chat panel"),
         new("VoiceName", "Assistant voice", "Choose an installed Windows voice"),
         new("QSelectedProvider", "Assistant provider", "Choose an AI service or local model"),
         new("QSelectedModel", "Assistant model", "Choose the model for chat"),
