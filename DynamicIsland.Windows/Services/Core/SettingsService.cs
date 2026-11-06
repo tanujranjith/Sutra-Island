@@ -102,6 +102,13 @@ public sealed class SettingsService(LoggingService log)
         settings.PaletteFavorites = (settings.PaletteFavorites ?? []).Where(x => Enum.TryParse<Infrastructure.CommandPalette.PaletteCommand>(x, out _)).Distinct().ToList();
         settings.PaletteRecents = (settings.PaletteRecents ?? []).Where(x => Enum.TryParse<Infrastructure.CommandPalette.PaletteCommand>(x, out _)).Distinct().Take(10).ToList();
         settings.VoiceName ??= "";
+        settings.AssistantWakeSensitivity = settings.AssistantWakeSensitivity?.ToLowerInvariant() is "high" or "low"
+            ? settings.AssistantWakeSensitivity.ToLowerInvariant() : "normal";
+        settings.WakeConfidenceThreshold = Math.Clamp(double.IsFinite(settings.WakeConfidenceThreshold) ? settings.WakeConfidenceThreshold : .86, .80, .97);
+        settings.WakeCooldownSeconds = Math.Clamp(double.IsFinite(settings.WakeCooldownSeconds) ? settings.WakeCooldownSeconds : 4, 1, 15);
+        if (settings.WakeVoiceProfile is not null && !settings.WakeVoiceProfile.IsValid) settings.WakeVoiceProfile = null;
+        settings.IslandScreenshotHistoryLimit = Math.Clamp(settings.IslandScreenshotHistoryLimit, 1, 30);
+        settings.GoogleSearchLanguage = Infrastructure.CommandPalette.GoogleSearch.NormalizeLanguage(settings.GoogleSearchLanguage);
         settings.SchemaVersion = Math.Max(16, settings.SchemaVersion);
         settings.NotificationPollSeconds = Math.Clamp(double.IsFinite(settings.NotificationPollSeconds) ? settings.NotificationPollSeconds : 1, 0.1, 30);
         settings.MediaPollMilliseconds = Math.Clamp(settings.MediaPollMilliseconds, 100, 3000);

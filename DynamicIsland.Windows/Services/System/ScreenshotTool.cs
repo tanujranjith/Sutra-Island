@@ -21,7 +21,7 @@ using FontFamily = System.Windows.Media.FontFamily;
 namespace DynamicIsland.Windows.Services;
 
 /// <summary>Local pixel capture only: no OCR, provider calls, persistence, or upload.</summary>
-internal sealed class ScreenshotTool(IslandWindow island, ScreenContextService screen, Func<bool> reduced) : IDisposable
+internal sealed class ScreenshotTool(IslandWindow island, ScreenContextService screen, Func<bool> reduced, Action<BitmapSource>? copied = null) : IDisposable
 {
     private ScreenshotPreview? _preview;
     private CaptureOverlay? _overlay;
@@ -183,7 +183,7 @@ internal sealed class ScreenshotTool(IslandWindow island, ScreenContextService s
     {
         if (_preview is null)
         {
-            _preview = new ScreenshotPreview(Pin);
+            _preview = new ScreenshotPreview(Pin, copied: copied);
             _preview.Closed += (_, _) => _preview = null;
         }
         return _preview;
@@ -257,15 +257,17 @@ internal sealed class ScreenshotPreview : Window
     private bool _copying;
     private bool _suppressDismiss;
     private readonly Action<BitmapSource> _copy;
+    private readonly Action<BitmapSource>? _copied;
     private readonly Viewbox _imageView;
     private readonly WrapPanel _actions;
     private readonly System.Windows.Threading.DispatcherTimer _autoClose = new() { Interval = TimeSpan.FromSeconds(10) };
     private readonly System.Windows.Threading.DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromMilliseconds(2600) };
     private Rect _presentationArea;
     private Window? _copyToast;
-    public ScreenshotPreview(Action<BitmapSource> pin,Action<BitmapSource>? copy=null)
+    public ScreenshotPreview(Action<BitmapSource> pin,Action<BitmapSource>? copy=null,Action<BitmapSource>? copied=null)
     {
         _copy=copy??CopyLocal;
+        _copied=copied;
         Resources.MergedDictionaries.Add(new ResourceDictionary { Source=new Uri("/DynamicIsland.Windows;component/Views/ScreenshotResources.xaml",UriKind.Relative) });
         Title="Screenshot · Sutra Island";Width=580;SizeToContent=SizeToContent.Height;WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;
         AllowsTransparency=true;Background=Brushes.Transparent;Topmost=true;ShowInTaskbar=false;
@@ -340,7 +342,7 @@ internal sealed class ScreenshotPreview : Window
     public async Task<bool> CopyAsync()
     {
         if(_image is null||_copying)return false;_copying=true;
-        try { var image=RenderImage();for(var attempt=0;attempt<5;attempt++){try{_copy(image);SetStatus($"Copied · {image.PixelWidth} × {image.PixelHeight} · local only");return true;}catch(System.Runtime.InteropServices.COMException){await Task.Delay(50);}}SetStatus("Clipboard is busy. Your image is still here; choose Copy to retry.");return false; }
+        try { var image=RenderImage();for(var attempt=0;attempt<5;attempt++){try{_copy(image);_copied?.Invoke(image);SetStatus($"Copied · {image.PixelWidth} × {image.PixelHeight} · local only");return true;}catch(System.Runtime.InteropServices.COMException){await Task.Delay(50);}}SetStatus("Clipboard is busy. Your image is still here; choose Copy to retry.");return false; }
         catch(Exception){SetStatus("Could not copy this image. Your preview is still available; try again or save it locally.");return false;}
         finally {_copying=false;}
     }

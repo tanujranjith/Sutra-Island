@@ -20,8 +20,10 @@ internal static partial class UpgradeVerification
         check(app.FindResource("SutraIslandLogo") is BitmapSource { PixelWidth: 256 }
             && app.FindResource("SutraAssistantLogo") is BitmapSource { PixelWidth: 256 },
             "Both supplied logos load from the published app as shared decoded image resources");
-        check(((Border)window.FindName("AssistantBrandLogo")).Child is SutraMascotView,
-            "Assistant header uses the shared animated mascot without a duplicate static eye layer underneath");
+        check(window.FindName("AssistantBrandLogo") is null && ((TextBlock)window.FindName("AssistantBrandTitle")).Margin.Left == 0,
+            "Assistant header shows the Sutra Assistant title without a mascot icon");
+        check(window.FindName("QResponseMascot") is SutraMascotView { ShowThinkingBulb: true },
+            "Assistant response row keeps the mascot and its floating lightbulb");
         using (var trayIcon = (System.Drawing.Icon)typeof(TrayService).GetMethod("CreateIcon", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, null)!)
             check(trayIcon.Width == 32 && trayIcon.Height == 32, "Branded tray icon loads its 32-pixel embedded Windows icon");
 

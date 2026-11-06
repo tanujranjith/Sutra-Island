@@ -6,6 +6,10 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/CommandPalette/GoogleSearch.cs" Link="GoogleSearch.cs" />
+    <Compile Include="../DynamicIsland.Windows/Models/WakeVoiceProfile.cs" Link="WakeVoiceProfile.cs" />
+    <Compile Include="../DynamicIsland.Windows/Services/Q/WakeDetectionPolicy.cs" Link="WakeDetectionPolicy.cs" />
+    <Compile Include="../DynamicIsland.Windows/Services/Q/WhisperWakePolicy.cs" Link="WhisperWakePolicy.cs" />
     <Compile Include="../DynamicIsland.Windows/Infrastructure/TextPresentationCache.cs" Link="TextPresentationCache.cs" />
     <Compile Include="../DynamicIsland.Windows/Services/Core/NotificationHistoryService.cs" Link="NotificationHistoryService.cs" />
     <Compile Include="../DynamicIsland.Windows/Services/System/LoggingService.cs" Link="LoggingService.cs" />

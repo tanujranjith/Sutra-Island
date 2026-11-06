@@ -54,6 +54,15 @@ internal static partial class UpgradeVerification
         {
             if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_BACKDROP")=="1") { await VerifyDesktopFrostAsync(vm,window,output); return; }
             if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_PERFORMANCE")=="1") { await VerifyPerformanceAsync(vm,Check,output); return; }
+            if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_FEATURE_SETTINGS")=="1")
+            {
+                await VerifyGoogleBrowserAsync(vm, window, media, timers, timerVm, Check);
+                await VerifyFeatureSettingsAsync(vm, window, persistence, log, registry, Check, output);
+                bindingLog.Flush(); PresentationTraceSources.DataBindingSource.Listeners.Remove(bindingLog);
+                bindingLog.Close(); bindingClosed = true;
+                Check(!File.ReadAllText(Path.Combine(output, "sutra-bindings.log")).Contains("Error:"), "Feature settings render without WPF binding errors");
+                return;
+            }
             if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_TIMER_ONLY")=="1")
             {
                 timers.StartTimer(TimeSpan.FromMinutes(5),"Fixture");
@@ -343,6 +352,8 @@ internal static partial class UpgradeVerification
         public string LastPanel = "", LastSetting = "";
         public bool OpenedChat { get; private set; }
         public bool OpenedScreenshot { get; private set; }
+        public Uri? LastBrowserDestination { get; private set; }
+        public void OpenDefaultBrowser(Uri destination) => LastBrowserDestination = destination;
         public void ShowScreenshotTool() => OpenedScreenshot=true;
         public void ShowSettings() { }
         public void ShowTimerPanel() { }

@@ -18,7 +18,9 @@ internal static class ScreenshotVerification
         var pixels=Enumerable.Repeat((byte)255,96*64*4).ToArray();
         var image=BitmapSource.Create(96,64,96,96,PixelFormats.Bgra32,null,pixels,96*4);image.Freeze();
         var attempts=0;BitmapSource? copied=null;
-        var preview=new ScreenshotPreview(_=>{},bitmap=>{attempts++;if(attempts<3)throw new System.Runtime.InteropServices.COMException("fixture busy clipboard");copied=bitmap;}) {Opacity=0,ShowActivated=false};
+        var clipboardHistory=new ClipboardService(new LoggingService());
+        var remembered=0;
+        var preview=new ScreenshotPreview(_=>{},bitmap=>{attempts++;if(attempts<3)throw new System.Runtime.InteropServices.COMException("fixture busy clipboard");copied=bitmap;},bitmap=>{remembered++;clipboardHistory.RememberScreenshot(bitmap);}) {Opacity=0,ShowActivated=false};
         try
         {
             preview.Present(new Rect(100,10,180,40),new Rect(0,0,1200,800),true);
@@ -39,6 +41,29 @@ internal static class ScreenshotVerification
             var sample=new byte[4];annotated.CopyPixels(new Int32Rect(40,20,1,1),sample,4,0);
             Check(sample[2]>200&&sample[1]<100,"Annotations are flattened into copied and saved image pixels");
             await preview.CopyAsync();Check(attempts==3&&copied is not null,"Busy clipboard writes retry and complete without recapturing");
+            Check(remembered==1,"Only a successful screenshot copy enters Island history, after clipboard retries finish");
+            var history=await clipboardHistory.ReadPaletteAsync(30);
+            var screenshot=history.SingleOrDefault(item=>item.Id.StartsWith("sutra-screenshot-",StringComparison.Ordinal));
+            Check(screenshot is { IsImage:true, ImageWidth:96, ImageHeight:64, PreviewBgra:not null } && ReferenceEquals(clipboardHistory.ScreenshotOriginal(screenshot.Id),copied),"Copied annotations appear in Island clipboard history and retain their original full-resolution pixels");
+            clipboardHistory.ReleasePaletteEntries();
+            history=await clipboardHistory.ReadPaletteAsync(30);
+            Check(history.Any(item=>item.Id==screenshot!.Id),"Closing and reopening clipboard history retains session screenshots independently of Windows history");
+            clipboardHistory.RememberScreenshot(copied!);
+            history=await clipboardHistory.ReadPaletteAsync(30);
+            Check(history.Count(item=>item.Id.StartsWith("sutra-screenshot-",StringComparison.Ordinal))==1,"Recopying an unchanged screenshot does not duplicate the history row");
+            for(var i=0;i<13;i++)
+            {
+                var next=BitmapSource.Create(96,64,96,96,PixelFormats.Bgra32,null,pixels,96*4);next.Freeze();clipboardHistory.RememberScreenshot(next);
+            }
+            history=await clipboardHistory.ReadPaletteAsync(30);
+            Check(history.Count(item=>item.Id.StartsWith("sutra-screenshot-",StringComparison.Ordinal))==10,"Session screenshot history evicts old captures at its configured entry limit");
+            clipboardHistory.ConfigureScreenshotHistory(true,3);
+            history=await clipboardHistory.ReadPaletteAsync(30);
+            Check(history.Count(item=>item.Id.StartsWith("sutra-screenshot-",StringComparison.Ordinal))==3,"Reducing screenshot history capacity immediately evicts older captures");
+            clipboardHistory.ConfigureScreenshotHistory(false,10);
+            clipboardHistory.RememberScreenshot(copied!);
+            history=await clipboardHistory.ReadPaletteAsync(30);
+            Check(!history.Any(item=>item.Id.StartsWith("sutra-screenshot-",StringComparison.Ordinal)),"Disabling screenshot history clears retained pixels and stops remembering new screenshots");
             var capture=new RenderTargetBitmap((int)Math.Ceiling(preview.ActualWidth),(int)Math.Ceiling(preview.ActualHeight),96,96,PixelFormats.Pbgra32);capture.Render((Visual)preview.Content);
             var captureDirectory=System.IO.Path.Combine(AppDataPaths.Root,"captures");System.IO.Directory.CreateDirectory(captureDirectory);
             var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(capture));using(var file=System.IO.File.Create(System.IO.Path.Combine(captureDirectory,"screenshot-preview.png")))encoder.Save(file);

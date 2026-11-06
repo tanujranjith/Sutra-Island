@@ -9,7 +9,7 @@ public enum PaletteCommand
     StartStopwatch, PauseStopwatch, ResumeStopwatch, ResetStopwatch,
     FocusOn, FocusOff, Expand, Collapse, OpenSettings,
     Help, Convert, Volume, OpenMedia, Recenter, Clipboard, NotificationHistory, NotificationsOn, NotificationsOff, RetryNotifications, DismissBanner, Chat, VoiceInput, StopAssistant, ReadReply, WakeOn, WakeOff, AskScreen, SearchSettings,
-    Stopwatch, Focus, AudioOutput, Screenshot
+    Stopwatch, Focus, AudioOutput, Screenshot, GoogleSearch
 }
 
 public sealed record CommandDefinition(
@@ -25,7 +25,7 @@ public sealed record CommandDefinition(
         PaletteCommand.Ask or PaletteCommand.Say or PaletteCommand.Compare or PaletteCommand.Chat or PaletteCommand.VoiceInput or PaletteCommand.StopAssistant or PaletteCommand.ReadReply or PaletteCommand.WakeOn or PaletteCommand.WakeOff or PaletteCommand.AskScreen => "Assistant",
         PaletteCommand.NotificationsOn or PaletteCommand.NotificationsOff or PaletteCommand.RetryNotifications or PaletteCommand.DismissBanner or PaletteCommand.NotificationHistory => "Notifications",
         PaletteCommand.SearchSettings or PaletteCommand.OpenSettings => "Settings",
-        PaletteCommand.Convert or PaletteCommand.Stopwatch or PaletteCommand.Clipboard or PaletteCommand.Screenshot => "Tools",
+        PaletteCommand.Convert or PaletteCommand.Stopwatch or PaletteCommand.Clipboard or PaletteCommand.Screenshot or PaletteCommand.GoogleSearch => "Tools",
         PaletteCommand.AudioOutput => "Audio",
         _ => "Island"
     };
@@ -46,7 +46,7 @@ public static class CommandCatalog
         new(PaletteCommand.Seek, "seek", ["forward", "fwd", "back", "backward", "rewind"], "Scrub through the current track", "Enter to scrub · or forward 30 seconds"),
         new(PaletteCommand.Mute, "mute", [], "Mute system audio", "mute"),
         new(PaletteCommand.Unmute, "unmute", [], "Unmute system audio", "unmute"),
-        new(PaletteCommand.Ask, "ask", [], "Ask Sutra a question, or open chat", "ask why is the sky blue"),
+        new(PaletteCommand.Ask, "ask", [], "Ask Sutra a question, or open chat", "ask: why is the sky blue"),
         new(PaletteCommand.Say, "say", [], "Suggest wording for what to say next", "say"),
         new(PaletteCommand.Compare, "compare", [], "Compare two options in Sutra", "compare train or drive"),
         new(PaletteCommand.Timer, "timer", [], "Start a timer or open timer controls", "timer 10 minutes for laundry"),
@@ -74,6 +74,7 @@ public static class CommandCatalog
         new(PaletteCommand.Recenter, "recenter", [], "Recenter the island", "recenter"),
         new(PaletteCommand.Clipboard, "clipboard", [], "Open clipboard history", "clipboard"),
         new(PaletteCommand.Screenshot, "screenshot", ["capture", "snip", "screen shot"], "Capture a region, a window, or all screens locally", "Enter to open the capture overlay"),
+        new(PaletteCommand.GoogleSearch, "google", ["google search", "search google", "web search", "search", "g"], "Search Google in your default browser", "google best coffee near me · Enter without a query opens Google"),
         new(PaletteCommand.NotificationHistory, "notifications", ["notification history", "history"], "Review notifications and mirroring controls", "Enter to review"),
         new(PaletteCommand.NotificationsOn, "notifications on", [], "Enable Windows notification mirroring", "notifications on"),
         new(PaletteCommand.NotificationsOff, "notifications off", [], "Disable Windows notification mirroring", "notifications off"),
@@ -96,6 +97,7 @@ public static class CommandCatalog
     [
         ById(PaletteCommand.Help),
         ById(PaletteCommand.Convert),
+        ById(PaletteCommand.GoogleSearch),
         ById(PaletteCommand.Chat),
         ById(PaletteCommand.VoiceInput),
         ById(PaletteCommand.Volume),
@@ -126,8 +128,8 @@ public static class CommandCatalog
         foreach (var alias in command.Aliases) yield return alias;
     }
 
-    /// <summary>Longest name/alias that is the whole input or is followed by a space wins, so
-    /// "pause timer laundry" resolves to the timer command with argument "laundry".</summary>
+    /// <summary>Longest name/alias that is the whole input or is followed by a space wins; Ask
+    /// also accepts a colon separator, so "ask: question" resolves with the question as argument.</summary>
     public static CommandMatch? Match(string input)
     {
         var text = input.Trim();
@@ -141,7 +143,8 @@ public static class CommandCatalog
             {
                 if (text.Length < token.Length) continue;
                 if (!text.StartsWith(token, StringComparison.OrdinalIgnoreCase)) continue;
-                if (text.Length > token.Length && !char.IsWhiteSpace(text[token.Length])) continue;
+                var askColon = command.Id == PaletteCommand.Ask && text.Length > token.Length && text[token.Length] == ':';
+                if (text.Length > token.Length && !char.IsWhiteSpace(text[token.Length]) && !askColon) continue;
                 if (token.Length <= bestLength) continue;
                 bestLength = token.Length;
                 best = command;
@@ -149,7 +152,9 @@ public static class CommandCatalog
             }
         }
         if (best is null) return null;
-        var argument = text.Length > bestToken.Length ? text[bestToken.Length..].Trim() : "";
+        var argumentStart = bestToken.Length;
+        if (best.Id == PaletteCommand.Ask && argumentStart < text.Length && text[argumentStart] == ':') argumentStart++;
+        var argument = text.Length > argumentStart ? text[argumentStart..].Trim() : "";
         if (best.Id == PaletteCommand.Seek && !bestToken.Equals(best.Name, StringComparison.OrdinalIgnoreCase))
             argument = bestToken + (argument.Length == 0 ? "" : " " + argument);
         return new CommandMatch(best, argument);

@@ -1371,7 +1371,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     public async Task<string?> DictateQAsync()
     {
-        if (!_qSpeech.IsAvailable) return null;
+        if (!_qSpeech.IsAvailable || _wakeTraining) return null;
         OnUi(() => _qSnapshot = _qSnapshot with { State = QRunState.Listening, Status = "Listening…", Error = null });
         var text = await _qSpeech.DictateAsync(CancellationToken.None).ConfigureAwait(false);
         OnUi(() => _qSnapshot = _qSnapshot with { State = QRunState.Ready, Status = string.IsNullOrWhiteSpace(text) ? "Ready for a question" : "Dictation ready", Prompt = text ?? string.Empty });

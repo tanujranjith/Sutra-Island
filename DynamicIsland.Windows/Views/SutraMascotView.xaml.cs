@@ -44,8 +44,7 @@ public partial class SutraMascotView : System.Windows.Controls.UserControl
         Blink.BeginAnimation(ScaleTransform.ScaleYProperty, null);
         Gaze.BeginAnimation(TranslateTransform.XProperty, null); Gaze.BeginAnimation(TranslateTransform.YProperty, null);
         HasEyeMotion = false;
-        BulbScale.BeginAnimation(ScaleTransform.ScaleXProperty, null); BulbScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        BulbGlow.BeginAnimation(OpacityProperty, null); BulbRays.BeginAnimation(OpacityProperty, null);
+        BulbFloat.BeginAnimation(TranslateTransform.YProperty, null);
         HasBulbMotion = false;
     }
     internal static DoubleAnimationUsingKeyFrames CreateBlinkAnimation()
@@ -96,7 +95,7 @@ public partial class SutraMascotView : System.Windows.Controls.UserControl
         var oldX = Gaze.X; var oldY = Gaze.Y;
         StopMotion(); Blink.ScaleY = 1;
         ApplyExpression();
-        CornerBulb.Visibility = ShowThinkingBulb && State is (QRunState.Capturing or QRunState.Thinking or QRunState.Streaming) ? Visibility.Visible : Visibility.Collapsed;
+        CornerBulb.Visibility = ShowThinkingBulb ? Visibility.Visible : Visibility.Collapsed;
         var thinking = State is QRunState.Thinking or QRunState.Capturing;
         Gaze.X = thinking ? 12 : 0;
         Gaze.Y = thinking ? -12 : State == QRunState.Listening ? -6 : State == QRunState.Error ? 6 : 0;
@@ -106,10 +105,8 @@ public partial class SutraMascotView : System.Windows.Controls.UserControl
         if (IsBulbVisible)
         {
             HasBulbMotion = true;
-            BulbGlow.BeginAnimation(OpacityProperty, new DoubleAnimation(.25, .8, TimeSpan.FromMilliseconds(800)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
-            BulbRays.BeginAnimation(OpacityProperty, new DoubleAnimation(.3, 1, TimeSpan.FromMilliseconds(800)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
-            foreach (var axis in new[] { ScaleTransform.ScaleXProperty, ScaleTransform.ScaleYProperty })
-                BulbScale.BeginAnimation(axis, new DoubleAnimation(.96, 1.04, TimeSpan.FromMilliseconds(1000)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
+            BulbFloat.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-1.2, 1.2, TimeSpan.FromMilliseconds(1600))
+            { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
         }
         if (Expression == SutraMascotExpression.Open) Blink.BeginAnimation(ScaleTransform.ScaleYProperty, CreateBlinkAnimation());
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };

@@ -32,7 +32,7 @@ public partial class SettingsWindow : Window
         DataContext = settingsViewModel;
         settingsViewModel.PropertyChanged += SettingsOnPropertyChanged;
         Closed += (_, _) => settingsViewModel.PropertyChanged -= SettingsOnPropertyChanged;
-        IsVisibleChanged += (_, _) => { if (!IsVisible) QApiKeyBox.Clear(); };
+        IsVisibleChanged += (_, _) => { if (!IsVisible) { QApiKeyBox.Clear(); settingsViewModel.CancelWakeTraining(); } };
         PreviewIslandData.DataContext = islandViewModel;
         PreviewIslandData.SizeChanged += PreviewIslandData_SizeChanged;
         Closed += (_, _) => PreviewIslandData.SizeChanged -= PreviewIslandData_SizeChanged;
@@ -227,7 +227,7 @@ public partial class SettingsWindow : Window
         {
             foreach (var control in LogicalDescendants(page).OfType<FrameworkElement>())
             {
-                var properties = new[] { System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty, System.Windows.Controls.Primitives.Selector.SelectedItemProperty, System.Windows.Controls.Primitives.Selector.SelectedValueProperty, System.Windows.Controls.TextBox.TextProperty, System.Windows.Controls.Primitives.RangeBase.ValueProperty };
+                var properties = new[] { System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty, System.Windows.Controls.Primitives.Selector.SelectedItemProperty, System.Windows.Controls.Primitives.Selector.SelectedValueProperty, System.Windows.Controls.TextBox.TextProperty, System.Windows.Controls.Primitives.RangeBase.ValueProperty, System.Windows.Controls.Primitives.ButtonBase.CommandProperty };
                 if (!properties.Any(dp => System.Windows.Data.BindingOperations.GetBindingExpression(control, dp)?.ParentBinding.Path?.Path == property)) continue;
                 SettingsSearchBox.Text = "";
                 if (DataContext is SettingsViewModel settings) settings.SelectedSectionKey = key;
@@ -304,7 +304,7 @@ public partial class SettingsWindow : Window
         PositionTab.Visibility = Matches(PositionTab, "island", "position", "monitor", "offset", "display", "placement", "screen") ? Visibility.Visible : Visibility.Collapsed;
         ActivitiesTab.Visibility = Matches(ActivitiesTab, "widgets", "connections", "activities", "weather", "notifications", "notification", "integrations", "network", "wifi", "bluetooth", "stocks", "calendar", "meeting", "clipboard", "privacy", "countdown", "caps", "num", "lock") ? Visibility.Visible : Visibility.Collapsed;
         PollingTab.Visibility = Matches(PollingTab, "polling", "rate", "refresh", "interval", "frequency", "cadence", "window", "screen", "wifi", "wireless", "connectivity", "clock", "date", "media", "playback", "audio", "timer", "battery", "system monitor", "privacy", "theme", "airpods", "notifications", "calendar", "stocks", "weather") ? Visibility.Visible : Visibility.Collapsed;
-        QTab.Visibility = Matches(QTab, "q", "assistant", "provider", "model", "api", "prompt", "response", "tokens", "screen", "voice", "speech", "wake", "hey sutra") ? Visibility.Visible : Visibility.Collapsed;
+        QTab.Visibility = Matches(QTab, "q", "assistant", "provider", "model", "api", "prompt", "response", "tokens", "screen", "voice", "speech", "wake", "hey sutra", "training", "cooldown", "confidence") ? Visibility.Visible : Visibility.Collapsed;
         FlowTab.Visibility = Matches(FlowTab, "flow", "sutra flow", "dictation", "dictate", "whisper", "voice", "speech", "transcribe", "push-to-talk", "microphone", "vocabulary") ? Visibility.Visible : Visibility.Collapsed;
         ShortcutsTab.Visibility = Matches(ShortcutsTab, "shortcuts", "behavior", "command palette", "startup", "hotkey", "hover", "click-through", "always on top", "expand") ? Visibility.Visible : Visibility.Collapsed;
         AdvancedTab.Visibility = Matches(AdvancedTab, "advanced", "developer", "backup", "profiles", "warnings", "debug", "import", "export", "reset", "volume warning", "battery warning") ? Visibility.Visible : Visibility.Collapsed;

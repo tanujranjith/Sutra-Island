@@ -1,3 +1,13 @@
+# Sutra Island v1.3.1
+
+- Keep Sutra Flow, local Whisper recognition, and compact voice mode from the latest cloud source in the desktop build.
+- Add Google search in the default browser, with language, SafeSearch, and empty-query preferences.
+- Close the palette immediately and hand off to the browser in the background so Windows browser startup does not freeze the island.
+- Add five-example local wake phrase training, stricter detection, cooldown, and a training requirement option.
+- Keep copied Island screenshots in bounded session clipboard history with a retention toggle and capture limit.
+- Preserve the assistant response mascot and command palette latency improvements from the local desktop updates.
+
+---
 # Sutra Island v1.3.0
 
 - Add compact Sutra Assistant voice mode: the island listens, thinks, and presents a short answer or system-command result without opening the full chat panel.
@@ -21,6 +31,18 @@
 - A spoken "Thank you" is now kept; it is only dropped as a Whisper guess when the recording has almost no speech.
 - Add a CI workflow that builds and tests every pull request.
 - Add Settings → Sutra Flow: on/off, cleanup level, vocabulary for names and terms, speech model status, and words dictated.
+
+---
+# Sutra Island v1.2.7
+
+- Accept `ask: question` in the command palette and start the Sutra Assistant transition before saving command recents.
+- Launch the assistant request without waiting for the provider response before focusing its composer.
+
+---
+# Sutra Island v1.2.6
+
+- Remove the duplicate mascot from the assistant header and keep the title text only.
+- Put the assistant mascot beside the response with a flat golden bulb that floats gently; respect reduced-motion settings.
 
 ---
 # Sutra Island v1.2.5

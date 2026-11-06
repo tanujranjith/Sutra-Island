@@ -4,8 +4,9 @@ using WinClipboard = Windows.ApplicationModel.DataTransfer.Clipboard;
 namespace DynamicIsland.Windows.Services;
 
 /// <summary>
-/// Reads Windows clipboard text and image history (Win+V) on demand and copies an original item back. Requires clipboard history
-/// to be enabled; otherwise returns nothing. Best-effort, no special capability needed.
+/// Reads Windows clipboard text and image history (Win+V) on demand and copies an original item back.
+/// Island screenshots also remain in bounded session memory when enabled, independently of Windows history.
+/// Windows text/image history requires clipboard history to be enabled. Best-effort, no special capability needed.
 /// </summary>
 public sealed partial class ClipboardService(LoggingService log) : Infrastructure.CommandPalette.IPaletteClipboard
 {

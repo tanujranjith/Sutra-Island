@@ -78,6 +78,7 @@ public sealed class CommandPaletteSuggestion
         PaletteCommand.Recenter => "\uE81D",
         PaletteCommand.Clipboard => "\uE77F",
         PaletteCommand.Screenshot => "\uE722",
+        PaletteCommand.GoogleSearch => "\uE721",
         PaletteCommand.NotificationHistory or PaletteCommand.NotificationsOn or PaletteCommand.NotificationsOff => "\uE7F4",
         PaletteCommand.RetryNotifications => "\uE72C",
         PaletteCommand.DismissBanner => "\uE711",
@@ -202,13 +203,17 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         try
         {
             var result = await _runner.ExecuteAsync(match);
-            if (!result.IsError && !result.ShowAllCommands && match.Command.Id != PaletteCommand.SearchSettings)
+            var rememberCommand = !result.IsError && !result.ShowAllCommands && match.Command.Id != PaletteCommand.SearchSettings;
+            if (rememberCommand)
             {
                 var id = match.Command.Id.ToString();
                 _settings.PaletteRecents.Remove(id); _settings.PaletteRecents.Insert(0, id);
                 if (_settings.PaletteRecents.Count > 10) _settings.PaletteRecents.RemoveRange(10, _settings.PaletteRecents.Count - 10);
-                if (_save is not null) await _save();
             }
+            // Start closing the palette immediately. Persisting command recents must not hold the
+            // assistant surface behind the palette while the settings file is written.
+            if (result.Close) CloseRequested?.Invoke(this, EventArgs.Empty);
+            if (rememberCommand && _save is not null) await _save();
             if (result.ShowAllCommands)
             {
                 _showingAllCommands = true;
@@ -223,7 +228,6 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
             }
             if (result.Close)
             {
-                CloseRequested?.Invoke(this, EventArgs.Empty);
                 return;
             }
             if (!string.IsNullOrEmpty(result.Message))
@@ -264,7 +268,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
             var commands = forceAll || _showingAllCommands
                 ? CommandCatalog.All
                 : CommandCatalog.Filter(_query, _settings.PaletteFavorites, _settings.PaletteRecents);
-            foreach (var command in commands)
+            foreach (var command in commands.Where(command => _runner.IsCommandEnabled(command.Id)))
                 Suggestions.Add(new CommandPaletteSuggestion(command, _settings.PaletteFavorites.Contains(command.Id.ToString()), _runner.Availability(command.Id)));
         }
 

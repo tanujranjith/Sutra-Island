@@ -11,6 +11,7 @@ public interface ICommandPaletteHost
 {
     void ShowSettings();
     void ShowScreenshotTool() { }
+    void OpenDefaultBrowser(Uri destination) => throw new NotSupportedException("Opening the default browser is unavailable in this window.");
     void ShowTimerPanel();
     void ShowAlarmPanel();
     void ShowStopwatchPanel();
@@ -49,6 +50,7 @@ public sealed class CommandRunner(
     public IPaletteOutputControl? Outputs => outputs ?? audio as IPaletteOutputControl;
     public Task SetMirroringAsync(bool enabled) => host.SetNotificationsAsync(enabled);
     public Task OpenAssistantPanelAsync(string command) => host.OpenCommandPanelAsync(command);
+    public bool IsCommandEnabled(PaletteCommand command) => command != PaletteCommand.GoogleSearch || island.Settings.GoogleSearchEnabled;
     public async Task<CommandResult> ExecuteAsync(CommandMatch match)
     {
         try
@@ -72,6 +74,13 @@ public sealed class CommandRunner(
         var argument = match.Argument;
         switch (match.Command.Id)
         {
+            case PaletteCommand.GoogleSearch:
+                if (!island.Settings.GoogleSearchEnabled) return Fail("Google search is disabled in Settings.");
+                if (string.IsNullOrWhiteSpace(argument) && !island.Settings.GoogleSearchOpenHomepageWhenEmpty)
+                    return Fail("Add a query, for example: google coffee near me.");
+                // The host queues the shell handoff so the palette can dismiss immediately.
+                host.OpenDefaultBrowser(GoogleSearch.Destination(argument, island.Settings.GoogleSearchLanguage, island.Settings.GoogleSearchSafeSearch));
+                return Ok();
             case PaletteCommand.Screenshot:
                 host.ShowScreenshotTool();
                 return Ok();
@@ -314,6 +323,7 @@ public sealed class CommandRunner(
 
     public string? Availability(PaletteCommand command) => command switch
     {
+        PaletteCommand.GoogleSearch when !island.Settings.GoogleSearchEnabled => "Google search disabled",
         PaletteCommand.Seek when !Seek.Current.HasSession => "No active media",
         PaletteCommand.Seek when !Seek.Current.CanSeek || Seek.Current.Duration <= TimeSpan.Zero => "This source does not support seeking",
         PaletteCommand.Play or PaletteCommand.Pause or PaletteCommand.Next or PaletteCommand.Previous or PaletteCommand.OpenMedia when !island.Media.HasSession => "No active media",

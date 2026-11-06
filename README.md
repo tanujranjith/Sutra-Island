@@ -2,7 +2,7 @@
 
 Sutra Island is a Windows desktop companion: a compact, always-on-top island that expands into media controls, system information, timers, and other live activities. It also includes Sutra Assistant and a searchable command palette.
 
-Built with C#, WPF, and .NET 10. The current source version is **1.3.0**. See [release notes](RELEASE_NOTES.md) for changes, [Sutra Assistant](Q.md) for provider setup and privacy details, and [Sutra Flow](SUTRA_FLOW.md) for dictation.
+Built with C#, WPF, and .NET 10. The current source version is **1.3.1**. See [release notes](RELEASE_NOTES.md) for changes, [Sutra Assistant](Q.md) for provider setup and privacy details, and [Sutra Flow](SUTRA_FLOW.md) for dictation.
 
 ![Current graphite island with fixture media](media/graphite-island.png)
 
@@ -17,6 +17,9 @@ The screenshots show the current native interface with illustrative verification
 - **Sutra Flow dictation:** hold Right Ctrl, speak, and let go to paste clean text at the cursor. Speech is transcribed on this PC with Whisper. See [SUTRA_FLOW.md](SUTRA_FLOW.md).
 - **Command palette:** open with `Ctrl+Alt+K` by default to search commands and settings, control media and timers, calculate, convert units, and solve single-variable linear equations. For example, `3x+44x=1253` shows a copyable solution; nonlinear equations and systems of equations are not supported. Press Enter on a result to copy it. Use Up on an empty query to recall a previously run command.
 - **Customization:** choose visible activities, appearance, position, keyboard shortcuts, and reduced-motion behavior in Settings.
+- **Google search:** type `google <query>` in the command palette to open the results in your default browser. Language, SafeSearch, and empty-query behavior are under Settings → Advanced.
+- **Wake phrase training:** record five local “Hey Sutra” examples under Settings → Sutra Assistant. Training works with the installed Whisper model or Windows speech fallback; recordings are never saved. After training, say the phrase, pause for the listening dots, then ask your question.
+- **Screenshot history:** copied captures appear in Island clipboard history for the current app session. Choose whether to retain them and the capture limit under Settings → Advanced.
 
 ## Sutra Flow dictation
 

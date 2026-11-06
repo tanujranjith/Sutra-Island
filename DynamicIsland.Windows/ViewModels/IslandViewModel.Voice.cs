@@ -12,7 +12,9 @@ public sealed partial class IslandViewModel
     private bool _qScreenSession;
     private bool _qUseScreenNext;
     public bool QUseScreenNext { get => _qUseScreenNext; set { _qUseScreenNext = value; RaiseMany(nameof(QUseScreenNext), nameof(QSourceText)); } }
-    public string VoiceStatus => _voiceSnapshot.Error is null ? _voiceSnapshot.Status : _voiceSnapshot.Status + ": " + _voiceSnapshot.Error;
+    public string VoiceStatus => !_wakeTraining && Settings.WakeListeningEnabled && Settings.WakeRequireTraining && Settings.WakeVoiceProfile?.IsValid != true
+        ? "Train “Hey Sutra” in Settings to start wake listening"
+        : _voiceSnapshot.Error is null ? _voiceSnapshot.Status : _voiceSnapshot.Status + ": " + _voiceSnapshot.Error;
     public bool VoiceBusy => _voiceSnapshot.State is AssistantVoiceState.Listening or AssistantVoiceState.Thinking or AssistantVoiceState.Speaking;
     public AssistantVoiceState VoiceState => _voiceSnapshot.State;
     public bool AssistantSpeaking => _voiceSnapshot.State == AssistantVoiceState.Speaking;
@@ -134,18 +136,49 @@ public sealed partial class IslandViewModel
         _compactVoiceTimer.Stop();
         _compactVoice.Reset();
     }
-    public Task ConfigureVoiceAsync() => _voice?.ConfigureAsync(Settings.QEnabled && Settings.WakeListeningEnabled, Settings.VoiceReadAloud, Settings.VoiceName) ?? Task.CompletedTask;
+    private bool _wakeTraining;
+    public Task ConfigureVoiceAsync()
+    {
+        if (_qSpeech is Services.Q.SpeechInputService platform)
+            platform.ConfigureWakeProfile(Settings.WakeVoiceProfile, Settings.WakeConfidenceThreshold,
+                Settings.WakeCooldownSeconds, Settings.WakeRequireTraining);
+        RaisePropertyChanged(nameof(VoiceStatus));
+        return _voice?.ConfigureAsync(!_wakeTraining && Settings.QEnabled && Settings.WakeListeningEnabled
+                && (!Settings.WakeRequireTraining || Settings.WakeVoiceProfile?.IsValid == true),
+            Settings.VoiceReadAloud, Settings.VoiceName) ?? Task.CompletedTask;
+    }
+    public async Task TrainWakeAsync(IProgress<string> progress, CancellationToken cancellationToken)
+    {
+        if (_wakeTraining) return;
+        if (_qSpeech is not Services.Q.SpeechInputService platform || !platform.IsAvailable)
+            throw new InvalidOperationException("Install the Sutra Flow speech model or an English Windows speech recognizer and allow microphone access before training.");
+        _wakeTraining = true;
+        try
+        {
+            await ConfigureVoiceAsync();
+            var profile = await platform.TrainWakeAsync(progress, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            Settings.WakeVoiceProfile = profile;
+            platform.ConfigureWakeProfile(profile, Settings.WakeConfidenceThreshold, Settings.WakeCooldownSeconds, Settings.WakeRequireTraining);
+            await PersistSettingsAsync();
+        }
+        finally
+        {
+            _wakeTraining = false;
+            await ConfigureVoiceAsync();
+        }
+    }
     public async Task SetWakeEnabledAsync(bool enabled)
     { Settings.WakeListeningEnabled = enabled; await PersistSettingsAsync(); await ConfigureVoiceAsync(); }
     public async Task StartVoiceAsync()
     {
-        if (!Settings.QEnabled) return;
+        if (!Settings.QEnabled || _wakeTraining) return;
         await StartChatAsync(useScreen: QUseScreenNext);
         if (!Settings.QDisclosureAccepted)
         { _voiceSnapshot = new(AssistantVoiceState.Error, "Allow the assistant provider disclosure before using voice"); RaisePropertyChanged(nameof(VoiceStatus)); return; }
         if (_voice is not null) await _voice.ListenAsync();
     }
-    public Task ReadReplyAsync() => _voice?.ReadAsync(CleanQResponseText(QResponse)) ?? Task.CompletedTask;
+    public Task ReadReplyAsync() => _wakeTraining ? Task.CompletedTask : _voice?.ReadAsync(CleanQResponseText(QResponse)) ?? Task.CompletedTask;
     public void StopAssistant() { _voice?.Stop(); CancelQ(); }
     public async Task StartChatAsync(string? prompt = null, bool useScreen = false, bool newConversation = false, bool expand = true)
     {

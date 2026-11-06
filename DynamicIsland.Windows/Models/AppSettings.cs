@@ -37,12 +37,20 @@ public sealed class AppSettings
     public bool WakeListeningEnabled { get; set; }
     /// <summary>"high", "normal", or "low": how readily the Whisper wake detector reacts to "Hey Sutra".</summary>
     public string AssistantWakeSensitivity { get; set; } = "normal";
+    public WakeVoiceProfile? WakeVoiceProfile { get; set; }
+    public double WakeConfidenceThreshold { get; set; } = .86;
+    public double WakeCooldownSeconds { get; set; } = 4;
+    public bool WakeRequireTraining { get; set; }
     public bool VoiceReadAloud { get; set; } = true;
     /// <summary>Voice turns play in the compact island (the voice orb) instead of opening the chat panel.</summary>
     public bool CompactVoiceMode { get; set; } = Infrastructure.CompactVoicePolicy.DefaultEnabled;
     public string VoiceName { get; set; } = "";
     public List<string> PaletteFavorites { get; set; } = [];
     public List<string> PaletteRecents { get; set; } = [];
+    public bool GoogleSearchEnabled { get; set; } = true;
+    public bool GoogleSearchOpenHomepageWhenEmpty { get; set; } = true;
+    public bool GoogleSearchSafeSearch { get; set; }
+    public string GoogleSearchLanguage { get; set; } = "auto";
     public bool ShowTimerAlarm { get; set; } = true;
     public bool FocusModeEnabled { get; set; }
     public DateTimeOffset? FocusSessionEndsAt { get; set; }
@@ -149,6 +157,8 @@ public sealed class AppSettings
 
     // ===== Clipboard / notifications / calendar (Windows APIs; may be limited unpackaged) =====
     public bool ShowClipboard { get; set; }
+    public bool RememberIslandScreenshots { get; set; } = true;
+    public int IslandScreenshotHistoryLimit { get; set; } = 10;
     public bool ShowNotifications { get; set; }
     public double NotificationPollSeconds { get; set; } = 1;
     // Background refresh cadences. These stay independent so faster local state updates do not

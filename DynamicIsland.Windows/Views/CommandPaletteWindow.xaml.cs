@@ -129,7 +129,7 @@ public partial class CommandPaletteWindow : Window
         }
 
         await _viewModel.ExecuteAsync();
-        if (IsVisible)
+        if (IsVisible && !IsDismissing)
         {
             FocusActiveControl();
         }

@@ -1046,10 +1046,7 @@
                             <Grid Grid.Row="0">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border x:Name="AssistantBrandLogo" Width="32" Height="32" CornerRadius="10" Background="Transparent" AutomationProperties.Name="Sutra Assistant">
-                                        <views:SutraMascotView x:Name="AssistantMascot" ShowThinkingBulb="True" State="{Binding AssistantMascotState}" Speaking="{Binding AssistantSpeaking}" ReducedMotion="{Binding IsReducedMotion}" />
-                                    </Border>
-                                    <TextBlock x:Name="AssistantBrandTitle" Text="Sutra Assistant" Margin="14,0,0,0" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource QText}" VerticalAlignment="Center" /><Border Width="1" Height="14" Background="{DynamicResource QBorder}" Margin="10,0"/><TextBlock Text="{Binding QHeaderStatusText}" Foreground="{DynamicResource QMuted}" FontSize="10" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="AssistantBrandTitle" Text="Sutra Assistant" Margin="0" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource QText}" VerticalAlignment="Center" /><Border Width="1" Height="14" Background="{DynamicResource QBorder}" Margin="10,0"/><TextBlock Text="{Binding QHeaderStatusText}" Foreground="{DynamicResource QMuted}" FontSize="10" VerticalAlignment="Center"/>
 
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
@@ -1101,8 +1098,8 @@
                                         <Border HorizontalAlignment="Left" MaxWidth="752" Margin="0,6,12,8" Padding="0" CornerRadius="0" Background="Transparent" BorderThickness="0">
                                             <Grid>
                                                 <Grid.ColumnDefinitions><ColumnDefinition Width="39" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                                <Grid Width="27" Height="27" HorizontalAlignment="Left" VerticalAlignment="Top">
-                                                    <Border Width="27" Height="27" CornerRadius="8" Background="{StaticResource SutraAssistantBrandBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <Grid Width="27" Height="27" HorizontalAlignment="Left" VerticalAlignment="Top" ClipToBounds="False">
+                                                    <views:SutraMascotView x:Name="QResponseMascot" Width="27" Height="27" ShowThinkingBulb="True" State="{Binding AssistantMascotState}" Speaking="{Binding AssistantSpeaking}" ReducedMotion="{Binding IsReducedMotion}" ClipToBounds="False" />
                                                 </Grid>
                                                 <Grid Grid.Column="1" Margin="0,0,0,0">
                                                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>

@@ -21,13 +21,13 @@ public sealed partial class ClipboardService
             {
                 _paletteEntries.Clear();
                 SetStatus(new(IntegrationState.PermissionRequired, "Enable clipboard history in Windows Settings.", "ms-settings:clipboard"));
-                return [];
+                return RecentScreenshots(max);
             }
-            var entries = new List<ClipboardEntry>();
+            var entries = _screenshots.Select(item => (Entry: item.Entry, CopiedAt: item.CopiedAt)).ToList();
             var originals = new Dictionary<string, ClipboardHistoryItem>();
             foreach (var item in history.Items)
             {
-                if (entries.Count >= Math.Clamp(max, 1, 30) || read != _paletteReadGeneration) break;
+                if (originals.Count >= Math.Clamp(max, 1, 30) || read != _paletteReadGeneration) break;
                 try
                 {
                     ClipboardEntry? entry = null;
@@ -47,20 +47,20 @@ public sealed partial class ClipboardService
                         var text = await item.Content.GetTextAsync();
                         if (!string.IsNullOrWhiteSpace(text)) entry = new(item.Id, text);
                     }
-                    if (entry is not null) { entries.Add(entry); originals[item.Id] = item; }
+                    if (entry is not null) { entries.Add((entry, item.Timestamp)); originals[item.Id] = item; }
                 }
                 catch (Exception ex) { log.Debug($"Clipboard item unavailable: {ex.GetType().Name}"); }
             }
             if (read != _paletteReadGeneration) return [];
             _paletteEntries.Clear(); foreach (var pair in originals) _paletteEntries.Add(pair.Key, pair.Value);
             SetStatus(new(IntegrationState.Ready, entries.Count == 0 ? "Clipboard history is empty" : "Ready"));
-            return entries;
+            return entries.OrderByDescending(item => item.CopiedAt).Take(Math.Clamp(max, 1, 30)).Select(item => item.Entry).ToArray();
         }
         catch (Exception ex)
         {
             log.Debug($"Clipboard history unavailable: {ex.GetType().Name}");
             if (read == _paletteReadGeneration) { _paletteEntries.Clear(); SetStatus(new(IntegrationState.Error, "Clipboard history could not load. Refresh to retry.")); }
-            return [];
+            return read == _paletteReadGeneration ? RecentScreenshots(max) : [];
         }
     }
     internal static async Task<ClipboardEntry> ReadImagePreviewAsync(string id, IRandomAccessStream stream)
@@ -82,6 +82,11 @@ public sealed partial class ClipboardService
         if (!entry.IsImage) return CopyText(entry.Text);
         try
         {
+            if (ScreenshotOriginal(entry.Id) is { } screenshot)
+            {
+                System.Windows.Clipboard.SetDataObject(ScreenshotPreview.ClipboardData(screenshot), true);
+                return true;
+            }
             return _paletteEntries.TryGetValue(entry.Id, out var original)
                 && WinClipboard.SetHistoryItemAsContent(original) == SetHistoryItemAsContentStatus.Success;
         }

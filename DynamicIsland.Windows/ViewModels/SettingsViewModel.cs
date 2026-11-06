@@ -9,7 +9,7 @@ using DynamicIsland.Q.Core;
 
 namespace DynamicIsland.Windows.ViewModels;
 
-public sealed class SettingsViewModel : ObservableObject
+public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly AppSettings _settings;
     private readonly SettingsService _settingsService;
@@ -37,6 +37,7 @@ public sealed class SettingsViewModel : ObservableObject
         _qSecrets = qSecrets;
         _qProviders = qProviders;
         _codexAccount = codexAccount;
+        InitializeWakeTrainingCommands();
         _codexModels = codexAccount.Snapshot.Models ?? [];
         _codexAccount.Changed += OnCodexAccountChanged;
         SaveCommand = new RelayCommand(() => _ = SaveAsync());
@@ -141,7 +142,8 @@ public sealed class SettingsViewModel : ObservableObject
     public IReadOnlyList<string> InstalledVoices => Services.Q.SpeechInputService.GetInstalledVoices();
     public void RefreshRuntimePreferences()
     {
-        foreach (var property in new[] { nameof(ShowNotifications), nameof(WakeListeningEnabled), nameof(VoiceReadAloud), nameof(CompactVoiceMode), nameof(VoiceName), nameof(ShowDate), nameof(ShowCompactDate), nameof(CapsLockNotifications), nameof(NumLockNotifications) }) RaisePropertyChanged(property);
+        RefreshWakeTraining();
+        foreach (var property in new[] { nameof(ShowNotifications), nameof(WakeListeningEnabled), nameof(WakeSensitivity), nameof(VoiceReadAloud), nameof(CompactVoiceMode), nameof(VoiceName), nameof(ShowDate), nameof(ShowCompactDate), nameof(CapsLockNotifications), nameof(NumLockNotifications) }) RaisePropertyChanged(property);
     }
     public bool ShowTimerAlarm { get => _settings.ShowTimerAlarm; set => Set(v => _settings.ShowTimerAlarm = v, value); }
     public bool FocusModeEnabled { get => _settings.FocusModeEnabled; set { Set(v => _settings.FocusModeEnabled = v, value); RaisePropertyChanged(nameof(FocusModeLabel)); _apply(); } }
@@ -938,6 +940,8 @@ public sealed class SettingsViewModel : ObservableObject
 
     private void RefreshAllAndApply()
     {
+        _wakeTrainingStatus = "";
+        RefreshWakeTraining();
         RebuildModuleOrder();
         RebuildQuickLaunch();
         RaisePropertyChanged(string.Empty);
@@ -965,6 +969,8 @@ public sealed class SettingsViewModel : ObservableObject
         if (choice != System.Windows.MessageBoxResult.OK) return;
 
         _settings.ResetToDefaults();
+        _wakeTrainingStatus = "";
+        RefreshWakeTraining();
         RebuildModuleOrder();
         RebuildQuickLaunch();
         RebuildQShortcuts();

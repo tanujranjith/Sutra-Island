@@ -90,7 +90,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             return;
         }
         _log = new LoggingService();
-        _log.Info($"Application startup entered: pid={Environment.ProcessId}");
+        _log.Info($"Application startup entered: pid={Environment.ProcessId}, version={typeof(App).Assembly.GetName().Version}");
         var openSettingsFromCommandLine = e.Args
             .Any(arg => string.Equals(arg, "--settings", StringComparison.OrdinalIgnoreCase));
         var showIslandFromCommandLine = e.Args
@@ -173,6 +173,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _notificationHistory = new NotificationHistoryService(_log);
         _privacy = new PrivacySensorService(_log);
         _clipboard = new ClipboardService(_log);
+        _clipboard.ConfigureScreenshotHistory(_settings.RememberIslandScreenshots, _settings.IslandScreenshotHistoryLimit);
         _qScreen = new ScreenContextService(_log);
         _qSpeech = new SpeechInputService(_log);
         _qSecrets = new DpapiSecretStore(_log);
@@ -198,7 +199,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _timerViewModel = new TimerAlarmViewModel(_timerAlarm, _settings.Use24HourClock);
         _islandWindow = new IslandWindow(_islandViewModel, _timerViewModel, _position, _settingsService, _log, _qScreen);
         _islandWindow.OpenSettingsRequested += (_, _) => ShowSettings();
-        _screenshots=new ScreenshotTool(_islandWindow,_qScreen,()=>_islandViewModel.IsReducedMotion);
+        _screenshots=new ScreenshotTool(_islandWindow,_qScreen,()=>_islandViewModel.IsReducedMotion,_clipboard.RememberScreenshot);
         _islandWindow.ScreenshotRequested+=(_,_)=>_screenshots.Open();
         _islandWindow.OpenQSettingsRequested += (_, _) => { ShowSettings(); _settingsWindow?.OpenQSettings(); };
         _islandWindow.OpenClipboardRequested += (_, _) => _ = ShowClipboardAsync();
@@ -207,6 +208,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
 
         _settingsViewModel = new SettingsViewModel(_settings, _settingsService, _startupService,
             ApplySettings, Recenter, () => _settingsWindow?.Hide(), _qSecrets, providers, _codexAccount);
+        _settingsViewModel.AttachWakeTraining(_islandViewModel);
         _islandViewModel.QProviderSelectionChanged += (_, _) => _settingsViewModel.RefreshQProviderControls();
         _media.AvailableAppsChanged += (_, apps) => Dispatcher.BeginInvoke(() =>
             _settingsViewModel.SetAvailableApps(apps));
@@ -236,6 +238,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
                 _tray?.ShowNotification("Sutra Flow", status.Detail);
         };
         _flowSettings = new ViewModels.FlowSettingsViewModel(_settings, _settingsService, _flow);
+        _log.Info($"Sutra Flow initialized: enabled={_settings.FlowEnabled}, modelInstalled={_flow.Engine.IsModelInstalled}.");
         if (!Infrastructure.AppDataPaths.IsPreview) _flow.Start();
         _notifications.Configure(TimeSpan.FromSeconds(_settings.NotificationPollSeconds));
         if (_settings.ShowNotifications) _ = _notifications.StartAsync();
@@ -301,6 +304,8 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         if (_settingsWindow is null)
         {
             _settingsWindow = new SettingsWindow(_settingsViewModel, _islandViewModel!, _islandWindow!);
+            _settingsWindow.ContentRendered += (_, _) => _log?.Info(
+                $"Settings rendered: pid={Environment.ProcessId}, exe={Environment.ProcessPath}, visible={_settingsWindow.IsVisible}, title={_settingsWindow.Title}, size={_settingsWindow.ActualWidth:0}x{_settingsWindow.ActualHeight:0}, flowSettingsBound={(_settingsWindow.FindName("FlowPage") as FrameworkElement)?.DataContext is FlowSettingsViewModel}.");
             _settingsWindow.OpenTimerRequested += (_, _) => ShowTimerAlarm();
             _settingsWindow.IsVisibleChanged += (_, _) => UpdateKeepExpanded();
             _settingsWindow.Closing += (_, args) =>
@@ -346,6 +351,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     {
         if (_settings is null) return;
         _log?.SetDebugEnabled(_settings.DebugLogging);
+        _clipboard?.ConfigureScreenshotHistory(_settings.RememberIslandScreenshots, _settings.IslandScreenshotHistoryLimit);
         RegisterQHotkey();
         RegisterCommandPaletteHotkeyIfChanged();
         RegisterScreenshotHotkey();
@@ -469,8 +475,17 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
 
     private void CancelAssistantResponse()
     { if (Dispatcher.CheckAccess()) _islandViewModel?.CancelQ(); else Dispatcher.BeginInvoke(() => _islandViewModel?.CancelQ()); }
-    void ICommandPaletteHost.OpenChat(string? question, bool useScreen) => Dispatcher.BeginInvoke(async () =>
-    { await _islandViewModel!.StartChatAsync(question, useScreen); _islandWindow?.FocusAssistantComposer(); });
+    void ICommandPaletteHost.OpenChat(string? question, bool useScreen)
+    {
+        void OpenChatNow()
+        {
+            if (_islandViewModel is null || _islandWindow is null) return;
+            _ = _islandViewModel.StartChatAsync(question, useScreen);
+            _islandWindow.FocusAssistantComposer();
+        }
+        if (Dispatcher.CheckAccess()) OpenChatNow();
+        else Dispatcher.BeginInvoke(OpenChatNow);
+    }
     void ICommandPaletteHost.ShowSettingsSearch(string query) => Dispatcher.BeginInvoke(() => { ShowSettings(); _settingsWindow?.OpenSearch(query); });
     void ICommandPaletteHost.RecenterIsland() => Recenter();
     Task ICommandPaletteHost.OpenClipboardAsync() => ShowClipboardAsync();
