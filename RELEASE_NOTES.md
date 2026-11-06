@@ -1,5 +1,8 @@
 # Sutra Island v1.3.0
 
+- Add compact Sutra Assistant voice mode: the island listens, thinks, and presents a short answer or system-command result without opening the full chat panel.
+- Keep voice replies readable with a fully opaque, theme-matched background in dark, light, and custom themes. Prevent media or desktop content from showing through, including when a new question interrupts dismissal.
+- Keep consecutive voice answers current, fit long answers into two lines, and retain hover-to-hold, Open in chat, speech controls, and reduced-motion support.
 - Add Sutra Flow, local push-to-talk dictation: hold Right Ctrl, speak, and let go to paste clean text wherever the cursor is. A quick tap, or Ctrl with another key, still works as Ctrl.
 - Transcribe on this PC with Whisper (whisper.cpp via Whisper.net). The 148 MB base.en speech model downloads once on first launch; nothing is bundled into the exe.
 - Morph the island into a dot-matrix voice display while dictating: voice columns ripple from the center, flatten on release, shimmer while polishing, and draw a green check when pasted (red X on errors).
