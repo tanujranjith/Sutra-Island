@@ -33,6 +33,15 @@ needs accepting. Typed chat always uses the panel.
 Text and slider colors follow the active theme. Spoken command results stay open through speech,
 then hold for 3 s before exiting. The panel's auto-close timer waits while the orb owns the conversation.
 
+The active orb uses a fully opaque, theme-matched surface, including with Graphite/acrylic enabled.
+Media and desktop content must not show through voice text. The surface returns to the normal island
+material on exit; a new wake during exit restores the solid backing immediately.
+
+On Windows, run `dotnet run --project scripts/VoiceSurfaceCheck/VoiceSurfaceCheck.csproj -c Release`
+to check the real WPF control over a magenta media backing. The check covers all active states in dark,
+light, and custom themes, both motion settings, the enlarged answer area, interrupted exit, and live
+theme changes. It does not start the desktop app, microphone, or provider services.
+
 ## Interaction
 
 - **Esc** cancels at any point (stops listening, the response, and speech) and runs the exit. It is a

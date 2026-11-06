@@ -7,8 +7,10 @@
     <!-- The compact voice orb: the island itself becomes the voice UI (docs/voice-orb). Every layer is
          driven from code-behind by State; nothing animates while the orb is idle and collapsed. -->
     <Grid x:Name="Root" ClipToBounds="True">
-        <!-- Same surface as the island, so the media/system content underneath fades out and back in. -->
-        <Border x:Name="Surface" Opacity="0" IsHitTestVisible="False" Background="{Binding IslandSurfaceBrush}" CornerRadius="{Binding IslandCornerRadius}" />
+        <!-- Voice text needs an opaque backing, independent of the island's acrylic material. -->
+        <Border x:Name="Surface" Opacity="0" IsHitTestVisible="False"
+                Background="{Binding Palette.Surface, RelativeSource={RelativeSource AncestorType={x:Type views:CompactVoiceView}}}"
+                CornerRadius="{Binding IslandCornerRadius}" />
 
         <Grid x:Name="OrbContent">
             <Canvas x:Name="MascotLayer" ClipToBounds="False">

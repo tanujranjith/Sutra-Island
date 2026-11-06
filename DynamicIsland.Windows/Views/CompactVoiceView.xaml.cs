@@ -162,6 +162,12 @@ public partial class CompactVoiceView : UserControl
         StopLoops();
         if (to == CompactVoiceState.Idle) { ResetToIdle(); return; }
         Visibility = Visibility.Visible;
+        if (to != CompactVoiceState.Exit)
+        {
+            // Cover media before voice content appears, including a wake that interrupts exit.
+            Surface.BeginAnimation(OpacityProperty, null);
+            Surface.Opacity = 1;
+        }
         var fadeMs = ReducedMotion ? 150 : 220;
         var entering = from is CompactVoiceState.Idle or CompactVoiceState.Exit && to != CompactVoiceState.Exit;
         if (entering) Enter();
@@ -228,7 +234,6 @@ public partial class CompactVoiceView : UserControl
     private void Enter()
     {
         var reduced = ReducedMotion;
-        Surface.BeginAnimation(OpacityProperty, Anim(1, reduced ? 150 : CompactVoiceTimings.ContentFade.TotalMilliseconds, from: Surface.Opacity));
         OrbContent.BeginAnimation(OpacityProperty, null); OrbContent.Opacity = 1;
         MascotHost.BeginAnimation(OpacityProperty, null);
         MascotScale.BeginAnimation(ScaleTransform.ScaleXProperty, null); MascotScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);

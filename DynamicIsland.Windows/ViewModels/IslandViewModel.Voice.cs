@@ -81,7 +81,7 @@ public sealed partial class IslandViewModel
         RaiseMany(nameof(CompactVoiceTranscript), nameof(CompactVoiceAnswer), nameof(CompactVoiceError), nameof(CompactVoiceAction), nameof(CompactVoiceActionFrom));
         if (state == previous) return;
         UpdateQAutoCloseTimer();
-        RaiseMany(nameof(CompactVoiceState), nameof(CompactVoiceActive), nameof(CompactVoiceVisible), nameof(CompactVoiceWide), nameof(CompactVoiceTall), nameof(PinExpanded));
+        RaiseMany(nameof(CompactVoiceState), nameof(CompactVoiceActive), nameof(CompactVoiceVisible), nameof(CompactVoiceWide), nameof(CompactVoiceTall), nameof(PinExpanded), nameof(IslandBaseSurfaceBrush));
         if (state == CompactVoiceState.Idle || previous == CompactVoiceState.Idle)
             RaiseMany(nameof(ShowCompactMediaContent), nameof(ShowCompactQContent), nameof(QShowCompactSingle), nameof(ShowCompactHolePunchQOutput), nameof(ShowCompactArtSurface), nameof(ShowCompactEqualizer));
         // Hand the island back to the music: once the exit has begun (and the shell is shrinking),
