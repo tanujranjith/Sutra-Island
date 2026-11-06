@@ -120,23 +120,24 @@ public class WindowsVoicePlatform(LoggingService log) : IQSpeechInputService, IW
             LoadWakeGrammars(engine);
             engine.InitialSilenceTimeout = TimeSpan.FromSeconds(8);
             engine.BabbleTimeout = TimeSpan.FromSeconds(5);
-            var samples = new List<double[]>();
-            var durations = new List<double>();
-            for (var attempt = 0; samples.Count < WakeDetectionPolicy.RequiredSamples && attempt < 15; attempt++)
+            var training = new WakeTrainingSession();
+            for (var attempt = 0; !training.IsComplete && attempt < 15; attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                progress?.Report($"Example {samples.Count + 1} of 5 — say “Hey Sutra”, then pause.");
+                progress?.Report($"Example {training.AcceptedCount + 1} of 5 — say “Hey Sutra”, then pause.");
                 RecognitionResult? result;
+                var timedOut = false;
                 using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
                 {
                     timeout.CancelAfter(TimeSpan.FromSeconds(12));
                     try { result = await RecognizeOneAsync(engine, timeout.Token).ConfigureAwait(false); }
-                    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { result = null; }
+                    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { result = null; timedOut = true; }
                 }
                 cancellationToken.ThrowIfCancellationRequested();
                 if (result is null || !WakeDetectionPolicy.IsPhrase(result.Text, result.Confidence,
                     result.Words.Select(x => (double)x.Confidence).ToArray(), result.Audio.Duration.TotalSeconds, minimumConfidence: .82))
                 {
+                    log.Info($"Wake voice training: engine=Windows; attempt={attempt + 1}; acceptedCount={training.AcceptedCount}; result={(timedOut ? "timeout" : "phrase-retry")}.");
                     progress?.Report("That was not a clear “Hey Sutra”. Try again after the next prompt.");
                     await Task.Delay(1300, cancellationToken).ConfigureAwait(false);
                     continue;
@@ -144,16 +145,26 @@ public class WindowsVoicePlatform(LoggingService log) : IQSpeechInputService, IW
                 var features = ExtractWakeFeatures(result);
                 if (features is null)
                 {
+                    log.Info($"Wake voice training: engine=Windows; attempt={attempt + 1}; acceptedCount={training.AcceptedCount}; result=audio-retry.");
                     progress?.Report("The microphone was too quiet or distorted. Adjust its position and try again.");
                     await Task.Delay(1600, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
-                samples.Add(features);
-                durations.Add(result.Audio.Duration.TotalSeconds);
-                progress?.Report($"Example {samples.Count} of 5 captured.");
+                var previousCount = training.AcceptedCount;
+                var update = training.Add(features, result.Audio.Duration.TotalSeconds);
+                log.Info($"Wake voice training: engine=Windows; attempt={attempt + 1}; acceptedCount={update.AcceptedCount}; result={(update.SampleAccepted ? "sample-kept" : "replacement-needed")}.");
+                progress?.Report(update.AcceptedCount > previousCount
+                    ? $"Example {update.AcceptedCount} of 5 captured."
+                    : $"Keeping {update.AcceptedCount} of 5 matching examples. Repeat “Hey Sutra” after the next prompt.");
                 await Task.Delay(900, cancellationToken).ConfigureAwait(false);
             }
-            return WakeDetectionPolicy.CreateProfile(samples, durations);
+            if (training.TryCreateProfile(out var profile))
+            {
+                log.Info($"Wake voice training: engine=Windows; acceptedCount={training.AcceptedCount}; result=complete.");
+                return profile!;
+            }
+            log.Info($"Wake voice training: engine=Windows; acceptedCount={training.AcceptedCount}; result=attempt-limit.");
+            throw new InvalidOperationException($"Training kept {training.AcceptedCount} matching examples during retries but could not reach five. Move closer to the microphone and try again.");
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)

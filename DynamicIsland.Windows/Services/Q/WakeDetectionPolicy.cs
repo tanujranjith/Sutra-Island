@@ -7,6 +7,7 @@ namespace DynamicIsland.Windows.Services.Q;
 public static class WakeDetectionPolicy
 {
     public const int RequiredSamples = 5;
+    public const double MaximumEnrollmentDistance = .24;
     private const int Segments = 16, Coefficients = 12, SampleRate = 16000, FftSize = 512, MelBands = 20;
 
     public static bool IsPhrase(string? text, double confidence, IReadOnlyList<double> wordConfidences,
@@ -25,13 +26,15 @@ public static class WakeDetectionPolicy
             || durations.Any(x => !double.IsFinite(x) || x is < .35 or > 3))
             throw new InvalidOperationException("Five clear examples of Hey Sutra are needed. Try training again in a quiet room.");
 
-        // Every sample must agree with at least two others. Never widen the matcher to accommodate noise.
+        // Every sample must agree with at least two others. Enrollment retains good
+        // candidates and requests replacements before calling this final validation.
         var nearestDistances = examples.Select((sample, i) => examples.Where((_, j) => i != j)
             .Select(other => Distance(sample, other)).Order().Take(2).Average()).ToArray();
-        if (nearestDistances.Any(x => x > .24))
+        if (nearestDistances.Any(x => x > MaximumEnrollmentDistance))
             throw new InvalidOperationException("The examples sounded too different. Keep the microphone in the same place and try again.");
         return new WakeVoiceProfile
         {
+            Version = 2,
             TrainedAtUtc = DateTimeOffset.UtcNow,
             SampleCount = RequiredSamples,
             Templates = examples.Select(x => x.ToArray()).ToArray(),
@@ -46,21 +49,29 @@ public static class WakeDetectionPolicy
         if (!profile.IsValid || !ValidTemplate(features) || !double.IsFinite(durationSeconds)
             || durationSeconds < profile.MinimumDurationSeconds || durationSeconds > profile.MaximumDurationSeconds) return false;
         // Agreement with two examples prevents one accidental training outlier from opening the gate.
-        return profile.Templates.Select(x => Distance(features, x)).Order().Take(2).Average() <= profile.MaximumDistance;
+        return profile.Templates.Select(x => DistanceCore(features, x, normalizePath: profile.Version >= 2))
+            .Order().Take(2).Average() <= profile.MaximumDistance;
     }
 
     private static bool ValidTemplate(double[]? features) => features is { Length: Segments * Coefficients }
         && features.All(double.IsFinite) && features.Any(x => Math.Abs(x) > .001);
 
-    public static double Distance(double[] first, double[] second)
+    internal static bool ValidTrainingSample(double[]? features, double durationSeconds) =>
+        ValidTemplate(features) && double.IsFinite(durationSeconds) && durationSeconds is >= .35 and <= 3;
+
+    public static double Distance(double[] first, double[] second) => DistanceCore(first, second, normalizePath: true);
+
+    private static double DistanceCore(double[] first, double[] second, bool normalizePath)
     {
         if (!ValidTemplate(first) || !ValidTemplate(second)) return double.PositiveInfinity;
         // Bounded dynamic time warping tolerates small changes in pronunciation speed.
         var previous = Enumerable.Repeat(double.PositiveInfinity, Segments + 1).ToArray();
+        var previousLengths = new int[Segments + 1];
         previous[0] = 0;
         for (var i = 1; i <= Segments; i++)
         {
             var current = Enumerable.Repeat(double.PositiveInfinity, Segments + 1).ToArray();
+            var currentLengths = new int[Segments + 1];
             for (var j = Math.Max(1, i - 3); j <= Math.Min(Segments, i + 3); j++)
             {
                 double dot = 0, normA = 0, normB = 0;
@@ -71,11 +82,22 @@ public static class WakeDetectionPolicy
                     dot += a * b; normA += a * a; normB += b * b;
                 }
                 var cost = 1 - Math.Clamp(dot / Math.Sqrt(Math.Max(1e-12, normA * normB)), -1, 1);
-                current[j] = cost + Math.Min(previous[j - 1], Math.Min(previous[j], current[j - 1]));
+                var predecessor = previous[j - 1];
+                var length = previousLengths[j - 1];
+                if (previous[j] < predecessor || (previous[j] == predecessor && previousLengths[j] < length))
+                { predecessor = previous[j]; length = previousLengths[j]; }
+                if (current[j - 1] < predecessor || (current[j - 1] == predecessor && currentLengths[j - 1] < length))
+                { predecessor = current[j - 1]; length = currentLengths[j - 1]; }
+                current[j] = cost + predecessor;
+                currentLengths[j] = length + 1;
             }
             previous = current;
+            previousLengths = currentLengths;
         }
-        return previous[Segments] / Segments;
+        // A warped alignment can contain more than sixteen comparisons. Divide by
+        // the comparisons actually made, so normal timing changes are not penalized
+        // simply for needing a longer path. Version 1 profiles retain their old metric.
+        return previous[Segments] / (normalizePath ? previousLengths[Segments] : Segments);
     }
 
     /// <summary>Extracts normalized MFCC sequences from PCM audio; rejects silence and unusable captures.</summary>

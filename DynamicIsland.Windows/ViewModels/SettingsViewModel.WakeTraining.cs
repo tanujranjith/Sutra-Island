@@ -7,6 +7,7 @@ public sealed partial class SettingsViewModel
     private IslandViewModel? _wakeTrainingHost;
     private CancellationTokenSource? _wakeTrainingCancellation;
     private string _wakeTrainingStatus = "";
+    private bool _wakeTrainingCanceledByUser;
     public double WakeConfidenceThreshold
     {
         get => _settings.WakeConfidenceThreshold;
@@ -26,7 +27,7 @@ public sealed partial class SettingsViewModel
     public string WakeTrainingStatus => string.IsNullOrEmpty(_wakeTrainingStatus)
         ? _settings.WakeVoiceProfile?.IsValid == true
             ? $"Trained with {_settings.WakeVoiceProfile.SampleCount} examples. You can retrain if your microphone or surroundings change."
-            : "No voice training yet. Record five clear examples of “Hey Sutra” to reduce accidental activations."
+            : "No voice training yet. Record five examples of “Hey Sutra”. Matching examples are kept while you repeat any that need another try."
         : _wakeTrainingStatus;
     public RelayCommand TrainWakeCommand { get; private set; } = null!;
     public RelayCommand CancelWakeTrainingCommand { get; private set; } = null!;
@@ -44,7 +45,12 @@ public sealed partial class SettingsViewModel
         _wakeTrainingHost = host;
         RefreshWakeTraining();
     }
-    public void CancelWakeTraining() => _wakeTrainingCancellation?.Cancel();
+    public void CancelWakeTraining()
+    {
+        if (_wakeTrainingCancellation is null) return;
+        _wakeTrainingCanceledByUser = true;
+        _wakeTrainingCancellation.Cancel();
+    }
     private void RefreshWakeTraining()
     {
         RaisePropertyChanged(nameof(IsWakeTraining));
@@ -58,6 +64,7 @@ public sealed partial class SettingsViewModel
         if (IsWakeTraining || _wakeTrainingHost is null) return;
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(3));
         _wakeTrainingCancellation = cancellation;
+        _wakeTrainingCanceledByUser = false;
         _wakeTrainingStatus = "Preparing microphone…";
         RefreshWakeTraining();
         var progress = new Progress<string>(message =>
@@ -72,7 +79,11 @@ public sealed partial class SettingsViewModel
             _wakeTrainingStatus = "Training complete. Your five examples are saved on this PC. Say “Hey Sutra” on its own, wait for the dots, then ask your question. Wake listening follows the switch above.";
         }
         catch (OperationCanceledException)
-        { _wakeTrainingStatus = "Training canceled. Your previous voice training is unchanged."; }
+        {
+            _wakeTrainingStatus = _wakeTrainingCanceledByUser
+                ? "Training canceled. Your previous voice training is unchanged."
+                : "Training reached its time limit. Your previous voice training is unchanged. Choose Train my wake phrase to try again.";
+        }
         catch (Exception ex)
         { _wakeTrainingStatus = "Training could not finish: " + ex.Message; }
         finally

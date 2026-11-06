@@ -109,6 +109,39 @@ internal static partial class UpgradeVerification
             var cooldown = Bound<Slider>(RangeBase.ValueProperty, nameof(SettingsViewModel.WakeCooldownSeconds));
             check(confidence.Minimum == .80 && confidence.Maximum == .97 && cooldown.Minimum == 1 && cooldown.Maximum == 15,
                 "Wake confidence and cooldown sliders expose their supported adjustment ranges");
+            check(FeatureLogicalDescendants(editor).OfType<TextBlock>().Any(text => text.Text.Contains("you only repeat examples", StringComparison.Ordinal)),
+                "Training explains that matching examples are retained while an outlier is repeated");
+            var previousProfile = vm.Settings.WakeVoiceProfile;
+            try
+            {
+                // Synthetic feature vectors only: this checks persistence and UI
+                // compatibility without recording or enrolling anyone's voice.
+                var syntheticFeatures = Enumerable.Range(0, 192).Select(i => Math.Sin((i % 12) * .7 + (i / 12) * .12)).ToArray();
+                var syntheticProfile = WakeDetectionPolicy.CreateProfile(
+                    Enumerable.Range(0, 5).Select(_ => syntheticFeatures.ToArray()).ToArray(), [1, 1, 1, 1, 1]);
+                vm.Settings.WakeVoiceProfile = syntheticProfile;
+                await persistence.SaveAsync(vm.Settings);
+                var savedTraining = (await persistence.LoadAsync()).WakeVoiceProfile;
+                check(savedTraining is { Version: 2, IsValid: true, SampleCount: 5 }
+                    && System.Text.Json.JsonSerializer.Serialize(savedTraining) == System.Text.Json.JsonSerializer.Serialize(syntheticProfile),
+                    "New training profiles survive Settings normalization and save/reload without changing their samples or limits");
+                editorVm.RefreshRuntimePreferences(); await Layout();
+                check(editorVm.WakeTrainingStatus.Contains("Trained with 5 examples")
+                    && FeatureLogicalDescendants(editor).OfType<TextBlock>().Any(text => text.Text == editorVm.WakeTrainingStatus)
+                    && editorVm.TrainWakeCommand.CanExecute(null) && editorVm.ResetWakeTrainingCommand.CanExecute(null)
+                    && !editorVm.CancelWakeTrainingCommand.CanExecute(null),
+                    "Settings recognizes new saved training and enables retraining and reset without microphone input");
+                syntheticProfile.Version = 1;
+                await persistence.SaveAsync(vm.Settings);
+                check((await persistence.LoadAsync()).WakeVoiceProfile is { Version: 1, IsValid: true },
+                    "Existing Version 1 voice training remains valid through Settings normalization");
+            }
+            finally
+            {
+                vm.Settings.WakeVoiceProfile = previousProfile;
+                await persistence.SaveAsync(vm.Settings);
+                editorVm.RefreshRuntimePreferences(); await Layout();
+            }
             await CaptureSutraAsync(editor, output, "feature-settings-wake");
 
             var flowTab = (ToggleButton)editor.FindName("FlowTab");

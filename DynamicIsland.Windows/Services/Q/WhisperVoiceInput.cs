@@ -168,15 +168,15 @@ public sealed class WhisperVoiceInput : IDisposable
         lock (_gate) _stash = null;
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
         var token = lifetime.Token;
-        var examples = new List<double[]>();
-        var durations = new List<double>();
-        for (var attempt = 0; examples.Count < WakeDetectionPolicy.RequiredSamples && attempt < 15; attempt++)
+        var training = new WakeTrainingSession();
+        for (var attempt = 0; !training.IsComplete && attempt < 15; attempt++)
         {
             token.ThrowIfCancellationRequested();
             if (FlowRecorder.IsRecording) throw new InvalidOperationException("Finish Sutra Flow dictation before training the wake phrase.");
-            progress?.Report($"Example {examples.Count + 1} of 5 — say “Hey Sutra”, then pause.");
+            progress?.Report($"Example {training.AcceptedCount + 1} of 5 — say “Hey Sutra”, then pause.");
             float[]? audio;
             string text = "";
+            var timedOut = false;
             using (var limit = CancellationTokenSource.CreateLinkedTokenSource(token))
             {
                 limit.CancelAfter(TimeSpan.FromSeconds(20));
@@ -185,20 +185,31 @@ public sealed class WhisperVoiceInput : IDisposable
                     audio = await CaptureTrainingUtteranceAsync(limit.Token).ConfigureAwait(false);
                     if (audio is not null) text = await _engine.TranscribeAsync(audio, [], limit.Token).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException) when (!token.IsCancellationRequested) { audio = null; }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested) { audio = null; timedOut = true; }
             }
             token.ThrowIfCancellationRequested();
             if (audio is null || !WhisperWakePolicy.TryTrainingSample(text, audio, Rate, out var features, out var duration))
             {
+                _log.Info($"Wake voice training: engine=Whisper; attempt={attempt + 1}; acceptedCount={training.AcceptedCount}; result={(timedOut ? "timeout" : "phrase-or-audio-retry")}.");
                 progress?.Report("That was not a clear “Hey Sutra” on its own. Wait for the next prompt and try again.");
                 await Task.Delay(1400, token).ConfigureAwait(false);
                 continue;
             }
-            examples.Add(features); durations.Add(duration);
-            progress?.Report($"Example {examples.Count} of 5 captured.");
+            var previousCount = training.AcceptedCount;
+            var update = training.Add(features, duration);
+            _log.Info($"Wake voice training: engine=Whisper; attempt={attempt + 1}; acceptedCount={update.AcceptedCount}; result={(update.SampleAccepted ? "sample-kept" : "replacement-needed")}.");
+            progress?.Report(update.AcceptedCount > previousCount
+                ? $"Example {update.AcceptedCount} of 5 captured."
+                : $"Keeping {update.AcceptedCount} of 5 matching examples. Repeat “Hey Sutra” after the next prompt.");
             await Task.Delay(900, token).ConfigureAwait(false);
         }
-        return WakeDetectionPolicy.CreateProfile(examples, durations);
+        if (training.TryCreateProfile(out var profile))
+        {
+            _log.Info($"Wake voice training: engine=Whisper; acceptedCount={training.AcceptedCount}; result=complete.");
+            return profile!;
+        }
+        _log.Info($"Wake voice training: engine=Whisper; acceptedCount={training.AcceptedCount}; result=attempt-limit.");
+        throw new InvalidOperationException($"Training kept {training.AcceptedCount} matching examples during retries but could not reach five. Move closer to the microphone and try again.");
     }
 
     private async Task<float[]?> CaptureTrainingUtteranceAsync(CancellationToken token)

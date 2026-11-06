@@ -14,7 +14,7 @@ public sealed class WakeVoiceProfile
     public double MaximumDistance { get; set; }
 
     [JsonIgnore]
-    public bool IsValid => Version == 1 && SampleCount == 5 && Templates is { Length: 5 }
+    public bool IsValid => Version is 1 or 2 && SampleCount == 5 && Templates is { Length: 5 }
         && Templates.All(x => x is { Length: 192 } && x.All(double.IsFinite)
             && x.Any(v => Math.Abs(v) > .001))
         && double.IsFinite(MinimumDurationSeconds) && MinimumDurationSeconds >= .35

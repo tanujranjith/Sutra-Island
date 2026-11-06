@@ -1,3 +1,11 @@
+# Sutra Island v1.3.3
+
+- Keep matching wake phrase examples and ask for replacement captures instead of rejecting all five at the end of training.
+- Handle natural pronunciation timing differences while preserving existing saved profiles and the acoustic noise limits.
+- Clarify retained-example progress and distinguish user cancellation from a training timeout.
+- Add reproducible synthesized-speech tests for room noise, varied timing, outlier recovery, and profile compatibility. No user's voice is included in the fixture.
+
+---
 # Sutra Island v1.3.2
 
 - Make screenshot selection more responsive by caching the shaded desktop once and repainting only changed selection areas while dragging.

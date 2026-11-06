@@ -663,7 +663,7 @@
                         <Border Style="{StaticResource InsetGroup}"><StackPanel>
                             <Border Style="{StaticResource PreferenceRow}"><StackPanel>
                                 <TextBlock Text="Train “Hey Sutra” with my voice" Style="{StaticResource RowTitle}" />
-                                <TextBlock Text="In a quiet room, say the phrase once after each of five prompts. Training pauses assistant voice input and saves a local sound profile, without saving recordings. Wake listening stays under your control." Style="{StaticResource RowDescription}" TextWrapping="Wrap" />
+                                <TextBlock Text="Say “Hey Sutra” naturally after each prompt, then pause. Matching examples are kept, so you only repeat examples that need another try. Training pauses assistant voice input and saves a local sound profile without saving recordings." Style="{StaticResource RowDescription}" TextWrapping="Wrap" />
                                 <WrapPanel Margin="0,12,0,8">
                                     <Button Content="Train my wake phrase" Command="{Binding TrainWakeCommand}" Style="{StaticResource WakeTrainingButton}" Margin="0,0,8,6" />
                                     <Button Content="Cancel training" Command="{Binding CancelWakeTrainingCommand}" Style="{StaticResource WakeTrainingButton}" Margin="0,0,8,6" />
