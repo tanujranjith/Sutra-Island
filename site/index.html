@@ -2,15 +2,23 @@
 <html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8" />
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-859VEG68NC"></script>
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() { window.dataLayer.push(arguments); }
-      gtag("js", new Date());
-      gtag("config", "G-859VEG68NC", {
-        allow_google_signals: false,
-        allow_ad_personalization_signals: false
-      });
+      if (location.origin === "https://tanujranjith.github.io" &&
+          (location.pathname === "/Sutra-Island/site/" || location.pathname === "/Sutra-Island/site/index.html")) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { window.dataLayer.push(arguments); }
+        gtag("js", new Date());
+        gtag("config", "G-859VEG68NC", {
+          allow_google_signals: false,
+          allow_ad_personalization_signals: false,
+          page_title: "Sutra Island: a free, open-source Dynamic Island for Windows",
+          page_location: "https://tanujranjith.github.io/Sutra-Island/site/"
+        });
+        var analyticsScript = document.createElement("script");
+        analyticsScript.async = true;
+        analyticsScript.src = "https://www.googletagmanager.com/gtag/js?id=G-859VEG68NC";
+        document.head.appendChild(analyticsScript);
+      }
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Sutra Island: a free, open-source Dynamic Island for Windows</title>
