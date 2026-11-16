@@ -1,3 +1,15 @@
+# Sutra Island v1.3.7
+
+This release includes the desktop changes since v1.3.0, including the updates described in v1.3.1–v1.3.3 below.
+
+- Refresh “Hey Sutra” voice training with Sutra’s animated mascot and clear training, retry, and cancellation feedback. Five matching examples form a local voice profile; recordings are not saved.
+- Add optional assistant web search with source links for supported providers and models, plus local rendering of mathematical expressions in assistant replies.
+- Open installed Windows applications and supported Windows Settings pages from the command palette or assistant.
+- Improve clipboard and screenshot handling, privacy indicators, notch and window placement, audio controls, and desktop responsiveness.
+- Improve assistant provider handling, comparison views, and compact voice interactions. See the [assistant guide](Q.md), [web search guide](docs/web-search.md), and [math rendering notes](docs/math-rendering.md).
+- Include the wake-training, screenshot responsiveness, Sutra Flow, and browser search improvements documented in the preceding entries.
+
+---
 # Sutra Island v1.3.3
 
 - Keep matching wake phrase examples and ask for replacement captures instead of rejecting all five at the end of training.
