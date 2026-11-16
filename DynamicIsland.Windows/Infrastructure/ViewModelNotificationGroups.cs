@@ -23,6 +23,7 @@ public static class ViewModelNotificationGroups
 
     public static readonly IReadOnlySet<string> QProperties = new HashSet<string>(StringComparer.Ordinal)
     {
+        "QIsSearching", "QSearchUsed", "QWebSources", "QSearchNotice", "QSearchSuggestions", "QSearchStatus",
         "QState", "QCurrentMode", "QStatusText", "QHeaderStatusText", "QResponse", "QResponseDisplay", "QPromptText", "QPromptDisplay", "QHasPrompt", "QShortcuts", "QHasShortcuts",
         "QInlineStatusText", "QShowInlineThinking", "QCanStop", "QCanCopyResponse", "QCanRetry", "QShowResponseActions", "QError", "QSourceText", "QCompactText",
         "IsQActive", "ShowQSurface", "QIsAsk", "QIsSay", "QIsListening", "QNeedsConsent", "QSpeechAvailable", "QSelectedProvider", "ShowCompactMediaContent", "ShowCompactQContent",

@@ -131,6 +131,20 @@ public sealed class WhisperEngine : IDisposable
 
     private void Raise() => ModelStatusChanged?.Invoke(this, EventArgs.Empty);
 
+    /// <summary>Load and verify the model before the first wake utterance arrives.</summary>
+    public async Task WarmUpAsync(CancellationToken token)
+    {
+        if (!IsModelInstalled || Volatile.Read(ref _disposed) != 0) return;
+        await _gate.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            GetFactory();
+        }
+        finally { _gate.Release(); }
+    }
+
     /// <summary>Transcribes 16 kHz mono samples. The vocabulary nudges spelling of names and terms.</summary>
     /// <param name="expressive">Prompts Whisper with written-out hesitations so it keeps "uhh" and "ohhh" instead of dropping them.</param>
     public async Task<string> TranscribeAsync(float[] samples, IReadOnlyList<string> vocabulary, CancellationToken token, bool expressive = false, string? hint = null)

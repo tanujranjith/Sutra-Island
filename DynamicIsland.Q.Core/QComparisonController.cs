@@ -1,7 +1,7 @@
 namespace DynamicIsland.Q.Core;
 
 public sealed record QComparisonTarget(string ProviderId, string Model, string? Credential,
-    string ReasoningEffort = "auto", string? BaseUrl = null);
+    string ReasoningEffort = "auto", string? BaseUrl = null, bool WebSearch = false);
 
 public sealed record QComparisonSnapshot(QSessionSnapshot Left, QSessionSnapshot Right)
 {
@@ -64,9 +64,9 @@ public sealed class QComparisonController : IDisposable
             await _right.BeginAsync(mode, right.ProviderId, right.Model, context).ConfigureAwait(false);
             await Task.WhenAll(
                 _left.SubmitAsync(prompt, mode, left.ProviderId, left.Model, left.Credential, left.BaseUrl, includeImage,
-                    cancellationToken: linked.Token, maxResponseTokens: maxTokens, customSystemPrompt: systemPrompt, reasoningEffort: left.ReasoningEffort),
+                    cancellationToken: linked.Token, maxResponseTokens: maxTokens, customSystemPrompt: systemPrompt, reasoningEffort: left.ReasoningEffort, webSearch: left.WebSearch),
                 _right.SubmitAsync(prompt, mode, right.ProviderId, right.Model, right.Credential, right.BaseUrl, includeImage,
-                    cancellationToken: linked.Token, maxResponseTokens: maxTokens, customSystemPrompt: systemPrompt, reasoningEffort: right.ReasoningEffort)).ConfigureAwait(false);
+                    cancellationToken: linked.Token, maxResponseTokens: maxTokens, customSystemPrompt: systemPrompt, reasoningEffort: right.ReasoningEffort, webSearch: right.WebSearch)).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -100,7 +100,7 @@ public sealed class QComparisonController : IDisposable
         var previous = session.Snapshot;
         return session.SubmitAsync(previous.Prompt, previous.Mode, target.ProviderId, target.Model, target.Credential, target.BaseUrl,
             includeImage, cancellationToken: token, maxResponseTokens: maxTokens,
-            customSystemPrompt: systemPrompt, reasoningEffort: target.ReasoningEffort);
+            customSystemPrompt: systemPrompt, reasoningEffort: target.ReasoningEffort, webSearch: target.WebSearch);
     }
     public void Clear() { Cancel(); _left.Clear(); _right.Clear(); _leftIdentity = _rightIdentity = null; }
     public void Dispose() { Clear(); _left.Changed -= LeftChanged; _right.Changed -= RightChanged; _left.Dispose(); _right.Dispose(); }

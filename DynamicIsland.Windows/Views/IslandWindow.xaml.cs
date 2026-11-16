@@ -50,7 +50,6 @@ public partial class IslandWindow : Window
     private bool _qFollowLatest = true;
 
     private const double TimerPanelNormalCornerRadius = 28d;
-    private readonly RectangleGeometry _pillClip = new();
     private readonly RectangleGeometry _timerPanelClip = new();
 
     private double TimerPanelWidth => WindowSizingPolicy.BoundedDimension(930, AvailableWorkArea.Width);
@@ -76,7 +75,7 @@ public partial class IslandWindow : Window
     public IslandWindow(IslandViewModel viewModel, TimerAlarmViewModel timerViewModel, WindowPositionService position, SettingsService settingsService, LoggingService log, ScreenContextService qScreen)
     {
         InitializeComponent();
-        GlassShell.Clip = _pillClip;
+        // NotchBorder owns the shared shell mask, including its animated shoulders.
         TimerPanelHost.Clip = _timerPanelClip;
         DataContext = _viewModel = viewModel;
         SyncNotificationBanner();
@@ -164,12 +163,14 @@ public partial class IslandWindow : Window
         _timerViewModel.PropertyChanged += TimerViewModelOnPropertyChanged;
         _timerViewModel.ShowAlarmTabRequested += TimerViewModel_ShowAlarmTabRequested;
         SystemEvents.DisplaySettingsChanged += SystemEventsOnDisplaySettingsChanged;
+        SystemEvents.UserPreferenceChanged += SystemEventsOnUserPreferenceChanged;
         DpiChanged += (_, _) => Dispatcher.BeginInvoke(() => ApplyLayout(animate: false), DispatcherPriority.Loaded);
         SystemEvents.PowerModeChanged += SystemEventsOnPowerModeChanged;
         Closed += (_, _) =>
         {
             InputManager.Current.PreProcessInput -= OnOutputPickerInput;
             SystemEvents.DisplaySettingsChanged -= SystemEventsOnDisplaySettingsChanged;
+            SystemEvents.UserPreferenceChanged -= SystemEventsOnUserPreferenceChanged;
             SystemEvents.PowerModeChanged -= SystemEventsOnPowerModeChanged;
             _viewModel.PropertyChanged -= ViewModelOnPropertyChanged;
             _viewModel.NotificationGroupOpenRequested -= OnNotificationGroupOpen;
@@ -199,13 +200,7 @@ public partial class IslandWindow : Window
     // Apply the same physical clip to the entire shell so every presentation layer shares one mask.
     private void ApplyRoundedShellClip()
     {
-        var width = GlassShell.ActualWidth;
-        var height = GlassShell.ActualHeight;
-        if (width <= 0 || height <= 0) return;
-
-        var requested = _viewModel.IslandCornerRadius.TopLeft;
-        var radius = Math.Clamp(requested, 0d, Math.Min(width, height) / 2d);
-        UpdateRoundedClip(_pillClip, width, height, radius);
+        // The shell refreshes its geometry on size, radius and notch-progress changes.
     }
 
     private void ApplyRoundedTimerPanelClip()
@@ -318,7 +313,9 @@ public partial class IslandWindow : Window
         {
             ["QPopupSurface"] = palette.Control, ["QSurface"] = palette.Surface, ["QCard"] = palette.Card, ["QControl"] = palette.Control,
             ["QHover"] = palette.Hover, ["QBorder"] = palette.Border, ["QText"] = palette.Text,
-            ["QMuted"] = palette.Muted, ["QAccent"] = palette.Accent, ["QSelected"] = palette.Selected
+            ["QMuted"] = palette.Muted, ["QAccent"] = palette.Accent, ["QSelected"] = palette.Selected,
+            ["QUserBubbleBrush"] = _viewModel.Settings.Theme == DynamicIsland.Windows.Models.ThemeMode.Custom ? palette.Selected : palette.IsDark ? "#302B3D" : "#EEE9F8",
+            ["QComposerBorderBrush"] = palette.IsDark ? "#4A435A" : "#C9C3D5"
         };
         foreach (var (key, hex) in values)
         {
@@ -777,7 +774,7 @@ public partial class IslandWindow : Window
             IslandSize.Large => (1100d, 354d + quoteSpace + timerSpace + accessorySpace),
             _ => (990d, 334d + quoteSpace + timerSpace + accessorySpace)
         };
-        if (_viewModel.ShowQSurface) { expandedWidth = 920; expandedHeight = 621; }
+        if (_viewModel.ShowQSurface) { expandedWidth = 1000; expandedHeight = 625; }
         if (_viewModel.QShowCompactComparison) { expandedWidth = Math.Max(expandedWidth, 1100); expandedHeight = Math.Max(expandedHeight, 700); }
         // The transparent HWND must be at least as tall as the pill, otherwise WPF clips
         // a correctly measured Stats dashboard at the canvas boundary.
@@ -895,8 +892,9 @@ public partial class IslandWindow : Window
         var size = Math.Clamp(compactHeight, 38d, 62d);
         CompactTimerOrb.Width = size;
         CompactTimerOrb.Height = size;
+        CompactTimerOrb.Margin = new Thickness(0, 8d + (compactHeight - size) / 2d, 0, 0);
         var airPodsGap = _viewModel.IsAirPodsBannerActive ? 26d : 0d;
-        TimerOrbTranslate.X = compactWidth / 2d + 8d + size / 2d + airPodsGap;
+        TimerOrbTranslate.X = compactWidth / 2d + 12d + size / 2d + airPodsGap;
     }
 
     private void UpdatePrivacyIndicatorLayout(double compactWidth, double compactHeight, bool animate)
@@ -1034,7 +1032,7 @@ public partial class IslandWindow : Window
         if (!keepVoiceMorph) _compactVoiceMorphing = false;
         if (!animate || reduced)
         {
-            _frostBackdrop.SetSuspended(keepVoiceMorph);
+            _frostBackdrop.SetSuspended(keepVoiceMorph || _viewModel.IsTopNotch);
             SetPillAnimationCache(enabled: false, compactContent);
             if (!keepVoiceMorph)
             {
@@ -1105,7 +1103,7 @@ public partial class IslandWindow : Window
             {
                 frostHandoff.Stop();
                 if (generation == _pillAnimationGeneration && _expandAnimating && _viewModel.IsExpanded)
-                    _frostBackdrop.SetSuspended(false);
+                    _frostBackdrop.SetSuspended(_viewModel.IsTopNotch);
             };
             frostHandoff.Start();
         }
@@ -1183,7 +1181,7 @@ public partial class IslandWindow : Window
         ApplyVisualMode();
         GlassShell.Opacity = 1d;
         _expandAnimating = false;
-        _frostBackdrop.SetSuspended(false);
+        _frostBackdrop.SetSuspended(_viewModel.IsTopNotch);
         RestorePillShadow();
         if (!_loggedAnimationCompletion)
         {
@@ -1692,7 +1690,7 @@ public partial class IslandWindow : Window
             var dev = System.Windows.Forms.Screen.FromHandle(fg).DeviceName;
             if (dev == _lastFollowDevice) return;
             _lastFollowDevice = dev;
-            _position.PositionInitial(this, s);
+            ApplyLayout(animate: false);
         }
         catch { }
     }
@@ -1888,7 +1886,7 @@ public partial class IslandWindow : Window
 
     private void DragGrip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (_viewModel.Settings.LockPosition) return;
+        if (_viewModel.Settings.LockPosition || _viewModel.IsTopNotch) return;
         _dragging = true;
         try { DragMove(); }
         catch { }
@@ -1896,6 +1894,7 @@ public partial class IslandWindow : Window
         {
             _dragging = false;
             _position.CaptureManualPosition(this, _viewModel.Settings);
+            ApplyLayout(animate: false);
             _ = _settingsService.SaveAsync(_viewModel.Settings);
         }
         e.Handled = true;
@@ -2398,7 +2397,10 @@ public partial class IslandWindow : Window
     }
 
     private void SystemEventsOnDisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() =>
-        _position.PositionInitial(this, _viewModel.Settings));
+        ApplyLayout(animate: false));
+
+    private void SystemEventsOnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e) =>
+        Dispatcher.BeginInvoke(() => ApplyLayout(animate: false));
 
     private void SystemEventsOnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
     {

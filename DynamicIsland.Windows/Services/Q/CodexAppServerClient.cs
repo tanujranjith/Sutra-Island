@@ -48,7 +48,10 @@ public sealed class CodexAppServerClient : IAsyncDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (_initialized && IsRunning) return;
             StopProcess();
-            var runtime = await ValidateRuntimeAsync(_runtimeResolver.Resolve(), cancellationToken).ConfigureAwait(false);
+            // Discovery and bundled-runtime checksums can touch large executables.
+            // An uncontended semaphore does not move this work off the caller's UI thread.
+            var resolved = await Task.Run(_runtimeResolver.Resolve, cancellationToken).ConfigureAwait(false);
+            var runtime = await ValidateRuntimeAsync(resolved, cancellationToken).ConfigureAwait(false);
             ObjectDisposedException.ThrowIf(_disposed, this);
             RuntimeInfo = runtime;
             var process = new Process
@@ -182,11 +185,18 @@ public sealed class CodexAppServerClient : IAsyncDisposable
     public async IAsyncEnumerable<string> StreamTurnAsync(string model, string? reasoningEffort, string prompt, byte[]? image,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        await foreach (var item in StreamSearchTurnAsync(model, reasoningEffort, prompt, image, false, cancellationToken).ConfigureAwait(false))
+            if (item is DynamicIsland.Q.Core.QStreamEvent.Text text) yield return text.Value;
+    }
+
+    public async IAsyncEnumerable<DynamicIsland.Q.Core.QStreamEvent> StreamSearchTurnAsync(string model, string? reasoningEffort, string prompt, byte[]? image, bool webSearch,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
         await StartAsync(cancellationToken).ConfigureAwait(false);
         var workspace = Path.Combine(DynamicIsland.Windows.Infrastructure.AppDataPaths.Root, "CodexWorkspace");
         Directory.CreateDirectory(workspace);
         var thread = await SendRequestAsync("thread/start",
-            CodexTurnStartRequest.CreateThread(model, workspace), cancellationToken).ConfigureAwait(false);
+            CodexTurnStartRequest.CreateThread(model, workspace, webSearch), cancellationToken).ConfigureAwait(false);
         var threadId = String(thread.GetProperty("thread"), "id")
             ?? throw new CodexAppServerException(CodexFailureKind.Protocol, "Codex did not return a thread id.");
         await using var resources = new CodexTurnResources(() => TryDeleteThreadAsync(threadId));
@@ -200,7 +210,7 @@ public sealed class CodexAppServerClient : IAsyncDisposable
             input.Add(new { type = "localImage", path = tempImage });
         }
 
-        var channel = Channel.CreateUnbounded<string>();
+        var channel = Channel.CreateUnbounded<DynamicIsland.Q.Core.QStreamEvent>();
         var completed = new TaskCompletionSource<Exception?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var accumulator = new CodexTurnNotificationAccumulator(threadId);
         string? turnId = null;
@@ -210,7 +220,9 @@ public sealed class CodexAppServerClient : IAsyncDisposable
             {
                 var update = accumulator.Process(message);
                 if (update is null) return;
-                if (update.Kind == CodexTurnUpdateKind.Text && !string.IsNullOrEmpty(update.Value)) channel.Writer.TryWrite(update.Value);
+                if (update.Kind == CodexTurnUpdateKind.Text && !string.IsNullOrEmpty(update.Value)) channel.Writer.TryWrite(new DynamicIsland.Q.Core.QStreamEvent.Text(update.Value));
+                else if (webSearch && update.Kind is CodexTurnUpdateKind.Searching or CodexTurnUpdateKind.SearchCompleted)
+                    channel.Writer.TryWrite(new DynamicIsland.Q.Core.QStreamEvent.Search(update.Kind == CodexTurnUpdateKind.Searching));
                 else if (update.Kind == CodexTurnUpdateKind.Completed) { channel.Writer.TryComplete(); completed.TrySetResult(null); }
                 else if (update.Kind == CodexTurnUpdateKind.Failed)
                 {

@@ -82,6 +82,16 @@
                     </ScrollViewer>
                 </Grid>
 
+                <Grid x:Name="SearchLayer" Opacity="0" Visibility="Collapsed" VerticalAlignment="Center" IsHitTestVisible="False">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                        <TextBlock x:Name="SearchTitle" Text="Searching the web…" FontSize="13" TextTrimming="CharacterEllipsis">
+                            <TextBlock.Foreground><LinearGradientBrush StartPoint="0,0" EndPoint="1,0"><LinearGradientBrush.RelativeTransform><TranslateTransform x:Name="SearchShimmer"/></LinearGradientBrush.RelativeTransform><GradientStop Color="#B3A4CD"/><GradientStop Color="#B3A4CD" Offset="0.35"/><GradientStop Color="#F1E9FF" Offset="0.5"/><GradientStop Color="#B3A4CD" Offset="0.65"/><GradientStop Color="#B3A4CD" Offset="1"/></LinearGradientBrush></TextBlock.Foreground>
+                        </TextBlock>
+                        <TextBlock x:Name="SearchDetail" Text="Finding sources…" FontSize="10" Foreground="{Binding QThemePalette.Muted}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                    <views:SearchGlobe x:Name="VoiceSearchGlobe" Grid.Column="1" Width="26" Height="26" VerticalAlignment="Center"/>
+                </Grid>
                 <!-- Answer: at most two lines, then a muted "Open in chat" link. -->
                 <Grid x:Name="AnswerLayer" Opacity="0" Visibility="Collapsed">
                     <TextBlock x:Name="AnswerText" Foreground="{Binding QThemePalette.Text}" TextWrapping="Wrap" TextTrimming="WordEllipsis" VerticalAlignment="Top" LineStackingStrategy="BlockLineHeight" />

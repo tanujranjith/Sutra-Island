@@ -12,6 +12,8 @@ public static class AssistantControlIntent
         var text=prompt.Trim().TrimEnd('?', '!', '.').Trim();
         text=Regex.Replace(text,@"^(?:(?:hey\s+sutra|sutra)[,\s]+|please\s+|(?:can|could|would|will)\s+(?:you|u)\s+|i\s+want\s+you\s+to\s+)+","",RegexOptions.IgnoreCase);
         text=Regex.Replace(text,@"\s+please$","",RegexOptions.IgnoreCase).Trim();
+        if (WindowsLaunchCatalog.TrySettingsRequest(text, out var windowsSettings))
+        { request = new("OpenWindowsSettings", windowsSettings); return true; }
         var volume=Match(text,@"^(?:(?<verb>set|change|adjust|increase|decrease|raise|lower|turn up|turn down|turn)\s+)?(?:(?:the|my|system)\s+)*volume(?:\s+(?<direction>up|down))?\s*(?:(?<prep>to|at|by)\s+)?(?<amount>[+-]?\d+(?:\.\d+)?|[a-z]+(?:[ -][a-z]+)?)(?:\s*(?:%|percent))?$");
         if(volume.Success && TryNumber(Regex.Replace(volume.Groups["amount"].Value,@"\s+percent$","",RegexOptions.IgnoreCase),out var amount))
         {
@@ -59,6 +61,7 @@ public static class AssistantControlIntent
         }
         var match=CommandCatalog.Match(text);
         if(match is null || !AllowedCommands.Contains(match.Command.Id)) return false;
+        if(match.Command.Id == PaletteCommand.OpenApp && !WindowsLaunchCatalog.IsSingleAppRequest(match.Argument)) return false;
         if(match.Argument.Length>0 && !ArgumentCommands.Contains(match.Command.Id)) return false;
         request=new(match.Command.Id.ToString(),match.Command.Id==PaletteCommand.Timer?NormalizeDuration(match.Argument):match.Argument);return true;
     }
@@ -114,5 +117,10 @@ public static class AssistantControlIntent
         if(pieces.Length==1 && words.TryGetValue(pieces[0],out var number)){value=number;return true;}
         if(pieces.Length==2 && words.TryGetValue(pieces[0],out var tens) && tens>=20 && tens<100 && tens%10==0 && words.TryGetValue(pieces[1],out var units) && units>0 && units<10){value=tens+units;return true;}
         return false;
+    }
+    static AssistantControlIntent()
+    {
+        AllowedCommands.UnionWith([PaletteCommand.OpenApp, PaletteCommand.OpenWindowsSettings, PaletteCommand.ListApps]);
+        ArgumentCommands.UnionWith([PaletteCommand.OpenApp, PaletteCommand.OpenWindowsSettings, PaletteCommand.ListApps]);
     }
 }

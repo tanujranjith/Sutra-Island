@@ -56,7 +56,9 @@ public partial class AssistantActionView : UserControl
         ResultIcon.Visibility=succeeded?Visibility.Collapsed:Visibility.Visible;
         ResultIcon.Text=working?"···":failed?"!":"−";ResultIcon.Foreground=Brush(accent);
         ActionTitle.Text=feedback.Phase switch {AssistantActionPhase.Working=>WorkingTitle(feedback.Command),AssistantActionPhase.Succeeded=>SuccessTitle(feedback.Command),AssistantActionPhase.Failed=>"Couldn't complete action",_=>"Action stopped"};
-        ActionDetail.Text=working?"Applying island control…":failed?"See the details below":feedback.Phase==AssistantActionPhase.Cancelled?"Stopped before confirmation":
+        var windowsLaunch=feedback.Command is "OpenApp" or "OpenWindowsSettings" or "ListApps";
+        ActionDetail.Text=working?(windowsLaunch?"Contacting Windows…":"Applying island control…"):failed?"See the details below":feedback.Phase==AssistantActionPhase.Cancelled?"Stopped before confirmation":
+            windowsLaunch?(feedback.Message??"Request sent to Windows"):
             feedback.Command.Equals("Volume",StringComparison.OrdinalIgnoreCase) && feedback.Level is double percent?$"{percent:0}% · System output":"Confirmed by island controls";
         System.Windows.Automation.AutomationProperties.SetName(Card,$"{ActionTitle.Text}. {feedback.Message??ActionDetail.Text}");
         Card.Opacity=1;CardOffset.Y=0;IconScale.ScaleX=IconScale.ScaleY=1;OrbitAngle.Angle=0;
@@ -82,6 +84,7 @@ public partial class AssistantActionView : UserControl
     internal static string Glyph(string command)=>command.ToLowerInvariant() switch
     {
         "volume" or "unmute"=>"\uE767","mute"=>"\uE74F","audiooutput" or "setoutput" or "listoutputs"=>"\uE7F5",
+        "openapp" or "listapps"=>"\uE71D",
         "play" or "pause" or "next" or "previous" or "seek" or "openmedia"=>"\uE8D6",
         "timer" or "pausetimer" or "resumetimer" or "canceltimer" or "stopwatch" or "startstopwatch" or "pausestopwatch" or "resumestopwatch" or "resetstopwatch" or "lapstopwatch"=>"\uE916",
         "alarm" or "cancelalarm" or "dismissalarm" or "snoozealarm"=>"\uE707",
@@ -91,12 +94,14 @@ public partial class AssistantActionView : UserControl
     private static string WorkingTitle(string command)=>command.ToLowerInvariant() switch
     {
         "volume"=>"Adjusting volume","mute" or "unmute"=>"Updating audio","setoutput"=>"Switching audio output",
+        "openapp"=>"Opening Windows app","openwindowssettings"=>"Opening Windows Settings","listapps"=>"Finding installed apps",
         "play" or "pause" or "next" or "previous" or "seek"=>"Controlling playback","timer"=>"Starting timer","alarm"=>"Setting alarm",
         "setsetting"=>"Updating island setting","focussession" or "focuson" or "focusoff" or "endfocus"=>"Updating focus",_=>"Using island controls"
     };
     private static string SuccessTitle(string command)=>command.ToLowerInvariant() switch
     {
         "volume"=>"Volume updated","mute"=>"Audio muted","unmute"=>"Audio unmuted","setoutput"=>"Audio output switched",
+        "openapp"=>"App launch requested","openwindowssettings"=>"Settings launch requested","listapps"=>"Installed apps found",
         "timer"=>"Timer started","alarm"=>"Alarm set","setsetting"=>"Island setting updated","status" or "getsetting" or "listoutputs"=>"Status checked",_=>"Island action complete"
     };
 }

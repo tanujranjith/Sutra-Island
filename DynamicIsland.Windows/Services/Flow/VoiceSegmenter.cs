@@ -68,7 +68,7 @@ public sealed class VoiceSegmenter
             _preRollSamples = 0;
             return null;
         }
-        _utterance.AddRange(frame.ToArray());
+        AppendFrame(frame);
         _silentSamples = loud ? 0 : _silentSamples + frame.Length;
         var tooLong = _utterance.Count >= _sampleRate * _maxLength.TotalSeconds;
         if (_silentSamples < _sampleRate * _endSilence.TotalSeconds && !tooLong) return null;
@@ -83,5 +83,14 @@ public sealed class VoiceSegmenter
         _inSpeech = false;
         _speechFrames = 0;
         _silentSamples = 0;
+    }
+
+    private void AppendFrame(ReadOnlySpan<float> frame)
+    {
+        var offset = _utterance.Count;
+        var count = checked(offset + frame.Length);
+        _utterance.EnsureCapacity(count);
+        System.Runtime.InteropServices.CollectionsMarshal.SetCount(_utterance, count);
+        frame.CopyTo(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_utterance)[offset..]);
     }
 }

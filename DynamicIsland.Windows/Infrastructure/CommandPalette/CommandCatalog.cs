@@ -9,7 +9,7 @@ public enum PaletteCommand
     StartStopwatch, PauseStopwatch, ResumeStopwatch, ResetStopwatch,
     FocusOn, FocusOff, Expand, Collapse, OpenSettings,
     Help, Convert, Volume, OpenMedia, Recenter, Clipboard, NotificationHistory, NotificationsOn, NotificationsOff, RetryNotifications, DismissBanner, Chat, VoiceInput, StopAssistant, ReadReply, WakeOn, WakeOff, AskScreen, SearchSettings,
-    Stopwatch, Focus, AudioOutput, Screenshot, GoogleSearch
+    Stopwatch, Focus, AudioOutput, Screenshot, GoogleSearch, OpenApp, OpenWindowsSettings, ListApps
 }
 
 public sealed record CommandDefinition(
@@ -24,7 +24,8 @@ public sealed record CommandDefinition(
         PaletteCommand.Volume or PaletteCommand.OpenMedia or PaletteCommand.Play or PaletteCommand.Pause or PaletteCommand.Next or PaletteCommand.Previous or PaletteCommand.Seek or PaletteCommand.Mute or PaletteCommand.Unmute => "Audio",
         PaletteCommand.Ask or PaletteCommand.Say or PaletteCommand.Compare or PaletteCommand.Chat or PaletteCommand.VoiceInput or PaletteCommand.StopAssistant or PaletteCommand.ReadReply or PaletteCommand.WakeOn or PaletteCommand.WakeOff or PaletteCommand.AskScreen => "Assistant",
         PaletteCommand.NotificationsOn or PaletteCommand.NotificationsOff or PaletteCommand.RetryNotifications or PaletteCommand.DismissBanner or PaletteCommand.NotificationHistory => "Notifications",
-        PaletteCommand.SearchSettings or PaletteCommand.OpenSettings => "Settings",
+        PaletteCommand.SearchSettings or PaletteCommand.OpenSettings or PaletteCommand.OpenWindowsSettings => "Settings",
+        PaletteCommand.OpenApp or PaletteCommand.ListApps => "Apps",
         PaletteCommand.Convert or PaletteCommand.Stopwatch or PaletteCommand.Clipboard or PaletteCommand.Screenshot or PaletteCommand.GoogleSearch => "Tools",
         PaletteCommand.AudioOutput => "Audio",
         _ => "Island"
@@ -68,7 +69,10 @@ public static class CommandCatalog
         new(PaletteCommand.FocusOff, "focus off", [], "Turn focus mode off", "focus off"),
         new(PaletteCommand.Expand, "expand", [], "Expand the island", "expand"),
         new(PaletteCommand.Collapse, "collapse", [], "Collapse the island", "collapse"),
-        new(PaletteCommand.OpenSettings, "open settings", ["settings"], "Open settings", "open settings"),
+        new(PaletteCommand.OpenSettings, "island settings", ["settings", "open island settings", "sutra settings", "open sutra settings"], "Open Sutra Island settings", "island settings"),
+        new(PaletteCommand.OpenWindowsSettings, "windows settings", ["open windows settings", "open settings", "system settings", "open system settings"], "Open Windows Settings or a specific page", "windows settings Bluetooth"),
+        new(PaletteCommand.OpenApp, "open app", ["launch app", "start app", "open", "launch", "start"], "Open an installed Windows desktop or Store app", "open Notepad"),
+        new(PaletteCommand.ListApps, "apps", ["list apps", "show apps", "list installed apps"], "List installed Windows apps; optionally filter by name", "apps Microsoft"),
         new(PaletteCommand.Volume, "volume", ["vol"], "Adjust system volume with a live slider", "Enter to adjust · or volume 50"),
         new(PaletteCommand.OpenMedia, "open media", [], "Open the current media app", "open media"),
         new(PaletteCommand.Recenter, "recenter", [], "Recenter the island", "recenter"),
@@ -98,6 +102,9 @@ public static class CommandCatalog
         ById(PaletteCommand.Help),
         ById(PaletteCommand.Convert),
         ById(PaletteCommand.GoogleSearch),
+        ById(PaletteCommand.OpenApp),
+        ById(PaletteCommand.OpenWindowsSettings),
+        ById(PaletteCommand.ListApps),
         ById(PaletteCommand.Chat),
         ById(PaletteCommand.VoiceInput),
         ById(PaletteCommand.Volume),
@@ -134,6 +141,8 @@ public static class CommandCatalog
     {
         var text = input.Trim();
         if (text.Length == 0) return null;
+        if (WindowsLaunchCatalog.TrySettingsRequest(text, out var settingsQuery))
+            return new(ById(PaletteCommand.OpenWindowsSettings), settingsQuery);
         CommandDefinition? best = null;
         var bestLength = -1;
         string bestToken = "";
@@ -155,6 +164,7 @@ public static class CommandCatalog
         var argumentStart = bestToken.Length;
         if (best.Id == PaletteCommand.Ask && argumentStart < text.Length && text[argumentStart] == ':') argumentStart++;
         var argument = text.Length > argumentStart ? text[argumentStart..].Trim() : "";
+        if (best.Id == PaletteCommand.OpenApp) argument = WindowsLaunchCatalog.AppQuery(argument);
         if (best.Id == PaletteCommand.Seek && !bestToken.Equals(best.Name, StringComparison.OrdinalIgnoreCase))
             argument = bestToken + (argument.Length == 0 ? "" : " " + argument);
         return new CommandMatch(best, argument);

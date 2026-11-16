@@ -19,6 +19,7 @@ internal static partial class UpgradeVerification
     // Opt-in synthetic fixtures: no desktop capture, network, or provider requests.
     private static async Task VerifyPerformanceAsync(IslandViewModel vm, Action<bool, string> check, string output)
     {
+        await VerifyResponsivenessAsync(vm, check, output);
         static byte[] Pixels(BitmapSource source)
         {
             if (source.Format != PixelFormats.Bgra32)

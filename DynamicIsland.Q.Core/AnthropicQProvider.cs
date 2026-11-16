@@ -47,6 +47,7 @@ public sealed class AnthropicQProvider(HttpClient? httpClient = null) : HttpQPro
             ["messages"] = Messages(request),
             ["stream"] = true
         };
+        if (request.WebSearch) body["tools"] = new[] { new { type = "web_search_20250305", name = "web_search", max_uses = 5 } };
         var effort = QProviderPolicy.NormalizeEffort(Info.Id, request.Model, request.ReasoningEffort);
         if (effort != "auto") body["output_config"] = new { effort };
 
@@ -68,11 +69,32 @@ public sealed class AnthropicQProvider(HttpClient? httpClient = null) : HttpQPro
                 yield return new QStreamEvent.Failed(Sanitize(ProviderJson.ErrorMessage(root) ?? "Anthropic reported a streaming error."));
                 yield break;
             }
+            if (request.WebSearch)
+            {
+                if (type == "content_block_start" && root.TryGetProperty("content_block", out var block))
+                {
+                    if (ProviderJson.String(block, "type") == "server_tool_use" && ProviderJson.String(block, "name") == "web_search")
+                        yield return new QStreamEvent.Search(true);
+                    if (ProviderJson.String(block, "type") == "web_search_tool_result")
+                    {
+                        yield return new QStreamEvent.Search(false);
+                        if (block.TryGetProperty("content", out var results) && results.ValueKind == JsonValueKind.Object && ProviderJson.String(results, "type") == "web_search_tool_result_error")
+                            yield return new QStreamEvent.SearchNotice("Claude web search failed: " + ProviderJson.String(results, "error_code"));
+                    }
+                }
+                foreach (var source in QWebSearch.ReadSources(root)) yield return new QStreamEvent.Source(source);
+                if (root.TryGetProperty("delta", out var citationDelta) && citationDelta.TryGetProperty("citation", out var citation))
+                    foreach (var source in QWebSearch.ReadSources(citation)) yield return new QStreamEvent.Source(source);
+            }
             if (type == "content_block_delta" && root.TryGetProperty("delta", out var delta) &&
                 ProviderJson.String(delta, "type") == "text_delta")
             {
                 var text = ProviderJson.String(delta, "text");
                 if (text.Length > 0) { sawText = true; yield return new QStreamEvent.Text(text); }
+            }
+            if (type == "message_delta" && root.TryGetProperty("delta", out var stopped) && ProviderJson.String(stopped, "stop_reason") == "pause_turn")
+            {
+                yield return new QStreamEvent.Failed("Claude paused the search before finishing. Retry with a narrower question."); yield break;
             }
             if (type == "message_delta" && root.TryGetProperty("delta", out delta) &&
                 ProviderJson.String(delta, "stop_reason") == "max_tokens")

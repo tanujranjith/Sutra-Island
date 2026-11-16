@@ -244,8 +244,16 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public AssistantActionFeedback? QActionFeedback => QCompareEnabled ? null : _qSnapshot.Action;
     public bool QHasActionFeedback => QActionFeedback is not null;
     public QMode QCurrentMode => _qSnapshot.Mode;
+    public bool QShowThinkingBulb => !QIsSearching;
+    public bool QIsSearching => _qSnapshot.IsSearching;
+    public int QWebSourceCount => QWebSources.Select(s => s.Url).Distinct().Count();
+    public bool QSearchUsed => _qSnapshot.SearchUsed;
+    public IReadOnlyList<QWebSource> QWebSources => _qSnapshot.Sources ?? [];
+    public string QSearchNotice => _qSnapshot.SearchNotice ?? "";
+    public string QSearchSuggestions => _qSnapshot.SearchSuggestionsHtml ?? "";
+    public string QSearchStatus => QIsSearching ? _qSnapshot.Status : QSearchUsed ? "Search complete" : "";
     public string QStatusText => _qSnapshot.Status;
-    public string QHeaderStatusText => QState switch
+    public string QHeaderStatusText => QIsSearching ? "Searching…" : QState switch
     {
         QRunState.Capturing => "Reading…",
         QRunState.Ready => "Ready",
@@ -266,7 +274,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public bool QCanCopyResponse => !string.IsNullOrWhiteSpace(QResponse);
     public bool QCanRetry => !string.IsNullOrWhiteSpace(QPromptText) && QState is QRunState.Complete or QRunState.Cancelled or QRunState.Error;
     public bool QShowResponseActions => QCanStop || QCanCopyResponse || QCanRetry;
-    public string QInlineStatusText => QState switch
+    public string QInlineStatusText => QIsSearching ? _qSnapshot.Status : QState switch
     {
         QRunState.Capturing => "Reading…",
         QRunState.Thinking => "Thinking…",
@@ -302,6 +310,14 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public bool QIsListening => QState == QRunState.Listening;
     public bool QNeedsConsent => !Settings.QDisclosureAccepted;
     public bool QSpeechAvailable => _qSpeech.IsAvailable;
+    private static readonly IReadOnlyList<QShortcut> DefaultConversationPrompts = [
+        new() { Name = "Explain simply", Prompt = "Explain your last answer in simpler language." },
+        new() { Name = "Show an example", Prompt = "Show a concrete example of your last answer." }
+    ];
+    public IReadOnlyList<QShortcut> QConversationPrompts => QHasShortcuts ? QShortcuts : DefaultConversationPrompts;
+    public bool QShowConversationPrompts => !QCanStop && !QNeedsConsent && (QHasShortcuts || QCanCopyResponse);
+    public string QCompactProviderLabel => QIsCodexSelected ? "Codex" : QSelectedProviderLabel.Split(" · ")[0];
+    public string QReasoningEffortLabel => System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(QReasoningEffort);
     public IReadOnlyList<QShortcut> QShortcuts => Settings.QShortcuts ?? [];
     public bool QHasShortcuts => QShortcuts.Count > 0;
     public IReadOnlyList<QProviderChoice> QProviderOptions => _qProviders.Providers
@@ -368,6 +384,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             Settings.QReasoningEffort = effort;
             NormalizeProviderReasoningEffort();
             RaisePropertyChanged();
+            RaisePropertyChanged(nameof(QReasoningEffortLabel));
             _ = PersistSettingsAsync();
         }
     }
@@ -416,17 +433,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public bool ShowCompactStatusContent => !IsHolePunchMode && !QShowCompactComparison;
 
     private string CleanQResponseText(string response) => _responsePresentation.Format(response);
-    private static string CleanQResponseCore(string response)
-    {
-        if (string.IsNullOrWhiteSpace(response)) return string.Empty;
-        response = TextEncodingRepair.RepairUtf8ReadAsWindows1252(response);
-        var cleaned = response.Replace("```", string.Empty, StringComparison.Ordinal)
-            .Replace("**", string.Empty, StringComparison.Ordinal)
-            .Replace("__", string.Empty, StringComparison.Ordinal)
-            .Replace("`", string.Empty, StringComparison.Ordinal);
-        cleaned = Regex.Replace(cleaned, @"(?m)^\s{0,3}#{1,6}\s+", string.Empty);
-        return MathMarkupFormatter.Format(cleaned);
-    }
+    private static string CleanQResponseCore(string response) => ResponseTextFormatter.Format(response);
     public MediaInfo Media { get => _media; private set { if (SetProperty(ref _media, value)) UpdateArtwork(value.Artwork); } }
     public AudioState Audio { get => _audio; private set => SetProperty(ref _audio, value); }
     public BatteryState Battery { get => _battery; private set => SetProperty(ref _battery, value); }
@@ -455,7 +462,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         : "#B9A5FD";
     public MediaBrush AccentBrush => FrozenBrush(EffectiveAccentHex);
     public MediaBrush AccentSoftBrush => FrozenBrush(WithAlpha(EffectiveAccentHex, 0x33));
-    public MediaBrush IslandSurfaceBrush => Settings.Theme == ThemeMode.Graphite ? NativeFrostActive ? Infrastructure.FrostedMaterial.WithOpaqueCaps(FrozenBrush("#DC101114"),NativeFrostInset) : FrozenBrush("#FF101114") : IsCustomTheme ? FrozenBrush(QThemePalette.Surface) : IsDarkTheme ? FrozenBrush("#FF101114") : FrozenBrush("#FFF5F5F7");
+    public MediaBrush IslandSurfaceBrush => IsTopNotch && IsDarkTheme ? FrozenBrush("#FF000000") : Settings.Theme == ThemeMode.Graphite ? NativeFrostActive ? Infrastructure.FrostedMaterial.WithOpaqueCaps(FrozenBrush("#DC101114"),NativeFrostInset) : FrozenBrush("#FF101114") : IsCustomTheme ? FrozenBrush(QThemePalette.Surface) : IsDarkTheme ? FrozenBrush("#FF101114") : FrozenBrush("#FFF5F5F7");
     public MediaBrush IslandCardBrush => Settings.Theme == ThemeMode.Graphite ? FrozenBrush("#701D1F25") : IsCustomTheme ? FrozenBrush(QThemePalette.Card) : IsDarkTheme ? FrozenBrush("#FF1D1F25") : FrozenBrush("#FFFFFFFF");
     public MediaBrush IslandDividerBrush => IsCustomTheme ? FrozenBrush(QThemePalette.Border) : IsDarkTheme ? FrozenBrush("#FF35343E") : FrozenBrush("#FFD1D1D6");
     // Shell controls and progress bars need real theme-aware contrast. The old shared
@@ -899,6 +906,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     // ===== Outer island corner radius (user-chosen via the slider, 0–48 DIP) =====
     private double ClampedCornerRadius => Math.Clamp(Settings.IslandCornerRadius, 0, 48);
+    public bool IsTopNotch => Settings.TopNotchMode;
     public CornerRadius IslandCornerRadius => new(ClampedCornerRadius);
     public CornerRadius IslandInnerCornerRadius => new(Math.Max(0, ClampedCornerRadius - 1));
 
@@ -1366,7 +1374,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             cancellationToken: timeout.Token,
             maxResponseTokens: Settings.QMaxResponseTokens,
             customSystemPrompt: customSystemPrompt,
-            reasoningEffort: Settings.QReasoningEffort, contextPolicy: captureScreen ? QContextPolicy.Capture : QContextPolicy.None).ConfigureAwait(false);
+            reasoningEffort: Settings.QReasoningEffort, contextPolicy: captureScreen ? QContextPolicy.Capture : QContextPolicy.None, webSearch: Settings.QWebSearchEnabled).ConfigureAwait(false);
     }
 
     public async Task<string?> DictateQAsync()
@@ -1558,8 +1566,17 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private void OnQChanged(QSessionSnapshot snapshot) => OnUi(() =>
     {
         if (snapshot != _qSession.Snapshot) return;
+        var textOnly = snapshot.State == QRunState.Streaming &&
+            _qSnapshot.State == QRunState.Streaming &&
+            snapshot == _qSnapshot with { Response = snapshot.Response };
         if (snapshot.State == QRunState.Idle) _responsePresentation.Clear();
         _qSnapshot = snapshot;
+        if (textOnly)
+        {
+            RaiseMany(nameof(QResponse), nameof(QResponseDisplay), nameof(QCanCopyResponse), nameof(QShowResponseActions));
+            OnCompactVoiceQChanged();
+            return;
+        }
         RaiseQProperties();
         OnCompactVoiceQChanged();
         PumpNotifications();
@@ -1572,6 +1589,8 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         RaiseComparisonProperties();
         RaisePropertyChanged(nameof(QCanChangeProvider));
         UpdateQAutoCloseTimer();
+        RaiseMany(nameof(QConversationPrompts), nameof(QShowConversationPrompts), nameof(QCompactProviderLabel), nameof(QReasoningEffortLabel));
+        RaiseMany(nameof(QShowThinkingBulb), nameof(QWebSourceCount), nameof(QIsSearching), nameof(QSearchUsed), nameof(QWebSources), nameof(QSearchNotice), nameof(QSearchSuggestions), nameof(QSearchStatus));
         RaiseMany(nameof(QState), nameof(AssistantMascotState), nameof(QCurrentMode), nameof(QStatusText), nameof(QHeaderStatusText), nameof(QResponse), nameof(QResponseDisplay), nameof(QPromptText), nameof(QPromptDisplay), nameof(QHasPrompt), nameof(QInlineStatusText), nameof(QShowInlineThinking), nameof(QCanStop), nameof(QCanCopyResponse), nameof(QCanRetry), nameof(QShowResponseActions), nameof(QError), nameof(QShortcuts), nameof(QHasShortcuts), nameof(QSelectedModel), nameof(QModelOptions), nameof(QReasoningEffort), nameof(QReasoningEffortOptions), nameof(QIsCodexSelected), nameof(QCodexIsConnected), nameof(QShowCodexSignOut), nameof(QCodexChipText), nameof(QCodexAccountDetails),
         nameof(QSourceText), nameof(QCompactText), nameof(IsQActive), nameof(ShowQSurface), nameof(QIsAsk), nameof(QIsSay), nameof(QIsListening),
         nameof(QNeedsConsent), nameof(QSpeechAvailable), nameof(QSelectedProvider), nameof(QSelectedProviderLabel), nameof(ShowCompactMediaContent), nameof(ShowCompactQContent), nameof(ShowCompactHolePunchQOutput), nameof(ShowCompactArtSurface), nameof(ShowCompactStatusContent),
@@ -1912,7 +1931,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
 
     private void RaiseLayoutProperties()
     {
-        RaiseMany(nameof(IsCompact), nameof(IsAppleStyle), nameof(IsStatsStyle), nameof(PinExpanded), nameof(IsEdgePill), nameof(IsHolePunchMode),
+        RaiseMany(nameof(IsCompact), nameof(IsAppleStyle), nameof(IsStatsStyle), nameof(PinExpanded), nameof(IsEdgePill), nameof(IsHolePunchMode), nameof(IsTopNotch),
             nameof(IslandCornerRadius), nameof(IslandInnerCornerRadius),
             nameof(CompactAlbumSize), nameof(ExpandedAlbumSize), nameof(PreviewCompactAlbumSize), nameof(PreviewExpandedAlbumSize),
             nameof(CompactAlbumRadius), nameof(ExpandedAlbumRadius), nameof(PreviewCompactAlbumRadius), nameof(PreviewExpandedAlbumRadius),

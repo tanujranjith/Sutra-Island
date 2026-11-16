@@ -35,7 +35,9 @@ internal static partial class UpgradeVerification
         Check((await persistence.LoadAsync()).NotificationPollSeconds == 8, "Custom notification polling interval survives migration");
         using var media = new MediaSessionService(log); using var audio = new AudioSessionService(log); using var battery = new BatteryService(); using var clock = new ClockService();
         using var timers = new TimerAlarmService(log); using var theme = new ThemeService(); using var weather = new WeatherService(log); using var monitor = new SystemMonitorService();
-        using var spectrum = new AudioSpectrumService(log); using var stocks = new StocksService(log); using var calendar = new CalendarService(log); using var privacy = new PrivacySensorService(log);
+        var privacyFixture = PrivacySensorState.None;
+        using var spectrum = new AudioSpectrumService(log); using var stocks = new StocksService(log); using var calendar = new CalendarService(log);
+        using var privacy = new PrivacySensorService(log, Environment.GetEnvironmentVariable("ISLAND_VERIFY_PRIVACY") == "1" ? () => privacyFixture : null);
         var source = new NotificationSourceFixture { Snapshot = [new("Fixture", "Before first expansion", "Startup delivery", 901, DateTimeOffset.Now, "fixture.startup")] };
         using var notifications = new NotificationListenerService(log, source);
         var history = new NotificationHistoryService(log);
@@ -52,8 +54,32 @@ internal static partial class UpgradeVerification
         PresentationTraceSources.DataBindingSource.Listeners.Add(bindingLog); PresentationTraceSources.DataBindingSource.Switch.Level = SourceLevels.Warning;
         try
         {
+            if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_PRIVACY")=="1")
+            {
+                await VerifyPrivacyAsync(vm, window, privacy, state => privacyFixture = state, Check, output);
+                bindingLog.Flush(); PresentationTraceSources.DataBindingSource.Listeners.Remove(bindingLog);
+                bindingLog.Close(); bindingClosed = true;
+                Check(!File.ReadAllText(Path.Combine(output, "sutra-bindings.log")).Contains("Error:"), "Privacy indicators render without WPF binding errors");
+                return;
+            }
+            if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_NOTCH")=="1")
+            {
+                await VerifyNotchAsync(vm, window, persistence, log, registry, Check, output);
+                bindingLog.Flush(); PresentationTraceSources.DataBindingSource.Listeners.Remove(bindingLog);
+                bindingLog.Close(); bindingClosed = true;
+                Check(!File.ReadAllText(Path.Combine(output, "sutra-bindings.log")).Contains("Error:"), "Notch settings and preview have no WPF binding errors");
+                return;
+            }
             if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_BACKDROP")=="1") { await VerifyDesktopFrostAsync(vm,window,output); return; }
             if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_PERFORMANCE")=="1") { await VerifyPerformanceAsync(vm,Check,output); return; }
+            if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_VOLUME_SPACING")=="1")
+            {
+                await VerifyVolumeSpacingAsync(vm, timers, window, Check, output);
+                bindingLog.Flush(); PresentationTraceSources.DataBindingSource.Listeners.Remove(bindingLog);
+                bindingLog.Close(); bindingClosed = true;
+                Check(!File.ReadAllText(Path.Combine(output, "sutra-bindings.log")).Contains("Error:"), "Volume and compact spacing render without WPF binding errors");
+                return;
+            }
             if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_FEATURE_SETTINGS")=="1")
             {
                 await VerifyGoogleBrowserAsync(vm, window, media, timers, timerVm, Check);

@@ -28,7 +28,7 @@ public sealed partial class IslandViewModel
     public bool QShowSingleTranscript => !QCompareEnabled || QNeedsConsent;
     public bool QShowComparison => QCompareEnabled && !QNeedsConsent;
     public bool QShowCompactComparison => IsQActive && QCompareEnabled;
-    public System.Windows.Media.Brush IslandBaseSurfaceBrush => CompactVoiceVisible ? FrozenBrush(QThemePalette.Surface) : IsExpanded && ShowQSurface
+    public System.Windows.Media.Brush IslandBaseSurfaceBrush => IsTopNotch && IsDarkTheme ? FrozenBrush("#FF000000") : CompactVoiceVisible ? FrozenBrush(QThemePalette.Surface) : IsExpanded && ShowQSurface
         ? System.Windows.Media.Brushes.Transparent : IsExpanded && IsDarkTheme
             ? Settings.Theme == ThemeMode.Graphite && NativeFrostActive ? Infrastructure.FrostedMaterial.WithOpaqueCaps(FrozenBrush("#DC191B20"),NativeFrostInset) : FrozenBrush("#FF191B20") : IslandSurfaceBrush;
     public bool QShowCompactSingle => ShowCompactQContent && !QCompareEnabled;
@@ -38,7 +38,7 @@ public sealed partial class IslandViewModel
         : "Sutra sends your questions to the selected provider. Screen text and images are included only when you request screen help. Provider billing or account limits apply.";
     public string QSendLabel => QCompareEnabled ? "Send to both" : "Send";
     public string QStopLabel => QCompareEnabled ? "Stop both" : "Stop";
-    public string QComposerPlaceholder => QCompareEnabled ? "Ask both a follow-up…" : "Ask a follow-up…";
+    public string QComposerPlaceholder => QCompareEnabled ? "Ask both a follow-up…" : "Ask Sutra anything…";
     public IReadOnlyList<QProviderChoice> QCompareProviderOptions
     {
         get
@@ -106,6 +106,20 @@ public sealed partial class IslandViewModel
     }
     private QSessionSnapshot LeftAnswer => _qComparison.Snapshot.Left;
     private QSessionSnapshot RightAnswer => _qComparison.Snapshot.Right;
+    public bool QLeftSearching => LeftAnswer.IsSearching;
+    public bool QRightSearching => RightAnswer.IsSearching;
+    public bool QLeftSearchUsed => LeftAnswer.SearchUsed;
+    public bool QRightSearchUsed => RightAnswer.SearchUsed;
+    public bool QLeftBusy => QComparisonSnapshot.Busy(LeftAnswer.State);
+    public bool QRightBusy => QComparisonSnapshot.Busy(RightAnswer.State);
+    public IReadOnlyList<QWebSource> QLeftSources => LeftAnswer.Sources ?? [];
+    public IReadOnlyList<QWebSource> QRightSources => RightAnswer.Sources ?? [];
+    public string QLeftRawResponse => LeftAnswer.Response;
+    public string QRightRawResponse => RightAnswer.Response;
+    public string QLeftSearchNotice => LeftAnswer.SearchNotice ?? "";
+    public string QRightSearchNotice => RightAnswer.SearchNotice ?? "";
+    public string QLeftSuggestions => LeftAnswer.SearchSuggestionsHtml ?? "";
+    public string QRightSuggestions => RightAnswer.SearchSuggestionsHtml ?? "";
     public string QLeftAnswer => AnswerText(LeftAnswer);
     public string QRightAnswer => AnswerText(RightAnswer);
     public string QLeftStatus => AnswerStatus(LeftAnswer);
@@ -134,7 +148,7 @@ public sealed partial class IslandViewModel
     {
         var provider = right ? QCompareProvider : QSelectedProvider;
         return new(provider, right ? QCompareModel : QSelectedModel, _qSecrets.Get(provider),
-            right ? QCompareEffort : QReasoningEffort, provider == "ollama" ? Settings.QOllamaBaseUrl : null);
+            right ? QCompareEffort : QReasoningEffort, provider == "ollama" ? Settings.QOllamaBaseUrl : null, Settings.QWebSearchEnabled);
     }
     private async Task SubmitComparisonAsync(string prompt)
     {
@@ -171,6 +185,8 @@ public sealed partial class IslandViewModel
         }
         RaiseMany(nameof(QCompareEnabled), nameof(QSingleMode), nameof(QShowSingleTranscript), nameof(QShowComparison), nameof(QShowCompactComparison),
             nameof(QShowCompactSingle), nameof(IslandBaseSurfaceBrush), nameof(QCompactIconSize), nameof(ShowCompactEqualizer), nameof(QDisclosureText), nameof(QSendLabel), nameof(QStopLabel), nameof(QComposerPlaceholder), nameof(QLeftAnswer), nameof(QRightAnswer),
+            nameof(QLeftSearching), nameof(QRightSearching), nameof(QLeftSearchUsed), nameof(QRightSearchUsed), nameof(QLeftSources), nameof(QRightSources),
+            nameof(QLeftRawResponse), nameof(QRightRawResponse), nameof(QLeftSearchNotice), nameof(QRightSearchNotice), nameof(QLeftSuggestions), nameof(QRightSuggestions), nameof(QLeftBusy), nameof(QRightBusy),
             nameof(QLeftStatus), nameof(QRightStatus), nameof(QLeftCanCopy), nameof(QRightCanCopy), nameof(QCompareCanRetry), nameof(QLeftLabel), nameof(QRightLabel),
             nameof(QLeftCompact), nameof(QRightCompact));
     }

@@ -105,7 +105,16 @@ public sealed class WhisperVoiceInput : IDisposable
                 _ = Task.Run(() => CheckWakeAsync(utterance, epoch, wakeToken));
             }); }
             catch { _wakeCancellation = null; cancellation.Dispose(); throw; }
+            _ = Task.Run(() => WarmWakeModelAsync(wakeToken));
         }
+    }
+
+    private async Task WarmWakeModelAsync(CancellationToken token)
+    {
+        try { await _engine.WarmUpAsync(token).ConfigureAwait(false); }
+        catch (OperationCanceledException) { }
+        catch (ObjectDisposedException) { }
+        catch (Exception ex) { _log.Error("Sutra Assistant: wake model warm-up failed.", ex); }
     }
 
     private async Task CheckWakeAsync(float[] utterance, int epoch, CancellationToken wakeToken)

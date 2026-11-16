@@ -5,9 +5,9 @@ using Microsoft.Win32;
 namespace DynamicIsland.Windows.Services;
 
 /// <summary>
-/// Reports whether any app is currently using the webcam or microphone by reading the Windows
-/// CapabilityAccessManager consent store. An app in active use has LastUsedTimeStop == 0 while it holds
-/// the device. Read-only registry polling — no device is opened. Raises on the UI thread.
+/// Reports live webcam streaming via Media Foundation, supplemented by Windows usage history for
+/// webcam and microphone attribution. Read-only activity monitoring; no device is opened.
+/// Raises on the UI thread.
 /// </summary>
 public sealed class PrivacySensorService(LoggingService log, Func<PrivacySensorState>? readState = null) : IDisposable
 {
@@ -20,7 +20,9 @@ public sealed class PrivacySensorService(LoggingService log, Func<PrivacySensorS
     public PrivacySensorState Current { get; private set; } = PrivacySensorState.None;
     private bool _started;
     private bool _polling;
+    private bool _pollAgain;
     private bool _disposed;
+    private WindowsCameraActivityMonitor? _cameraMonitor;
 
     public void ConfigurePolling(TimeSpan interval)
     {
@@ -32,6 +34,14 @@ public sealed class PrivacySensorService(LoggingService log, Func<PrivacySensorS
     {
         if (_started) return;
         _started = true;
+        if (readState is null && !Infrastructure.AppDataPaths.IsPreview)
+        {
+            _cameraMonitor = new WindowsCameraActivityMonitor(_ =>
+            {
+                if (!_disposed) _timer.Dispatcher.BeginInvoke(Poll);
+            }, log.Info);
+            _cameraMonitor.Start();
+        }
         _timer.Tick += (_, _) => Poll();
         _timer.Start();
         Poll();
@@ -39,17 +49,28 @@ public sealed class PrivacySensorService(LoggingService log, Func<PrivacySensorS
 
     private async void Poll()
     {
-        if (_polling || _disposed) return;
+        if (_disposed) return;
+        if (_polling) { _pollAgain = true; return; }
         _polling = true;
         try
         {
-            var next = await Task.Run(() => readState?.Invoke() ?? new PrivacySensorState(ActiveApps("webcam"), ActiveApps("microphone")));
+            var next = await Task.Run(() => readState?.Invoke() ?? new PrivacySensorState(ActiveCameraApps(), ActiveApps("microphone")));
             if (_disposed || next == Current) return;
             Current = next;
+            log.Info($"Privacy activity changed: camera={next.Camera}, microphone={next.Microphone}.");
             Changed?.Invoke(this, next);
         }
-        finally { _polling = false; }
+        catch (Exception ex) { log.Debug($"Privacy activity could not be read: {ex.GetType().Name}."); }
+        finally
+        {
+            _polling = false;
+            if (_pollAgain && !_disposed) { _pollAgain = false; Poll(); }
+        }
     }
+
+    private IReadOnlyList<string> ActiveCameraApps() => ActiveApps("webcam")
+        .Concat(_cameraMonitor?.CurrentApps ?? Array.Empty<string>())
+        .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(app => app, StringComparer.OrdinalIgnoreCase).Take(8).ToArray();
 
     private IReadOnlyList<string> ActiveApps(string capability)
     {
@@ -216,6 +237,8 @@ public sealed class PrivacySensorService(LoggingService log, Func<PrivacySensorS
     {
         _disposed = true;
         _timer.Stop();
+        _cameraMonitor?.Dispose();
+        _cameraMonitor = null;
         _started = false;
     }
 }

@@ -16,6 +16,7 @@ namespace DynamicIsland.Windows.Views;
 public sealed class FlowDotMatrixView : FrameworkElement
 {
     private const int Rows = 5;
+    private static readonly (int dc, int row)[] CheckPath = [(-3, 2), (-2, 3), (-1, 4), (0, 3), (1, 2), (2, 1), (3, 0)];
     private static readonly Color Unlit = Color.FromRgb(0x30, 0x31, 0x38);
     private static readonly Color White = Color.FromRgb(0xF5, 0xF5, 0xFA);
     private static readonly Color Green = Color.FromRgb(0x78, 0xE1, 0xA0);
@@ -187,9 +188,8 @@ public sealed class FlowDotMatrixView : FrameworkElement
     private static int CheckIndex(int c, int r, double center)
     {
         var cx = (int)Math.Round(center);
-        (int dc, int row)[] path = [(-3, 2), (-2, 3), (-1, 4), (0, 3), (1, 2), (2, 1), (3, 0)];
-        for (var i = 0; i < path.Length; i++)
-            if (c == cx + path[i].dc && r == path[i].row) return i;
+        for (var i = 0; i < CheckPath.Length; i++)
+            if (c == cx + CheckPath[i].dc && r == CheckPath[i].row) return i;
         return -1;
     }
 

@@ -11,7 +11,7 @@ public sealed class SettingsService(LoggingService log)
         PropertyNameCaseInsensitive = true
     };
 
-    private static readonly SemaphoreSlim _gate = new(1, 1);
+    private static readonly Infrastructure.OrderedBackgroundWork _writes = new();
     private readonly string _directory = DynamicIsland.Windows.Infrastructure.AppDataPaths.Root;
 
     public string SettingsPath => Path.Combine(_directory, "settings.json");
@@ -64,25 +64,36 @@ public sealed class SettingsService(LoggingService log)
         }
     }
 
-    public async Task SaveAsync(AppSettings settings)
+    public Task SaveAsync(AppSettings settings)
     {
         Normalize(settings);
-        await _gate.WaitAsync();
+        // Capture mutable UI-owned preferences before scheduling file work.
+        try
+        {
+            var snapshot = JsonSerializer.SerializeToUtf8Bytes(settings, JsonOptions);
+            return _writes.Enqueue(() => SaveSnapshotAsync(snapshot));
+        }
+        catch (Exception ex)
+        {
+            log.Error("Unable to save settings", ex);
+            return Task.CompletedTask;
+        }
+    }
+
+    public Task FlushAsync() => _writes.FlushAsync();
+
+    private async Task SaveSnapshotAsync(byte[] snapshot)
+    {
         try
         {
             Directory.CreateDirectory(_directory);
             var temporary = SettingsPath + ".tmp";
-            await using (var stream = File.Create(temporary))
-                await JsonSerializer.SerializeAsync(stream, settings, JsonOptions);
+            await File.WriteAllBytesAsync(temporary, snapshot).ConfigureAwait(false);
             File.Move(temporary, SettingsPath, true);
         }
         catch (Exception ex)
         {
             log.Error("Unable to save settings", ex);
-        }
-        finally
-        {
-            _gate.Release();
         }
     }
 

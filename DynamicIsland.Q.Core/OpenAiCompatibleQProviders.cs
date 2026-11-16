@@ -23,7 +23,15 @@ public sealed class GroqQProvider(HttpClient? httpClient = null) : HttpQProvider
     {
         var effort = QProviderPolicy.NormalizeEffort(Info.Id, request.Model, request.ReasoningEffort);
         if (request.Model.StartsWith("openai/gpt-oss", StringComparison.OrdinalIgnoreCase) && effort is "none") effort = "low";
-        var extra = effort == "auto" ? null : new Dictionary<string, object?> { ["reasoning_effort"] = effort };
+        var extra = new Dictionary<string, object?>();
+        if (effort != "auto" && !request.Model.StartsWith("groq/compound", StringComparison.OrdinalIgnoreCase)) extra["reasoning_effort"] = effort;
+        if (request.Model.StartsWith("groq/compound", StringComparison.OrdinalIgnoreCase))
+            extra["compound_custom"] = new { tools = new { enabled_tools = request.WebSearch ? new[] { "web_search", "visit_website" } : Array.Empty<string>() } };
+        else if (request.Model.StartsWith("openai/gpt-oss", StringComparison.OrdinalIgnoreCase))
+        {
+            extra["tools"] = request.WebSearch ? new[] { new { type = "browser_search" } } : Array.Empty<object>();
+            if (!request.WebSearch) extra["tool_choice"] = "none";
+        }
         return StreamChatCompletionsAsync(request, credential, baseUrl, Info.DefaultBaseUrl!, "max_completion_tokens", extra, cancellationToken);
     }
 }
@@ -40,6 +48,8 @@ public sealed class XaiQProvider(HttpClient? httpClient = null) : HttpQProvider(
     public override IAsyncEnumerable<QStreamEvent> StreamAsync(QRequest request, string? credential, string? baseUrl,
         CancellationToken cancellationToken)
     {
+        if (request.WebSearch && QWebSearch.Supports(Info.Id, request.Model))
+            return StreamResponsesAsync(request, credential, baseUrl, Info.DefaultBaseUrl!, cancellationToken: cancellationToken);
         var effort = QProviderPolicy.NormalizeEffort(Info.Id, request.Model, request.ReasoningEffort);
         var extra = new Dictionary<string, object?>();
         if (effort != "auto") extra["reasoning_effort"] = effort;
@@ -61,8 +71,11 @@ public sealed class DeepSeekQProvider(HttpClient? httpClient = null) : HttpQProv
     public override IAsyncEnumerable<QStreamEvent> StreamAsync(QRequest request, string? credential, string? baseUrl,
         CancellationToken cancellationToken)
     {
+        if (request.WebSearch && request.Model == "deepseek-v4-pro")
+            return StreamResponsesAsync(request, credential, baseUrl, Info.DefaultBaseUrl!, cancellationToken: cancellationToken);
         var effort = QProviderPolicy.NormalizeEffort(Info.Id, request.Model, request.ReasoningEffort);
         var extra = new Dictionary<string, object?>();
+        if (request.WebSearch && request.Model == "deepseek-flash") extra["tools"] = new[] { new { type = "deepseek_web_search" }, new { type = "deepseek_read_url" } };
         if (effort == "none") extra["thinking"] = new { type = "disabled" };
         else if (effort != "auto")
         {
@@ -122,7 +135,8 @@ public sealed class OpenRouterQProvider(HttpClient? httpClient = null) : HttpQPr
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var profile = await GetReasoningProfileAsync(request.Model, credential, cancellationToken).ConfigureAwait(false);
-        var extra = BuildReasoningBody(profile, request.ReasoningEffort);
+        var extra = new Dictionary<string, object?>(BuildReasoningBody(profile, request.ReasoningEffort) ?? new Dictionary<string, object?>());
+        if (request.WebSearch) extra["plugins"] = new[] { new { id = "web", max_results = 5 } };
         await foreach (var item in StreamChatCompletionsAsync(request, credential, baseUrl, Info.DefaultBaseUrl!,
             "max_completion_tokens", extra, cancellationToken).ConfigureAwait(false)) yield return item;
     }

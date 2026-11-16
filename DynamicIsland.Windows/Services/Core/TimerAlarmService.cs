@@ -27,10 +27,14 @@ public sealed class TimerAlarmService : IDisposable
     public TimerAlarmSnapshot State => _engine.State;
     public string StorageWarning { get; private set; } = "";
     private bool _readOnly;
+    private volatile bool _disposed;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, OrderedBackgroundWork> Writers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly OrderedBackgroundWork _writes;
     public TimerAlarmService(LoggingService log, string? statePath = null)
     {
         _log = log;
-        _statePath = statePath ?? Path.Combine(AppDataPaths.Root, "timer-alarm.json");
+        _statePath = Path.GetFullPath(statePath ?? Path.Combine(AppDataPaths.Root, "timer-alarm.json"));
+        _writes = Writers.GetOrAdd(_statePath, _ => new());
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_statePath))!);
         var state = new TimerAlarmSnapshot();
         if (File.Exists(_statePath))
@@ -157,9 +161,32 @@ public sealed class TimerAlarmService : IDisposable
     {
         if (_readOnly) return;
         _engine.PrepareForSave();
-        try { File.WriteAllText(_statePath + ".tmp", JsonSerializer.Serialize(State, new JsonSerializerOptions { WriteIndented = true })); File.Move(_statePath + ".tmp", _statePath, true); }
-        catch (Exception ex) { StorageWarning = "Timer changes could not be saved."; _log.Error(StorageWarning, ex); }
+        var snapshot = JsonSerializer.Serialize(State, new JsonSerializerOptions { WriteIndented = true });
+        _writes.Enqueue(() =>
+        {
+            try { File.WriteAllText(_statePath + ".tmp", snapshot); File.Move(_statePath + ".tmp", _statePath, true); }
+            catch (Exception ex)
+            {
+                _log.Error("Timer changes could not be saved.", ex);
+                if (!_disposed && !_tickTimer.Dispatcher.HasShutdownStarted)
+                {
+                    try
+                    {
+                        _tickTimer.Dispatcher.BeginInvoke(() =>
+                        {
+                            if (_disposed) return;
+                            StorageWarning = "Timer changes could not be saved.";
+                            Changed?.Invoke(this, EventArgs.Empty);
+                        });
+                    }
+                    catch (InvalidOperationException) { } // dispatcher shutdown raced the failure
+                }
+            }
+            return Task.CompletedTask;
+        });
     }
+
+    public Task FlushAsync() => _writes.FlushAsync();
     public static string FormatDuration(TimeSpan value) => value.TotalHours >= 1
         ? $"{(int)value.TotalHours}:{value.Minutes:00}:{value.Seconds:00}"
         : $"{value.Minutes:00}:{value.Seconds:00}";
@@ -199,8 +226,11 @@ public sealed class TimerAlarmService : IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         Microsoft.Win32.SystemEvents.PowerModeChanged -= PowerChanged;
         Microsoft.Win32.SystemEvents.TimeChanged -= TimeChanged;
         _tickTimer.Stop(); _soundTimer?.Dispose(); Save();
+        FlushAsync().GetAwaiter().GetResult();
     }
 }

@@ -315,6 +315,34 @@
             </Setter>
         </Style>
 
+        <Style x:Key="QCanvasResponseButton" TargetType="Button" BasedOn="{StaticResource QButtonBase}">
+            <Setter Property="Foreground" Value="{DynamicResource QText}"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="2,5"/><Setter Property="FontSize" Value="14"/><Setter Property="MinHeight" Value="30"/>
+        </Style>
+        <Style x:Key="QCanvasNewButton" TargetType="Button" BasedOn="{StaticResource QButtonBase}">
+            <Setter Property="Foreground" Value="{DynamicResource QText}"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="{DynamicResource QComposerBorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Padding" Value="14,8"/><Setter Property="FontSize" Value="14"/><Setter Property="Height" Value="40"/>
+        </Style>
+        <Style x:Key="QCanvasPromptButton" TargetType="Button" BasedOn="{StaticResource QCanvasResponseButton}"><Setter Property="Foreground" Value="{DynamicResource QAccent}"/><Setter Property="FontSize" Value="14"/><Setter Property="Padding" Value="2,4"/></Style>
+        <Style x:Key="QCanvasSelector" TargetType="ComboBox" BasedOn="{StaticResource QSelectorComboBox}"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="Padding" Value="8,0,24,0"/><Setter Property="FontSize" Value="13"/></Style>
+        <Style x:Key="QCanvasSendButton" TargetType="Button" BasedOn="{StaticResource QButtonBase}">
+            <Setter Property="Foreground" Value="White"/><Setter Property="Background" Value="#FFB9A5FD"/>
+            <Setter Property="Width" Value="42"/><Setter Property="Height" Value="42"/><Setter Property="MinWidth" Value="42"/><Setter Property="MinHeight" Value="42"/><Setter Property="Padding" Value="0"/><Setter Property="FontSize" Value="22"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border CornerRadius="12" Background="{TemplateBinding Background}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></ControlTemplate></Setter.Value></Setter>
+            <Style.Triggers><DataTrigger Binding="{Binding QCanStop}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="QCanvasStopButton" TargetType="Button" BasedOn="{StaticResource QCanvasSendButton}">
+            <Setter Property="Visibility" Value="Collapsed"/><Setter Property="FontSize" Value="16"/>
+            <Style.Triggers><DataTrigger Binding="{Binding QCanStop}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="QScreenToggle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource QText}"/><Setter Property="FontSize" Value="13"/><Setter Property="Cursor" Value="Hand"/><Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
+                <Border x:Name="ScreenChrome" Padding="10,7" BorderBrush="{DynamicResource QBorder}" BorderThickness="1" CornerRadius="15" Background="Transparent">
+                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7F4;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Margin="0,0,7,0"/><ContentPresenter VerticalAlignment="Center"/><Grid Width="31" Height="19" Margin="10,0,0,0"><Border x:Name="ToggleTrack" Background="{DynamicResource QBorder}" CornerRadius="10"/><Ellipse x:Name="ToggleKnob" Width="15" Height="15" Fill="#FFF6F4FF" HorizontalAlignment="Left" Margin="2,0"/></Grid></StackPanel>
+                </Border>
+                <ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="ToggleTrack" Property="Background" Value="{DynamicResource QAccent}"/><Setter TargetName="ToggleKnob" Property="HorizontalAlignment" Value="Right"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ScreenChrome" Property="BorderBrush" Value="{DynamicResource QAccent}"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ScreenChrome" Property="Background" Value="{DynamicResource QHover}"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger></ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+
         <Style x:Key="QResponseActionButton" TargetType="Button" BasedOn="{StaticResource QButtonBase}">
             <Setter Property="Foreground" Value="{DynamicResource QText}" />
             <Setter Property="Background" Value="{DynamicResource QControl}" />
@@ -460,26 +488,26 @@
     </Window.Resources>
 
     <Grid Background="{x:Null}">
-        <Border x:Name="GlassShell" Width="230" Height="62" Margin="0,8,0,0" HorizontalAlignment="Center" VerticalAlignment="Top" CornerRadius="{Binding IslandCornerRadius}" Background="{Binding IslandBaseSurfaceBrush}" BorderThickness="1" BorderBrush="{StaticResource GlassRimBrush}" RenderTransformOrigin="0.5,0" ClipToBounds="True" Panel.ZIndex="10" MouseEnter="Pill_MouseEnter" MouseLeave="Pill_MouseLeave" MouseLeftButtonDown="Pill_MouseLeftButtonDown">
-                <Border.Effect>
+        <views:NotchBorder x:Name="GlassShell" IsNotch="{Binding IsTopNotch}" ReducedMotion="{Binding IsReducedMotion}" Width="230" Height="62" Margin="0,8,0,0" HorizontalAlignment="Center" VerticalAlignment="Top" CornerRadius="{Binding IslandCornerRadius}" Background="{Binding IslandBaseSurfaceBrush}" BorderThickness="1" BorderBrush="{StaticResource GlassRimBrush}" RenderTransformOrigin="0.5,0" ClipToBounds="True" Panel.ZIndex="10" MouseEnter="Pill_MouseEnter" MouseLeave="Pill_MouseLeave" MouseLeftButtonDown="Pill_MouseLeftButtonDown">
+                <views:NotchBorder.Effect>
                     <DropShadowEffect BlurRadius="28" ShadowDepth="8" Opacity="0.5" Color="#000000" Direction="90" />
-                </Border.Effect>
-                <Border.RenderTransform>
+                </views:NotchBorder.Effect>
+                <views:NotchBorder.RenderTransform>
                     <TransformGroup>
                         <ScaleTransform x:Name="PillScale" ScaleX="1" ScaleY="1" />
                     </TransformGroup>
-                </Border.RenderTransform>
+                </views:NotchBorder.RenderTransform>
             <Grid>
                 <Border x:Name="BackgroundLayer" Background="Transparent" CornerRadius="{Binding IslandInnerCornerRadius}" IsHitTestVisible="False" />
 
                 <!-- Compact: one calm, glanceable status strip — media, RAM, and time. -->
-                <Grid x:Name="CompactContent" Margin="10,0" ToolTip="{Binding DateToolTip}">
+                <Grid x:Name="CompactContent" Margin="14,0,16,0" ToolTip="{Binding DateToolTip}">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="52" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Border Grid.ColumnSpan="3" Margin="-10,0" Background="{DynamicResource QSurface}" BorderBrush="{DynamicResource QBorder}" BorderThickness="1" CornerRadius="34" IsHitTestVisible="False" Visibility="{Binding QShowCompactComparison, Converter={StaticResource BoolToVisibility}}" />
+                    <Border Grid.ColumnSpan="3" Margin="-14,0,-16,0" Background="{DynamicResource QSurface}" BorderBrush="{DynamicResource QBorder}" BorderThickness="1" CornerRadius="34" IsHitTestVisible="False" Visibility="{Binding QShowCompactComparison, Converter={StaticResource BoolToVisibility}}" />
                     <Grid Width="{Binding CompactAlbumSize}" Height="{Binding CompactAlbumSize}" VerticalAlignment="Center" Visibility="{Binding ShowCompactArtSurface, Converter={StaticResource BoolToVisibility}}">
                         <Border CornerRadius="{Binding CompactIconCorner}" Background="{Binding IslandCardBrush}">
                             <ContentControl Content="{Binding}" ContentTemplate="{StaticResource CompactActivityMark}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
@@ -488,7 +516,7 @@
                             <Border.Background><ImageBrush ImageSource="{Binding Artwork}" Stretch="UniformToFill" /></Border.Background>
                         </Border>
                     </Grid>
-                    <StackPanel Grid.Column="1" Margin="11,0,13,0" VerticalAlignment="Center" Visibility="{Binding ShowCompactMediaContent, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Grid.Column="1" Margin="8,0" VerticalAlignment="Center" Visibility="{Binding ShowCompactMediaContent, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Text="{Binding MediaTitle}" FontFamily="{Binding UiFontFamily}" FontSize="{Binding MediaTitleFontSize}" FontWeight="SemiBold" Foreground="{Binding PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding MediaArtist}" Margin="0,2,0,0" FontFamily="{Binding UiFontFamily}" FontSize="{Binding MediaArtistFontSize}" Foreground="{Binding SecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
@@ -497,7 +525,7 @@
                             <views:SutraMascotView State="{Binding AssistantMascotState}" Speaking="{Binding AssistantSpeaking}" ReducedMotion="{Binding IsReducedMotion}" />
                         </Border>
                     </Grid>
-                    <StackPanel Grid.Column="1" Margin="11,0,13,0" VerticalAlignment="Center" Visibility="{Binding QShowCompactSingle, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Grid.Column="1" Margin="8,0" VerticalAlignment="Center" Visibility="{Binding QShowCompactSingle, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Text="{Binding QCompactText}" FontFamily="{Binding UiFontFamily}" FontSize="{Binding CompactPrimaryFontSize}" FontWeight="SemiBold" Foreground="{Binding PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding QStatusText}" Margin="0,2,0,0" FontFamily="{Binding UiFontFamily}" FontSize="{Binding CompactSecondaryFontSize}" Foreground="{Binding SecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
@@ -511,7 +539,7 @@
                         <TextBlock Grid.Column="2" Grid.RowSpan="2" Text="" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource QMuted}" VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="12" />
                     </Grid>
                     <TextBlock Grid.ColumnSpan="3" Text="{Binding QCompactText}" FontFamily="{Binding UiFontFamily}" FontSize="{Binding CompactPrimaryFontSize}" FontWeight="SemiBold" Foreground="{Binding PrimaryTextBrush}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8,0" Visibility="{Binding ShowCompactHolePunchQOutput, Converter={StaticResource BoolToVisibility}}" />
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Visibility="{Binding ShowCompactStatusContent, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel x:Name="CompactStatusLane" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Visibility="{Binding ShowCompactStatusContent, Converter={StaticResource BoolToVisibility}}">
                         <views:CompactEqualizerView x:Name="CompactEqualizerLane" Active="{Binding ShowCompactEqualizer}" ReducedMotion="{Binding IsReducedMotion}" VerticalAlignment="Center" />
                         <Border Width="1" Height="30" Margin="0,0,12,0" Background="{Binding IslandDividerBrush}" Visibility="{Binding ShowCompactRam, Converter={StaticResource BoolToVisibility}}" />
                         <StackPanel Margin="0,0,13,0" Visibility="{Binding ShowCompactRam, Converter={StaticResource BoolToVisibility}}">
@@ -519,7 +547,7 @@
                             <TextBlock Text="{Binding RamText}" Margin="0,1,0,0" FontFamily="{Binding UiFontFamily}" FontSize="{Binding CompactSecondaryFontSize}" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" HorizontalAlignment="Right" />
                         </StackPanel>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="{Binding ClockTimeText}" FontFamily="{Binding UiFontFamily}" FontSize="{Binding CompactClockFontSize}" FontWeight="SemiBold" Visibility="{Binding ShowClock, Converter={StaticResource BoolToVisibility}}" Foreground="{Binding PrimaryTextBrush}" HorizontalAlignment="Right" />
+                            <TextBlock x:Name="CompactClockText" Text="{Binding ClockTimeText}" FontFamily="{Binding UiFontFamily}" FontSize="{Binding CompactClockFontSize}" FontWeight="SemiBold" Visibility="{Binding ShowClock, Converter={StaticResource BoolToVisibility}}" Foreground="{Binding PrimaryTextBrush}" HorizontalAlignment="Right" />
                             <TextBlock Text="{Binding CompactDateText}" ToolTip="{Binding DateToolTip}" FontFamily="{Binding UiFontFamily}" FontSize="9" TextTrimming="CharacterEllipsis" MaxWidth="105" Foreground="{Binding SecondaryTextBrush}" HorizontalAlignment="Right" Visibility="{Binding ShowCompactDate, Converter={StaticResource BoolToVisibility}}" />
                             <StackPanel Orientation="Horizontal" Margin="0,2,0,0" HorizontalAlignment="Right" Visibility="{Binding ShowCompactBattery, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="{Binding BatteryGlyph}" FontFamily="Segoe Fluent Icons" FontSize="10" Foreground="{Binding SecondaryTextBrush}" VerticalAlignment="Center" />
@@ -807,17 +835,10 @@
                                 <StackPanel Orientation="Horizontal">
                             <Border Width="{Binding SmallLiveWidgetWidth}" Height="64" Margin="0,0,8,0" Padding="10,5" CornerRadius="16" Background="#FF1A2028" Visibility="Collapsed">
                                 <Grid>
-                                    <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                                     <Button Command="{Binding OpenWifiSettingsCommand}" Background="Transparent" BorderThickness="0" Padding="0" ToolTip="Open Wi-Fi settings" AutomationProperties.Name="Open Wi-Fi settings">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <TextBlock Text="" FontFamily="Segoe Fluent Icons" FontSize="15" Foreground="{Binding WifiStatusBrush}" VerticalAlignment="Center" />
                                             <StackPanel Margin="8,0,0,0" VerticalAlignment="Center"><TextBlock Text="WI-FI" FontSize="8" Foreground="#FF8F9BA8" /><TextBlock Text="{Binding WifiStatusText}" FontSize="10.5" Foreground="{StaticResource AppleWhite}" /></StackPanel>
-                                        </StackPanel>
-                                    </Button>
-                                    <Button Grid.Row="1" Command="{Binding OpenBluetoothSettingsCommand}" Background="Transparent" BorderThickness="0" Padding="0" ToolTip="Open Bluetooth settings" AutomationProperties.Name="Open Bluetooth settings">
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                            <TextBlock Text="" FontFamily="Segoe Fluent Icons" FontSize="15" Foreground="{Binding BluetoothStatusBrush}" VerticalAlignment="Center" />
-                                            <StackPanel Margin="8,0,0,0" VerticalAlignment="Center"><TextBlock Text="BLUETOOTH" FontSize="8" Foreground="#FF8F9BA8" /><TextBlock Text="{Binding BluetoothStatusText}" FontSize="10.5" Foreground="{StaticResource AppleWhite}" /></StackPanel>
                                         </StackPanel>
                                     </Button>
                                 </Grid>
@@ -1032,137 +1053,97 @@
                         </Grid>
                     </Border>
 
-                <!-- Q overlay: approved Apple-inspired conversation mockup. -->
+                <!-- Sutra chat: selected conversation-canvas layout, retaining the animated mascot. -->
                 <Grid x:Name="QContent" Grid.Row="0" Grid.Column="0" Grid.RowSpan="7" Grid.ColumnSpan="3" Panel.ZIndex="90" Margin="0" Background="Transparent" ClipToBounds="False" Opacity="0" IsHitTestVisible="False" Visibility="Collapsed">
-                    <Border x:Name="QShell" CornerRadius="25" Background="{DynamicResource QSurface}" BorderBrush="{StaticResource GlassRimBrush}" BorderThickness="1" ClipToBounds="True">
-                        <Grid Margin="27,0,27,23">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="66" />
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="124" />
-                            </Grid.RowDefinitions>
-
-                            <Grid Grid.Row="0">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <Border x:Name="QShell" CornerRadius="23" Background="{DynamicResource QSurface}" BorderBrush="{DynamicResource QBorder}" BorderThickness="1" ClipToBounds="True">
+                        <Grid Margin="20,0,20,22">
+                            <Grid.RowDefinitions><RowDefinition Height="60"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <Grid Grid.Row="0" Margin="8,0">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock x:Name="AssistantBrandTitle" Text="Sutra Assistant" Margin="0" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource QText}" VerticalAlignment="Center" /><Border Width="1" Height="14" Background="{DynamicResource QBorder}" Margin="10,0"/><TextBlock Text="{Binding QHeaderStatusText}" Foreground="{DynamicResource QMuted}" FontSize="10" VerticalAlignment="Center"/>
-
+                                    <views:SutraMascotView x:Name="AssistantBrandLogo" Width="30" Height="30" ReducedMotion="{Binding IsReducedMotion}"/>
+                                    <TextBlock x:Name="AssistantBrandTitle" Text="Sutra Assistant" FontFamily="Segoe UI Variable Display" FontSize="19" FontWeight="SemiBold" Margin="13,0,0,0" Foreground="{DynamicResource QText}" VerticalAlignment="Center"/>
                                 </StackPanel>
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border CornerRadius="11" BorderBrush="{DynamicResource QBorder}" BorderThickness="1" Padding="12,8" Margin="0,0,8,0"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7F4;" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource QMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/><TextBlock Text="{Binding QSourceText}" Foreground="{DynamicResource QMuted}" FontSize="11" VerticalAlignment="Center" ToolTip="{Binding QHeaderStatusText}"/></StackPanel></Border>
-                                    <Button Content="" Click="QNew_Click" Style="{StaticResource QHeaderControl}" ToolTip="New chat" AutomationProperties.Name="New chat" />
-                                    <Button x:Name="QMenuButton" Content="" Click="MenuButton_Click" Style="{StaticResource QHeaderControl}" ToolTip="Sutra Assistant options" AutomationProperties.Name="Sutra Assistant options">
-                                        <Button.ContextMenu>
-                                            <ContextMenu Opened="IslandContextMenu_Opened" Closed="IslandContextMenu_Closed" DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                                                <MenuItem Header="Use screen for next question" IsCheckable="True" IsChecked="{Binding QUseScreenNext, Mode=TwoWay}" />
-                                                <MenuItem Header="Read last reply" Click="QRead_Click" />
-                                                <MenuItem Header="Compare two providers" IsCheckable="True" IsChecked="{Binding QCompareEnabled, Mode=TwoWay}" IsEnabled="{Binding QCanChangeProvider}" />
-                                                <MenuItem Header="Sutra Assistant settings and API keys" Click="QSettingsButton_Click" />
-                                                <MenuItem Header="Timer" Click="TimerButton_Click" />
-                                                <Separator />
-                                                <MenuItem Header="Recenter island" Click="RecenterMenu_Click" />
-                                                <MenuItem Header="Close assistant" Click="QClose_Click" />
-                                            </ContextMenu>
-                                        </Button.ContextMenu>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button x:Name="QNewChatButton" Click="QNew_Click" Style="{StaticResource QCanvasNewButton}" ToolTip="Start a new conversation" AutomationProperties.Name="New chat"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8F2;" FontFamily="Segoe Fluent Icons" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/><TextBlock Text="New chat"/></StackPanel></Button>
+                                    <Button x:Name="QMenuButton" Content="&#xE712;" Click="MenuButton_Click" Style="{StaticResource QHeaderControl}" Margin="8,0,0,0" ToolTip="Sutra Assistant options" AutomationProperties.Name="Sutra Assistant options">
+                                        <Button.ContextMenu><ContextMenu Opened="IslandContextMenu_Opened" Closed="IslandContextMenu_Closed" DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                            <MenuItem Header="Use screen for next question" IsCheckable="True" IsChecked="{Binding QUseScreenNext, Mode=TwoWay}"/>
+                                            <MenuItem Header="Read last reply" Click="QRead_Click"/>
+                                            <MenuItem Header="Compare two providers" IsCheckable="True" IsChecked="{Binding QCompareEnabled, Mode=TwoWay}" IsEnabled="{Binding QCanChangeProvider}"/>
+                                            <MenuItem Header="Refresh available models" Command="{Binding RefreshQModelsCommand}" IsEnabled="{Binding QCanChangeProvider}"/>
+                                            <MenuItem Header="Sutra Assistant settings and API keys" Click="QSettingsButton_Click"/>
+                                            <Separator/><MenuItem Header="Timer" Click="TimerButton_Click"/><MenuItem Header="Recenter island" Click="RecenterMenu_Click"/><MenuItem Header="Close assistant" Click="QClose_Click"/>
+                                        </ContextMenu></Button.ContextMenu>
                                     </Button>
-                                    <Button Content="" Click="QClose_Click" Style="{StaticResource QHeaderControl}" ToolTip="Close Sutra Assistant" AutomationProperties.Name="Close Sutra Assistant" />
+                                    <Button Content="&#xE8BB;" Click="QClose_Click" Style="{StaticResource QHeaderControl}" Margin="8,0,0,0" ToolTip="Close Sutra Assistant" AutomationProperties.Name="Close Sutra Assistant"/>
                                 </StackPanel>
                             </Grid>
-                            <Border Grid.Row="0" BorderBrush="{DynamicResource QBorder}" BorderThickness="0,0,0,1" Margin="-27,0" IsHitTestVisible="False"/><Grid Grid.Row="1" Margin="19,24,19,12" Visibility="{Binding QShowSingleTranscript, Converter={StaticResource BoolToVisibility}}">
+                            <Border Grid.Row="0" BorderBrush="{DynamicResource QBorder}" BorderThickness="0,0,0,1" Margin="-20,0" IsHitTestVisible="False"/>
+                            <Grid Grid.Row="1" Margin="24,22,24,14" Visibility="{Binding QShowSingleTranscript, Converter={StaticResource BoolToVisibility}}">
                                 <ScrollViewer x:Name="QTranscriptScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False" ScrollChanged="QTranscriptScroll_ScrollChanged" Padding="0,0,8,0">
-                                    <ScrollViewer.Resources>
-                                        <Style TargetType="ScrollBar" BasedOn="{StaticResource QScrollBar}" />
-                                    </ScrollViewer.Resources>
-                                    <StackPanel><TextBlock Text="{Binding DateText}" Foreground="{DynamicResource QMuted}" FontSize="10" HorizontalAlignment="Center" Margin="0,0,0,22"/>
-                                        <Border Margin="0,0,0,12" Padding="16,12" Background="{DynamicResource QCard}" BorderBrush="{DynamicResource QBorder}" BorderThickness="1" CornerRadius="16" Visibility="{Binding QNeedsConsent, Converter={StaticResource BoolToVisibility}}">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                                <StackPanel>
-                                                    <TextBlock Text="Connect Sutra Assistant to your provider?" FontFamily="Segoe UI Variable Text" FontSize="13.5" FontWeight="SemiBold" Foreground="{DynamicResource QText}" />
-                                                    <TextBlock Text="{Binding QDisclosureText}" Margin="0,4,12,0" FontFamily="Segoe UI Variable Text" FontSize="11.5" Foreground="{DynamicResource QMuted}" TextWrapping="Wrap" />
+                                    <ScrollViewer.Resources><Style TargetType="ScrollBar" BasedOn="{StaticResource QScrollBar}"/></ScrollViewer.Resources>
+                                    <StackPanel x:Name="QConversationColumn" HorizontalAlignment="Stretch">
+                                        <Border Margin="0,0,0,18" Padding="16,12" Background="{DynamicResource QCard}" BorderBrush="{DynamicResource QBorder}" BorderThickness="1" CornerRadius="14" Visibility="{Binding QNeedsConsent, Converter={StaticResource BoolToVisibility}}">
+                                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Connect Sutra Assistant to your provider?" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource QText}"/><TextBlock Text="{Binding QDisclosureText}" Margin="0,5,16,0" FontSize="13" Foreground="{DynamicResource QMuted}" TextWrapping="Wrap"/></StackPanel><Button Grid.Column="1" Content="Allow" Click="QAllow_Click" Style="{StaticResource QPrimaryButton}" VerticalAlignment="Center"/></Grid>
+                                        </Border>
+                                        <Grid x:Name="QUserTurn" Visibility="{Binding QHasPrompt, Converter={StaticResource BoolToVisibility}}" Margin="52,0,0,24">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="14"/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" HorizontalAlignment="Right">
+                                                <TextBlock Text="You" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource QMuted}" Margin="0,0,0,7" HorizontalAlignment="Right"/>
+                                                <Border x:Name="QUserBubble" HorizontalAlignment="Right" MaxWidth="580" Padding="14,10" Background="{DynamicResource QUserBubbleBrush}" CornerRadius="15"><TextBlock Text="{Binding QPromptText}" FontFamily="Segoe UI Variable Text" FontSize="15" LineHeight="22" TextWrapping="Wrap" Foreground="{DynamicResource QText}"/></Border>
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource QControl}" VerticalAlignment="Top"><TextBlock Text="&#xE77B;" FontFamily="Segoe Fluent Icons" FontSize="17" Foreground="{DynamicResource QMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                        </Grid>
+                                        <Grid x:Name="QAssistantTurn" Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <views:SutraMascotView x:Name="QResponseMascot" Width="28" Height="28" HorizontalAlignment="Left" VerticalAlignment="Top" ShowThinkingBulb="{Binding QShowThinkingBulb}" State="{Binding AssistantMascotState}" Speaking="{Binding AssistantSpeaking}" ReducedMotion="{Binding IsReducedMotion}" ClipToBounds="False"/>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Sutra" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource QMuted}" Margin="0,0,0,9"/>
+                                                <views:AssistantActionView x:Name="QDeviceAction" Feedback="{Binding QActionFeedback}" ReducedMotion="{Binding IsReducedMotion}" Margin="0,0,0,10" Visibility="{Binding QHasActionFeedback, Converter={StaticResource BoolToVisibility}}"/>
+                                                <views:AssistantReplyView x:Name="QReply" BodyFontSize="15" BodyLineHeight="23" LeadFontSize="19" Searching="{Binding QIsSearching}" SearchUsed="{Binding QSearchUsed}" Sources="{Binding QWebSources}" SearchNotice="{Binding QSearchNotice}" SuggestionsHtml="{Binding QSearchSuggestions}" RawText="{Binding QResponse}" Active="{Binding QShowInlineThinking}" Status="{Binding QInlineStatusText}" Text="{Binding QResponseDisplay}" ReducedMotion="{Binding IsReducedMotion}"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                                    <Button x:Name="QCopyButton" Click="QCopy_Click" Style="{StaticResource QCanvasResponseButton}" Margin="0,0,18,0" Visibility="{Binding QCanCopyResponse, Converter={StaticResource BoolToVisibility}}" ToolTip="Copy response" AutomationProperties.Name="Copy response"><StackPanel Orientation="Horizontal"><TextBlock x:Name="QCopyButtonGlyph" Text="&#xE8C8;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center"/><TextBlock x:Name="QCopyButtonLabel" Text="Copy" Margin="8,0,0,0"/></StackPanel></Button>
+                                                    <Button Click="QRetry_Click" Style="{StaticResource QCanvasResponseButton}" Visibility="{Binding QCanRetry, Converter={StaticResource BoolToVisibility}}" ToolTip="Retry question" AutomationProperties.Name="Retry question"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE72C;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center"/><TextBlock Text="Retry" Margin="8,0,0,0"/></StackPanel></Button>
                                                 </StackPanel>
-                                                <Button Grid.Column="1" Content="Allow" Click="QAllow_Click" Style="{StaticResource QPrimaryButton}" Padding="16,7" VerticalAlignment="Center" />
-                                            </Grid>
-                                        </Border>
-
-                                        <Border HorizontalAlignment="Right" MaxWidth="650" Margin="64,0,0,18" Padding="16,12" Background="#FF2D2A35" BorderBrush="Transparent" BorderThickness="0" CornerRadius="16,16,3,16" Visibility="{Binding QHasPrompt, Converter={StaticResource BoolToVisibility}}">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions><ColumnDefinition Width="0" /><ColumnDefinition Width="*" /><ColumnDefinition Width="0" /></Grid.ColumnDefinitions>
-
-                                                <TextBlock Grid.Column="1" Text="{Binding QPromptText}" Margin="0" FontFamily="Segoe UI Variable Text" FontSize="13" LineHeight="20" Foreground="White" TextWrapping="Wrap" VerticalAlignment="Center" />
-                                                <TextBlock Visibility="Collapsed" Grid.Column="2" Text="{Binding ClockTimeText}" FontFamily="Segoe UI Variable Text" FontSize="11.5" Foreground="{DynamicResource QMuted}" VerticalAlignment="Center" />
-                                            </Grid>
-                                        </Border>
-
-                                        <Border HorizontalAlignment="Left" MaxWidth="752" Margin="0,6,12,8" Padding="0" CornerRadius="0" Background="Transparent" BorderThickness="0">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions><ColumnDefinition Width="39" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                                <Grid Width="27" Height="27" HorizontalAlignment="Left" VerticalAlignment="Top" ClipToBounds="False">
-                                                    <views:SutraMascotView x:Name="QResponseMascot" Width="27" Height="27" ShowThinkingBulb="True" State="{Binding AssistantMascotState}" Speaking="{Binding AssistantSpeaking}" ReducedMotion="{Binding IsReducedMotion}" ClipToBounds="False" />
-                                                </Grid>
-                                                <Grid Grid.Column="1" Margin="0,0,0,0">
-                                                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                                                    <StackPanel Grid.Row="1">
-                                                    <views:AssistantActionView x:Name="QDeviceAction" Feedback="{Binding QActionFeedback}" ReducedMotion="{Binding IsReducedMotion}" Margin="0,0,0,10" Visibility="{Binding QHasActionFeedback, Converter={StaticResource BoolToVisibility}}" />
-                                                    <views:AssistantReplyView x:Name="QReply" Active="{Binding QShowInlineThinking}" Status="{Binding QInlineStatusText}" Text="{Binding QResponseDisplay}" ReducedMotion="{Binding IsReducedMotion}" />
-                                                    </StackPanel>
-                                                    <Grid Grid.Row="2" Margin="0,16,0,0" Visibility="{Binding QShowResponseActions, Converter={StaticResource BoolToVisibility}}">
-                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                                        <Button Click="QStop_Click" Style="{StaticResource QStopButton}" HorizontalAlignment="Left" Visibility="{Binding QCanStop, Converter={StaticResource BoolToVisibility}}" ToolTip="Stop response" AutomationProperties.Name="Stop response">
-                                                            <StackPanel Orientation="Horizontal"><TextBlock Text="" FontFamily="Segoe Fluent Icons" FontSize="11" VerticalAlignment="Center" /><TextBlock Text="Stop" Margin="8,0,0,0" /></StackPanel>
-                                                        </Button>
-                                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                                            <Button x:Name="QCopyButton" Background="Transparent" BorderThickness="0" Click="QCopy_Click" Style="{StaticResource QResponseActionButton}" Margin="0,0,8,0" Visibility="{Binding QCanCopyResponse, Converter={StaticResource BoolToVisibility}}" ToolTip="Copy response" AutomationProperties.Name="Copy response">
-                                                                <StackPanel Orientation="Horizontal"><TextBlock Text="" FontFamily="Segoe Fluent Icons" FontSize="13" VerticalAlignment="Center" /><TextBlock Text="Copy" Margin="7,0,0,0" /></StackPanel>
-                                                            </Button>
-                                                            <Button Background="Transparent" BorderThickness="0" Click="QRetry_Click" Style="{StaticResource QResponseActionButton}" Visibility="{Binding QCanRetry, Converter={StaticResource BoolToVisibility}}" ToolTip="Retry question" AutomationProperties.Name="Retry question">
-                                                                <StackPanel Orientation="Horizontal"><TextBlock Text="" FontFamily="Segoe Fluent Icons" FontSize="13" VerticalAlignment="Center" /><TextBlock Text="Retry" Margin="7,0,0,0" /></StackPanel>
-                                                            </Button>
-                                                        </StackPanel>
-                                                    </Grid>
-                                                </Grid>
-                                            </Grid>
-                                        </Border>
+                                                <ScrollViewer x:Name="QQuickActions" Margin="0,14,0,0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Visibility="{Binding QShowConversationPrompts, Converter={StaticResource BoolToVisibility}}">
+                                                    <ItemsControl ItemsSource="{Binding QConversationPrompts}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Button Content="{Binding Name}" Tag="{Binding Prompt}" Click="QQuickAction_Click" Style="{StaticResource QCanvasPromptButton}" Margin="0,0,14,0" ToolTip="Run prompt"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                                                </ScrollViewer>
+                                            </StackPanel>
+                                        </Grid>
                                     </StackPanel>
                                 </ScrollViewer>
-                                <Button x:Name="QJumpToLatestButton" Content="" Click="QJumpToLatest_Click" Style="{StaticResource QCircleButton}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,12" Visibility="Collapsed" ToolTip="Jump to latest response" AutomationProperties.Name="Jump to latest response" />
+                                <Button x:Name="QJumpToLatestButton" Content="&#xE74B;" Click="QJumpToLatest_Click" Style="{StaticResource QCircleButton}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,12" Visibility="Collapsed" ToolTip="Jump to latest response" AutomationProperties.Name="Jump to latest response"/>
                             </Grid>
-
-                            <views:QComparisonView x:Name="QComparisonPanel" Grid.Row="1" Margin="0,12,0,8" Visibility="{Binding QShowComparison, Converter={StaticResource BoolToVisibility}}" />
-                            <ScrollViewer x:Name="QQuickActions" Grid.Row="2" Margin="8,0,0,8" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Visibility="{Binding QHasShortcuts, Converter={StaticResource BoolToVisibility}}">
-                                <ItemsControl ItemsSource="{Binding QShortcuts}">
-                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate><DataTemplate><Button Content="{Binding Name}" Tag="{Binding Prompt}" Click="QQuickAction_Click" Style="{StaticResource QHeaderControl}" Width="Auto" Height="30" FontFamily="Segoe UI Variable Text" FontSize="12" Padding="10,4" Margin="0,0,8,0" ToolTip="Run saved prompt" /></DataTemplate></ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
-                            <Grid Grid.Row="3">
-                                <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="22" /></Grid.RowDefinitions>
-                                <!-- Voice mode: Sutra Flow's dots stand in for the composer while the assistant listens, thinks, and speaks. -->
-                                <views:FlowDotMatrixView x:Name="QVoiceDots" MinHeight="88" Visibility="Collapsed" AutomationProperties.Name="Sutra Assistant voice" />
-                                <Border x:Name="QComposer" Background="{DynamicResource QControl}" BorderBrush="#FF4D465D" BorderThickness="1" CornerRadius="16" Padding="12,8">
-                                    <Grid>
-                                        <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="38" /></Grid.RowDefinitions>
-                                        <Grid>
-                                            <TextBox x:Name="QPromptBox" MinHeight="38" Style="{StaticResource QComposerTextBox}" Background="Transparent" BorderThickness="0" Padding="0" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" ToolTip="Enter to send; Shift + Enter for a new line" AutomationProperties.Name="Sutra Assistant prompt" TextChanged="QPromptBox_TextChanged" PreviewKeyDown="QPromptBox_KeyDown" />
-                                            <TextBlock x:Name="QPromptPlaceholder" Text="{Binding QComposerPlaceholder}" Margin="0" IsHitTestVisible="False" FontFamily="Segoe UI Variable Text" FontSize="13" Foreground="{DynamicResource QMuted}" VerticalAlignment="Center" />
+                            <views:QComparisonView x:Name="QComparisonPanel" Grid.Row="1" Margin="0,12,0,8" Visibility="{Binding QShowComparison, Converter={StaticResource BoolToVisibility}}"/>
+                            <Grid Grid.Row="2">
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <views:FlowDotMatrixView x:Name="QVoiceDots" Height="116" Visibility="Collapsed" AutomationProperties.Name="Sutra Assistant voice"/>
+                                <Border x:Name="QComposer" MinHeight="108" Background="{DynamicResource QControl}" BorderBrush="{DynamicResource QComposerBorderBrush}" BorderThickness="1" CornerRadius="18" Padding="18,12,12,10">
+                                    <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                        <Grid MinHeight="34" Margin="0,0,6,8">
+                                            <TextBox x:Name="QPromptBox" MinHeight="32" MaxHeight="120" Style="{StaticResource QComposerTextBox}" FontSize="15" Background="Transparent" BorderThickness="0" Padding="0" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" ToolTip="Enter to send; Shift + Enter for a new line" AutomationProperties.Name="Sutra Assistant prompt" TextChanged="QPromptBox_TextChanged" PreviewKeyDown="QPromptBox_KeyDown"/>
+                                            <TextBlock x:Name="QPromptPlaceholder" Text="{Binding QComposerPlaceholder}" IsHitTestVisible="False" FontFamily="Segoe UI Variable Text" FontSize="15" Foreground="{DynamicResource QMuted}" VerticalAlignment="Center"/>
                                         </Grid>
-                                        <DockPanel Grid.Row="1" LastChildFill="False">
-                                            <Button x:Name="QSendButton" DockPanel.Dock="Right" Content="" FontFamily="Segoe Fluent Icons" Click="QSend_Click" Style="{StaticResource QSendButton}" Width="34" MinWidth="34" Height="34" MinHeight="34" Padding="0" Margin="8,0,0,0" ToolTip="Send question" AutomationProperties.Name="Send question"><Button.Template><ControlTemplate TargetType="Button"><Border Background="{TemplateBinding Background}" CornerRadius="10"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></ControlTemplate></Button.Template></Button><CheckBox x:Name="UseScreenCheckBox" DockPanel.Dock="Right" Content="Use screen" IsChecked="{Binding QUseScreenNext, Mode=TwoWay}" Foreground="{DynamicResource QMuted}" Margin="10,0" FontSize="10.5" VerticalAlignment="Center" ToolTip="Capture the active window only for the next question" />
-                                            <Button DockPanel.Dock="Left" Content="" Click="QMic_Click" Style="{StaticResource QMicButton}" Width="38" Height="38" MinHeight="38" Background="Transparent" BorderThickness="0" IsEnabled="{Binding QSpeechAvailable}" ToolTip="Ask with your voice" AutomationProperties.Name="Ask with your voice" />
-                                            <Button DockPanel.Dock="Right" Content="{Binding QStopLabel}" Click="QStop_Click" Style="{StaticResource QStopButton}" Visibility="{Binding QCanStop, Converter={StaticResource BoolToVisibility}}" />
-                                            <ComboBox x:Name="QProviderSelector" Width="160" Height="32" VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource QSelectorComboBox}" Background="Transparent" BorderThickness="0" Padding="8,0,26,0" ItemsSource="{Binding QProviderOptions}" SelectedValuePath="Id" DisplayMemberPath="Name" Tag="{Binding QSelectedProviderLabel}" SelectedValue="{Binding QSelectedProvider, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding QCanChangeProvider}" DropDownClosed="QSelector_DropDownClosed" ToolTip="{Binding QSelectedProviderLabel}" AutomationProperties.Name="Sutra Assistant provider" />
-                                            <ComboBox x:Name="QModelSelector" Width="160" IsEditable="True" IsTextSearchEnabled="False" Text="{Binding QSelectedModel, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="32" VerticalAlignment="Center" Style="{StaticResource QSelectorComboBox}" Background="Transparent" BorderThickness="0" Padding="8,0,26,0" ItemsSource="{Binding QModelOptions}" SelectedItem="{Binding QSelectedModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding QCanChangeProvider}" DropDownClosed="QSelector_DropDownClosed" ToolTip="Select a model or enter its exact model ID" AutomationProperties.Name="Sutra Assistant model" />
-                                            <Button Command="{Binding RefreshQModelsCommand}" IsEnabled="{Binding QCanChangeProvider}" Content="" Style="{StaticResource QHeaderControl}" Width="28" Height="32" FontSize="12" ToolTip="{Binding QModelRefreshStatus}" AutomationProperties.Name="Refresh available models" />
-                                            <ComboBox x:Name="QEffortSelector" Width="80" Height="32" VerticalAlignment="Center" Margin="6,0,0,0" Style="{StaticResource QSelectorComboBox}" Background="Transparent" BorderThickness="0" Padding="8,0,26,0" ItemsSource="{Binding QReasoningEffortOptions}" SelectedItem="{Binding QReasoningEffort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding QCanChangeProvider}" DropDownClosed="QSelector_DropDownClosed" ToolTip="Reasoning effort for the selected model" AutomationProperties.Name="Reasoning effort" />
-                                        </DockPanel>
+                                        <Border Grid.Row="0" BorderBrush="{DynamicResource QBorder}" BorderThickness="0,0,0,1" Margin="0,0,6,0"/>
+                                        <Grid Grid.Row="1" Margin="0,10,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <WrapPanel VerticalAlignment="Center" Margin="-8,0,8,0">
+                                                <ComboBox x:Name="QProviderSelector" Width="105" Height="34" Style="{StaticResource QCanvasSelector}" ItemsSource="{Binding QProviderOptions}" SelectedValuePath="Id" DisplayMemberPath="Name" Tag="{Binding QCompactProviderLabel}" SelectedValue="{Binding QSelectedProvider, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding QCanChangeProvider}" DropDownClosed="QSelector_DropDownClosed" ToolTip="{Binding QSelectedProviderLabel}" AutomationProperties.Name="Sutra Assistant provider"/>
+                                                <Border Width="1" Height="20" Background="{DynamicResource QBorder}" Margin="4,0,12,0"/>
+                                                <ComboBox x:Name="QModelSelector" Width="184" Height="34" IsEditable="True" IsTextSearchEnabled="False" Text="{Binding QSelectedModel, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Style="{StaticResource QCanvasSelector}" ItemsSource="{Binding QModelOptions}" SelectedItem="{Binding QSelectedModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding QCanChangeProvider}" DropDownClosed="QSelector_DropDownClosed" ToolTip="Select a model or enter its exact model ID" AutomationProperties.Name="Sutra Assistant model"/>
+                                                <ComboBox x:Name="QEffortSelector" Width="100" Height="34" Style="{StaticResource QCanvasSelector}" ItemsSource="{Binding QReasoningEffortOptions}" SelectedItem="{Binding QReasoningEffort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Tag="{Binding QReasoningEffortLabel}" IsEnabled="{Binding QCanChangeProvider}" DropDownClosed="QSelector_DropDownClosed" ToolTip="Reasoning effort" AutomationProperties.Name="Reasoning effort"/>
+                                                <Border Width="1" Height="20" Background="{DynamicResource QBorder}" Margin="8,0,12,0"/>
+                                                <Button x:Name="QVoiceModeButton" Click="QMic_Click" Style="{StaticResource QCanvasResponseButton}" Height="34" IsEnabled="{Binding QSpeechAvailable}" ToolTip="Ask with your voice" AutomationProperties.Name="Ask with your voice"><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE720;" FontFamily="Segoe Fluent Icons" FontSize="18" Margin="0,0,8,0" VerticalAlignment="Center"/><TextBlock Text="Voice mode"/></StackPanel></Button>
+                                            </WrapPanel>
+                                            <CheckBox x:Name="UseScreenCheckBox" Grid.Column="1" Style="{StaticResource QScreenToggle}" Content="Use screen" IsChecked="{Binding QUseScreenNext, Mode=TwoWay}" Margin="0,0,14,0" VerticalAlignment="Center" ToolTip="Capture the active window only for the next question" AutomationProperties.Name="Use screen"/>
+                                            <Grid Grid.Column="2" Width="42" Height="42" VerticalAlignment="Center">
+                                                <Button x:Name="QSendButton" Content="&#xE74A;" FontFamily="Segoe Fluent Icons" Click="QSend_Click" Style="{StaticResource QCanvasSendButton}" ToolTip="Send question" AutomationProperties.Name="Send question"/>
+                                                <Button x:Name="QComposerStopButton" Content="&#xE71A;" FontFamily="Segoe Fluent Icons" Click="QStop_Click" Style="{StaticResource QCanvasStopButton}" ToolTip="Stop generation" AutomationProperties.Name="Stop generation"/>
+                                            </Grid>
+                                        </Grid>
                                     </Grid>
                                 </Border>
-                                <DockPanel Grid.Row="1" LastChildFill="True">
-
-                                    <TextBlock x:Name="VoiceStatusText" Text="{Binding VoiceStatus}" TextTrimming="CharacterEllipsis" ToolTip="{Binding VoiceStatus}" VerticalAlignment="Center" FontSize="10.5" Foreground="{DynamicResource QMuted}" />
-                                </DockPanel>
-
+                                <TextBlock x:Name="VoiceStatusText" Grid.Row="1" Text="{Binding VoiceStatus}" Visibility="{Binding VoiceBusy, Converter={StaticResource BoolToVisibility}}" FontSize="11" Foreground="{DynamicResource QMuted}" Margin="8,6,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding VoiceStatus}"/>
                             </Grid>
                         </Grid>
                     </Border>
@@ -1254,7 +1235,7 @@
 
                 <!-- Compact voice mode: the island itself becomes the Sutra Assistant voice orb (docs/voice-orb). -->
                 <views:CompactVoiceView x:Name="CompactVoice" Panel.ZIndex="480" Margin="-1"
-                                        State="{Binding CompactVoiceState}" Transcript="{Binding CompactVoiceTranscript}" Answer="{Binding CompactVoiceAnswer}"
+                                        IsSearching="{Binding QIsSearching}" SearchStatus="{Binding QSearchStatus}" SourceCount="{Binding QWebSourceCount}" State="{Binding CompactVoiceState}" Transcript="{Binding CompactVoiceTranscript}" Answer="{Binding CompactVoiceAnswer}"
                                         ActionFeedback="{Binding CompactVoiceAction}" ActionFromLevel="{Binding CompactVoiceActionFrom}" ErrorText="{Binding CompactVoiceError}"
                                         ReducedMotion="{Binding IsReducedMotion}" Palette="{Binding QThemePalette}" />
 
@@ -1270,7 +1251,7 @@
                     </Grid>
                 </Border>
             </Grid>
-        </Border>
+        </views:NotchBorder>
 
         <!-- Compact voice orb rim: a thin lavender line with a soft outer glow, outside the shell's clip. -->
         <Border x:Name="CompactVoiceRim" Panel.ZIndex="11" IsHitTestVisible="False" Visibility="Collapsed" Opacity="0"
@@ -1383,6 +1364,7 @@
                     <DropShadowEffect BlurRadius="13" ShadowDepth="2" Opacity="0.42" Color="#CC000000" />
                 </Border.Effect>
             </Border>
+            <Viewbox x:Name="TimerOrbRing" Margin="6" Stretch="Uniform"><Grid Width="38" Height="38">
             <Ellipse Width="38" Height="38" Stroke="{Binding AccentSoftBrush}" StrokeThickness="3" Opacity="0.72" />
             <Ellipse Width="38" Height="38" Stroke="{Binding AccentBrush}" StrokeThickness="3" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
                 <Ellipse.StrokeDashArray>
@@ -1395,6 +1377,7 @@
                     <RotateTransform Angle="-90" CenterX="19" CenterY="19" />
                 </Ellipse.RenderTransform>
             </Ellipse>
+            </Grid></Viewbox>
              <TextBlock Text="{Binding TimerOrbGlyph}" FontFamily="Segoe Fluent Icons" FontSize="14" Foreground="{Binding AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
         <TextBlock Text="{Binding TimerCountText}" HorizontalAlignment="Right" VerticalAlignment="Top" Foreground="{Binding AccentBrush}" FontWeight="Bold" FontSize="11" /></Grid>
 

@@ -21,13 +21,26 @@ namespace DynamicIsland.Windows.Views;
 /// </summary>
 public partial class CompactVoiceView : UserControl
 {
+    public static readonly DependencyProperty IsSearchingProperty = DependencyProperty.Register(nameof(IsSearching), typeof(bool), typeof(CompactVoiceView), new PropertyMetadata(false, (d, _) => { var v = (CompactVoiceView)d; if (v.SearchLayer is not null) v.ApplyState(v.State, v.State); }));
+    public static readonly DependencyProperty SearchStatusProperty = DependencyProperty.Register(nameof(SearchStatus), typeof(string), typeof(CompactVoiceView), new PropertyMetadata("", (d, _) => ((CompactVoiceView)d).UpdateSearchText()));
+    public static readonly DependencyProperty SourceCountProperty = DependencyProperty.Register(nameof(SourceCount), typeof(int), typeof(CompactVoiceView), new PropertyMetadata(0, (d, _) => ((CompactVoiceView)d).UpdateSearchText()));
+    public bool IsSearching { get => (bool)GetValue(IsSearchingProperty); set => SetValue(IsSearchingProperty, value); }
+    public string SearchStatus { get => (string)GetValue(SearchStatusProperty); set => SetValue(SearchStatusProperty, value); }
+    public int SourceCount { get => (int)GetValue(SourceCountProperty); set => SetValue(SourceCountProperty, value); }
+    private void UpdateSearchText()
+    {
+        if (SearchTitle is null) return;
+        SearchTitle.Text = string.IsNullOrWhiteSpace(SearchStatus) ? "Searching the web…" : SearchStatus;
+        SearchDetail.Text = SourceCount > 0 ? $"{SourceCount} source{(SourceCount == 1 ? "" : "s")} found" : "Finding sources…";
+        OpenInChatLink.Text = SourceCount > 0 ? $"{SourceCount} sources · Open in chat" : "Open in chat";
+    }
     public static readonly DependencyProperty StateProperty = DependencyProperty.Register(nameof(State), typeof(CompactVoiceState), typeof(CompactVoiceView), new PropertyMetadata(CompactVoiceState.Idle, (d, e) => ((CompactVoiceView)d).ApplyState((CompactVoiceState)e.OldValue, (CompactVoiceState)e.NewValue)));
     public static readonly DependencyProperty TranscriptProperty = DependencyProperty.Register(nameof(Transcript), typeof(string), typeof(CompactVoiceView), new PropertyMetadata("", (d, _) => ((CompactVoiceView)d).UpdateTranscript()));
     public static readonly DependencyProperty AnswerProperty = DependencyProperty.Register(nameof(Answer), typeof(string), typeof(CompactVoiceView), new PropertyMetadata("", (d, _) => ((CompactVoiceView)d).OnAnswerChanged()));
     public static readonly DependencyProperty ActionFeedbackProperty = DependencyProperty.Register(nameof(ActionFeedback), typeof(AssistantActionFeedback), typeof(CompactVoiceView), new PropertyMetadata(null, (d, _) => ((CompactVoiceView)d).OnActionChanged()));
     public static readonly DependencyProperty ActionFromLevelProperty = DependencyProperty.Register(nameof(ActionFromLevel), typeof(double?), typeof(CompactVoiceView), new PropertyMetadata(null));
     public static readonly DependencyProperty ErrorTextProperty = DependencyProperty.Register(nameof(ErrorText), typeof(string), typeof(CompactVoiceView), new PropertyMetadata("", (d, e) => ((CompactVoiceView)d).ErrorMessageText.Text = (string?)e.NewValue ?? ""));
-    public static readonly DependencyProperty ReducedMotionProperty = DependencyProperty.Register(nameof(ReducedMotion), typeof(bool), typeof(CompactVoiceView), new PropertyMetadata(false));
+    public static readonly DependencyProperty ReducedMotionProperty = DependencyProperty.Register(nameof(ReducedMotion), typeof(bool), typeof(CompactVoiceView), new PropertyMetadata(false, (d, _) => { var v = (CompactVoiceView)d; if (v.VoiceSearchGlobe is not null) { v.VoiceSearchGlobe.ReducedMotion = v.ReducedMotion; if (v.ReducedMotion) v.SearchShimmer.BeginAnimation(TranslateTransform.XProperty, null); } }));
     public static readonly DependencyProperty PaletteProperty = DependencyProperty.Register(nameof(Palette), typeof(ThemePalette), typeof(CompactVoiceView), new PropertyMetadata(ThemePalette.Dark, (d, _) => ((CompactVoiceView)d).RefreshTranscriptColor()));
     /// <summary>The compact island height the orb lays out against (the answer grows below it).</summary>
     public static readonly DependencyProperty BaseHeightProperty = DependencyProperty.Register(nameof(BaseHeight), typeof(double), typeof(CompactVoiceView), new PropertyMetadata(62d, (d, _) => ((CompactVoiceView)d).ApplyMetrics()));
@@ -108,6 +121,9 @@ public partial class CompactVoiceView : UserControl
         TextArea.Margin = new Thickness(textLeft, 0, Math.Round(40 * k), 0);
         ListenLayer.Height = ActionLayer.Height = ErrorLayer.Height = h;
         ListenLayer.Margin = new Thickness(0, 0, barsWidth + Math.Round(16 * k), 0);
+        SearchTitle.FontSize = Math.Max(11.5, 24 * k);
+        SearchDetail.FontSize = Math.Max(9, 16 * k);
+        SearchLayer.Height = h;
         var transcript = Math.Max(11.5, 24 * k);
         Placeholder.FontSize = TranscriptText.FontSize = ShimmerText.FontSize = transcript;
         var answer = Math.Max(11.5, 23 * k);
@@ -159,6 +175,7 @@ public partial class CompactVoiceView : UserControl
     private void ApplyState(CompactVoiceState from, CompactVoiceState to)
     {
         var motion = CompactVoiceMotion.For(to, ReducedMotion);
+        var searching = IsSearching && to == CompactVoiceState.Thinking;
         StopLoops();
         if (to == CompactVoiceState.Idle) { ResetToIdle(); return; }
         Visibility = Visibility.Visible;
@@ -188,7 +205,11 @@ public partial class CompactVoiceView : UserControl
         };
         ErrorDot.Visibility = to == CompactVoiceState.Error ? Visibility.Visible : Visibility.Collapsed;
 
-        var listen = to is CompactVoiceState.Wake or CompactVoiceState.Listening or CompactVoiceState.Thinking;
+        var listen = !searching && to is CompactVoiceState.Wake or CompactVoiceState.Listening or CompactVoiceState.Thinking;
+        Fade(SearchLayer, searching ? 1 : 0, fadeMs);
+        VoiceSearchGlobe.Active = searching; VoiceSearchGlobe.ReducedMotion = ReducedMotion;
+        UpdateSearchText();
+        if (searching && !ReducedMotion) SearchShimmer.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(1.3, -1.3, TimeSpan.FromSeconds(2.2)) { RepeatBehavior = RepeatBehavior.Forever });
         Fade(ListenLayer, listen ? 1 : 0, fadeMs);
         Fade(AnswerLayer, to == CompactVoiceState.Answer ? 1 : 0, fadeMs, to == CompactVoiceState.Answer && !ReducedMotion ? 120 : 0);
         Fade(ActionLayer, to == CompactVoiceState.Action ? 1 : 0, fadeMs);
@@ -206,14 +227,14 @@ public partial class CompactVoiceView : UserControl
 
         // Loops: each runs only in its state, and never with reduced motion.
         if (motion.Ripples) { StartRipple(Ripple1, Ripple1Scale, 0); StartRipple(Ripple2, Ripple2Scale, 550); }
-        if (motion.Orbit)
+        if (motion.Orbit && !searching)
         {
             OrbitBox.BeginAnimation(OpacityProperty, Anim(1, 200));
             OrbitAngle.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, 360, TimeSpan.FromMilliseconds(857)) { RepeatBehavior = RepeatBehavior.Forever });
         }
         if (motion.Bob)
             MascotShift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-2, 2, TimeSpan.FromMilliseconds(350)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
-        if (motion.Shimmer)
+        if (motion.Shimmer && !searching)
         {
             ShimmerText.BeginAnimation(OpacityProperty, Anim(1, 200));
             ShimmerShift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(-1, 1, TimeSpan.FromMilliseconds(900)) { RepeatBehavior = RepeatBehavior.Forever });
@@ -228,7 +249,7 @@ public partial class CompactVoiceView : UserControl
             }
             else AnswerGlow.BeginAnimation(OpacityProperty, Anim(0.7, fadeMs));
         }
-        HasLoopMotion = motion.Ripples || motion.Orbit || motion.Bob || motion.Shimmer || (to == CompactVoiceState.Answer && motion.Breathe);
+        HasLoopMotion = searching && !ReducedMotion || motion.Ripples || motion.Orbit || motion.Bob || motion.Shimmer || (to == CompactVoiceState.Answer && motion.Breathe);
     }
 
     private void Enter()
@@ -278,7 +299,8 @@ public partial class CompactVoiceView : UserControl
     private void ResetToIdle()
     {
         StopBarsTimer();
-        foreach (var element in new UIElement[] { Surface, MascotHost, ListenLayer, AnswerLayer, ActionLayer, ErrorLayer, Bars, AnswerGlow, Placeholder, OpenInChatLink })
+        VoiceSearchGlobe.Active = false;
+        foreach (var element in new UIElement[] { Surface, MascotHost, SearchLayer, ListenLayer, AnswerLayer, ActionLayer, ErrorLayer, Bars, AnswerGlow, Placeholder, OpenInChatLink })
         { element.BeginAnimation(OpacityProperty, null); element.Opacity = 0; }
         ListenLayer.Visibility = AnswerLayer.Visibility = ActionLayer.Visibility = ErrorLayer.Visibility = Bars.Visibility = Visibility.Collapsed;
         MascotScale.BeginAnimation(ScaleTransform.ScaleXProperty, null); MascotScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
@@ -309,6 +331,8 @@ public partial class CompactVoiceView : UserControl
         var glow = AnswerGlow.Opacity;
         AnswerGlow.BeginAnimation(OpacityProperty, null); AnswerGlow.Opacity = glow;
         if (State != CompactVoiceState.Answer) AnswerGlow.BeginAnimation(OpacityProperty, Anim(0, 200, from: glow));
+        SearchShimmer.BeginAnimation(TranslateTransform.XProperty, null);
+        VoiceSearchGlobe.Active = false;
         HasLoopMotion = false;
     }
 

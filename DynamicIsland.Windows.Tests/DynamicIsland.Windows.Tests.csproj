@@ -6,6 +6,11 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/MathReplyMarkup.cs" Link="MathReplyMarkup.cs" />
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/MathMarkupFormatter.cs" Link="MathMarkupFormatter.cs" />
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/ResponseTextFormatter.cs" Link="ResponseTextFormatter.cs" />
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/CommandPalette/WindowsLaunchCatalog.cs" Link="WindowsLaunchCatalog.cs" />
+    <Compile Include="../DynamicIsland.Windows/Infrastructure/OrderedBackgroundWork.cs" Link="OrderedBackgroundWork.cs" />
     <Compile Include="../DynamicIsland.Windows/Infrastructure/CommandPalette/GoogleSearch.cs" Link="GoogleSearch.cs" />
     <Compile Include="../DynamicIsland.Windows/Models/WakeVoiceProfile.cs" Link="WakeVoiceProfile.cs" />
     <Compile Include="../DynamicIsland.Windows/Services/Q/WakeDetectionPolicy.cs" Link="WakeDetectionPolicy.cs" />

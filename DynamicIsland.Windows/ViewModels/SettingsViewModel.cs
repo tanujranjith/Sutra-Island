@@ -225,6 +225,20 @@ public sealed partial class SettingsViewModel : ObservableObject
     public System.Windows.CornerRadius PreviewMiniCorner => new(ClampedIslandRadius * 0.5);
     public bool ScrollLongTitles { get => _settings.ScrollLongTitles; set { Set(v => _settings.ScrollLongTitles = v, value); _apply(); } }
     public AnimationIntensity AnimationIntensity { get => _settings.AnimationIntensity; set => Set(v => _settings.AnimationIntensity = v, value); }
+    public bool TopNotchMode
+    {
+        get => _settings.TopNotchMode;
+        set
+        {
+            if (_settings.TopNotchMode == value) return;
+            _settings.TopNotchMode = value;
+            RaisePropertyChanged();
+            RefreshPositionControls();
+            _apply();
+            _ = _settingsService.SaveAsync(_settings);
+        }
+    }
+    public bool CanAdjustFloatingPosition => !TopNotchMode;
     public PositionMode DefaultPosition
     {
         get => _settings.DefaultPosition;
@@ -243,7 +257,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     public int HorizontalOffsetMinimum => -HorizontalOffsetMaximum;
     public int VerticalOffsetMaximum => Math.Max(1000, System.Windows.Forms.Screen.AllScreens.Max(s => s.Bounds.Height));
     public int VerticalOffsetMinimum => -VerticalOffsetMaximum;
-    public string PositionOffsetHelp => "Offsets are relative to the preset: positive values move inward from the right/bottom edges, or right/down from the center. Zero reaches the edge. Bottom presets sit above the taskbar.";
+    public string PositionOffsetHelp => TopNotchMode ? "Mac notch mode stays attached to the physical top center of your chosen display. Switch it off to restore your floating position and offsets. Width and height still apply; the notch uses its own curved corners." : "For top presets, 0 places the visible island exactly at the physical screen top, even over a taskbar. Positive vertical values move it down. Right and bottom presets use inward offsets; bottom presets stay above the taskbar. Unlock the position to drag the expanded island.";
     public int SideOffset
     {
         get => _settings.SideOffset;
@@ -256,6 +270,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
     public void RefreshPositionControls()
     {
+        RaisePropertyChanged(nameof(CanAdjustFloatingPosition));
+        RaisePropertyChanged(nameof(PositionOffsetHelp));
         RaisePropertyChanged(nameof(DefaultPosition));
         RaisePropertyChanged(nameof(SideOffset));
         RaisePropertyChanged(nameof(TopOffset));
@@ -493,6 +509,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             Set(v => _settings.QSelectedModel = v.Trim(), value);
             NormalizeProviderEffort();
             RaisePropertyChanged(nameof(QReasoningEffortOptions));
+            RaisePropertyChanged(nameof(QWebSearchDescription));
             _apply();
         }
     }
@@ -524,12 +541,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         foreach (var property in new[] { nameof(QSelectedProvider), nameof(QModelOptions), nameof(QSelectedModel),
             nameof(QReasoningEffortOptions), nameof(QReasoningEffort), nameof(QApiKey), nameof(QApiKeyStatus),
-            nameof(QSavedKeyProviders), nameof(QIsCodexSelected), nameof(QShowApiKey) })
+            nameof(QSavedKeyProviders), nameof(QIsCodexSelected), nameof(QShowApiKey), nameof(QWebSearchDescription) })
             RaisePropertyChanged(property);
         QConnectionStatus = "Not tested";
     }
     public bool QIsCodexSelected => string.Equals(_settings.QSelectedProvider, "codex", StringComparison.OrdinalIgnoreCase);
-    public bool QShowApiKey => !QIsCodexSelected && !string.Equals(_settings.QSelectedProvider, "ollama", StringComparison.OrdinalIgnoreCase);
+    public bool QShowApiKey => !QIsCodexSelected;
+    public bool QWebSearchEnabled { get => _settings.QWebSearchEnabled; set { Set(v => _settings.QWebSearchEnabled = v, value); _apply(); } }
+    public string QWebSearchDescription => QWebSearch.Description(_settings.QSelectedProvider, _settings.QSelectedModel);
     private CodexModel? SelectedCodexModel => _codexModels.FirstOrDefault(model => string.Equals(model.Id, _settings.QSelectedModel, StringComparison.OrdinalIgnoreCase));
     public IReadOnlyList<string> QModelOptions => QIsCodexSelected && _codexModels.Count > 0
         ? _codexModels.Select(model => model.Id).ToArray()

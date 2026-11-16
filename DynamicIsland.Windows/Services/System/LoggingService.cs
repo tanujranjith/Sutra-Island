@@ -4,7 +4,8 @@ namespace DynamicIsland.Windows.Services;
 
 public sealed class LoggingService
 {
-    private readonly object _gate = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Infrastructure.OrderedBackgroundWork> Writers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Infrastructure.OrderedBackgroundWork _writes;
     private readonly string _logPath;
     private bool _debugEnabled;
 
@@ -13,6 +14,7 @@ public sealed class LoggingService
         var directory = Path.Combine(DynamicIsland.Windows.Infrastructure.AppDataPaths.Root, "logs");
         Directory.CreateDirectory(directory);
         _logPath = Path.Combine(directory, "dynamic-island.log");
+        _writes = Writers.GetOrAdd(_logPath, _ => new());
     }
 
     public string LogPath => _logPath;
@@ -24,18 +26,22 @@ public sealed class LoggingService
 
     private void Write(string level, string message)
     {
-        lock (_gate)
+        // Preserve event time and ordering without making input or audio callbacks wait for disk.
+        var sanitized = message.Replace('\r', ' ').Replace('\n', ' ');
+        var line = $"{DateTimeOffset.Now:O} [{level}] {sanitized}{Environment.NewLine}";
+        _writes.Enqueue(() =>
         {
             try
             {
                 RotateIfNeeded();
-                var sanitized = message.Replace('\r', ' ').Replace('\n', ' ');
-                File.AppendAllText(_logPath,
-                    $"{DateTimeOffset.Now:O} [{level}] {sanitized}{Environment.NewLine}", Encoding.UTF8);
+                File.AppendAllText(_logPath, line, Encoding.UTF8);
             }
             catch { }
-        }
+            return Task.CompletedTask;
+        });
     }
+
+    public Task FlushAsync() => _writes.FlushAsync();
 
     private void RotateIfNeeded()
     {

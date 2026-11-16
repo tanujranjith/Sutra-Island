@@ -46,12 +46,13 @@ public sealed class GeminiQProvider(HttpClient? httpClient = null) : HttpQProvid
         var generationConfig = new Dictionary<string, object?> { ["maxOutputTokens"] = request.MaxResponseTokens };
         var effort = QProviderPolicy.NormalizeEffort(Info.Id, request.Model, request.ReasoningEffort);
         if (effort != "auto") generationConfig["thinkingConfig"] = new { thinkingLevel = effort };
-        var body = new
+        var body = new Dictionary<string, object?>
         {
-            systemInstruction = new { parts = new[] { new { text = QPromptComposer.SystemPrompt(request) } } },
-            contents = Contents(request),
-            generationConfig
+            ["systemInstruction"] = new { parts = new[] { new { text = QPromptComposer.SystemPrompt(request) } } },
+            ["contents"] = Contents(request),
+            ["generationConfig"] = generationConfig
         };
+        if (request.WebSearch) body["tools"] = new[] { new { googleSearch = new { } } };
         var endpoint = Endpoint(baseUrl, Info.DefaultBaseUrl!, $"/v1beta/models/{Uri.EscapeDataString(request.Model)}:streamGenerateContent?alt=sse");
         using var message = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = Json(body) };
         message.Headers.TryAddWithoutValidation("x-goog-api-key", credential);
@@ -59,6 +60,7 @@ public sealed class GeminiQProvider(HttpClient? httpClient = null) : HttpQProvid
         using var response = await Http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, Info.DisplayName, cancellationToken).ConfigureAwait(false);
         yield return new QStreamEvent.Started();
+        if (request.WebSearch) yield return new QStreamEvent.Search(true, "Checking web sources…", false);
 
         var sawText = false;
         await foreach (var data in SseDataAsync(response, cancellationToken).ConfigureAwait(false))
@@ -82,6 +84,24 @@ public sealed class GeminiQProvider(HttpClient? httpClient = null) : HttpQProvid
             if (!root.TryGetProperty("candidates", out var candidates) || candidates.ValueKind != JsonValueKind.Array) continue;
             foreach (var candidate in candidates.EnumerateArray())
             {
+                if (request.WebSearch && candidate.TryGetProperty("groundingMetadata", out var grounding))
+                {
+                    yield return new QStreamEvent.Search(false);
+                    foreach (var source in QWebSearch.ReadSources(grounding)) yield return new QStreamEvent.Source(source);
+                    if (grounding.TryGetProperty("groundingChunks", out var chunks) && chunks.ValueKind == JsonValueKind.Array &&
+                        grounding.TryGetProperty("groundingSupports", out var supports) && supports.ValueKind == JsonValueKind.Array)
+                        foreach (var support in supports.EnumerateArray())
+                        {
+                            var cited = support.TryGetProperty("segment", out var segment) ? ProviderJson.String(segment, "text") : "";
+                            if (!support.TryGetProperty("groundingChunkIndices", out var indices) || indices.ValueKind != JsonValueKind.Array) continue;
+                            foreach (var index in indices.EnumerateArray())
+                                if (index.TryGetInt32(out var n) && n >= 0 && n < chunks.GetArrayLength())
+                                    foreach (var source in QWebSearch.ReadSources(chunks[n]))
+                                        yield return new QStreamEvent.Source(source with { CitedText = cited.Length > 0 ? cited : null });
+                        }
+                    if (grounding.TryGetProperty("searchEntryPoint", out var entry) && ProviderJson.String(entry, "renderedContent") is { Length: > 0 } html)
+                        yield return new QStreamEvent.SearchSuggestions(html);
+                }
                 var finishReason = ProviderJson.String(candidate, "finishReason");
                 if (finishReason.Length > 0 && finishReason is not ("STOP" or "MAX_TOKENS"))
                 {

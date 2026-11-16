@@ -213,6 +213,8 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
             // Start closing the palette immediately. Persisting command recents must not hold the
             // assistant surface behind the palette while the settings file is written.
             if (result.Close) CloseRequested?.Invoke(this, EventArgs.Empty);
+            // Present the requested controls before waiting for command-history persistence.
+            if (result.Panel != PalettePanel.None) OpenPanel(result.Panel);
             if (rememberCommand && _save is not null) await _save();
             if (result.ShowAllCommands)
             {
@@ -223,7 +225,6 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
             }
             if (result.Panel != PalettePanel.None)
             {
-                OpenPanel(result.Panel);
                 return;
             }
             if (result.Close)

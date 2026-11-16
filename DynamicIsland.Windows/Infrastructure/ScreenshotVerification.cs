@@ -30,7 +30,11 @@ internal static class ScreenshotVerification
             preview.SetImage(image);
             preview.SetMode(CaptureOverlay.RegionMode);
             var clipboard=ScreenshotPreview.ClipboardData(image);
-            Check(clipboard.GetImage() is not null && clipboard.GetData("CanUploadToCloudClipboard") is System.IO.MemoryStream { Length:4 } && clipboard.GetData("CanIncludeInClipboardHistory") is System.IO.MemoryStream { Length:4 },"Screenshot clipboard data includes image pixels and excludes Windows cloud sync/history");
+            Check(clipboard.GetImage() is not null && clipboard.GetData("PNG") is MemoryStream {Length: > 8} && clipboard.GetData(System.Windows.DataFormats.Dib) is MemoryStream {Length: > 40}, "Screenshot clipboard publishes Bitmap, PNG and DIB for Windows apps, browsers and chat editors");
+            Check(clipboard.GetData("CanUploadToCloudClipboard") is MemoryStream cloud && BitConverter.ToInt32(cloud.ToArray()) == 0
+                && clipboard.GetData("CanIncludeInClipboardHistory") is MemoryStream local && BitConverter.ToInt32(local.ToArray()) == 1,
+                "Screenshot copies opt into local Windows clipboard history while disabling cloud upload");
+            await VerifySystemClipboardAsync(image, Check);
             preview.Present(new Rect(100,10,180,40),new Rect(0,0,1200,800),false);
             var deadline=DateTime.UtcNow.AddSeconds(4);
             while(preview.RevealProgress<1 && DateTime.UtcNow<deadline)await Task.Delay(20);
@@ -115,6 +119,52 @@ internal static class ScreenshotVerification
         }
         await VerifyOverlayDirtyRenderingAsync(Check);
         var directory=System.IO.Path.Combine(AppDataPaths.Root,"captures");System.IO.Directory.CreateDirectory(directory);System.IO.File.WriteAllLines(System.IO.Path.Combine(directory,"screenshot-checks.txt"),report);
+    }
+
+    private static async Task VerifySystemClipboardAsync(BitmapSource image, Action<bool, string> check)
+    {
+        var original = System.Windows.Clipboard.GetDataObject();
+        var saved = new System.Windows.DataObject();
+        if (original is not null)
+            foreach (var format in original.GetFormats(false))
+            {
+                try
+                {
+                    var value = original.GetData(format, false);
+                    if (value is MemoryStream stream) value = new MemoryStream(stream.ToArray());
+                    if (value is not null) saved.SetData(format, value, false);
+                }
+                catch (Exception) { }
+            }
+        var actual = new ScreenshotPreview(_ => { }) { Opacity = 0, ShowActivated = false };
+        try
+        {
+            actual.SetImage(image);
+            check(await actual.CopyAsync(), "The production clipboard writer successfully copies a screenshot to Windows");
+            actual.Close();
+            var pasted = System.Windows.Clipboard.GetImage();
+            check(pasted is not null && pasted.PixelWidth == image.PixelWidth && pasted.PixelHeight == image.PixelHeight,
+                "Screenshot pixels remain pasteable from the system clipboard after its preview closes");
+            var data = System.Windows.Clipboard.GetDataObject();
+            check(data?.GetDataPresent("PNG", false) == true && data.GetDataPresent(System.Windows.DataFormats.Dib, false),
+                "The real system clipboard retains PNG and DIB image formats after OLE flush");
+            if (data!.GetData("PNG", false) is MemoryStream png)
+            {
+                var decoded = ScreenshotTool.Decode(png.ToArray());
+                check(decoded.PixelWidth == image.PixelWidth && decoded.PixelHeight == image.PixelHeight,
+                    "The system clipboard PNG stream decodes to the captured image dimensions");
+            }
+            else check(false, "The system clipboard exposes real PNG image bytes");
+        }
+        finally
+        {
+            if (actual.IsLoaded) actual.Close();
+            for (var attempt = 0; attempt < 5; attempt++)
+            {
+                try { System.Windows.Clipboard.SetDataObject(saved, true); break; }
+                catch (System.Runtime.InteropServices.COMException) when (attempt < 4) { await Task.Delay(60); }
+            }
+        }
     }
 
     private static async Task VerifyOverlayDirtyRenderingAsync(Action<bool,string> check)

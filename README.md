@@ -21,6 +21,12 @@ The screenshots show the current native interface with illustrative verification
 - **Wake phrase training:** record five local “Hey Sutra” examples under Settings → Sutra Assistant. Matching examples are kept during training while you repeat any outliers. Training works with the installed Whisper model or Windows speech fallback; recordings are never saved. After training, say the phrase, pause for the listening dots, then ask your question.
 - **Screenshot history:** copied captures appear in Island clipboard history for the current app session. Choose whether to retain them and the capture limit under Settings → Advanced.
 
+## Open Windows apps and Settings
+
+In the command palette (`Ctrl+Alt+K`) or Sutra Assistant, type or say `open Notepad`, `launch Calculator`, or `open Visual Studio Code`. Desktop and Microsoft Store apps are discovered from Windows. Use `apps` to list installed apps, or `apps Microsoft` to filter them. Ambiguous names ask for a full app name.
+
+Use `open settings` for Windows Settings, `open Bluetooth settings`, `open display settings`, or `windows settings sound` for a specific page. `island settings` opens Sutra Island's preferences. These commands work locally without an AI provider; launch receipts report the request sent to Windows. Only installed app names and supported Settings destinations are accepted.
+
 ## Sutra Flow dictation
 
 Hold **Right Ctrl**, speak, and let go: clean text is pasted wherever your cursor is. While you talk, the island keeps its size and its content dissolves into a dot-matrix voice display; it shimmers while polishing and draws a check when the text lands.

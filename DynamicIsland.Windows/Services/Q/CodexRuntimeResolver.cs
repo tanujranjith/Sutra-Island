@@ -72,7 +72,8 @@ public sealed class CodexRuntimeResolver
                     throw new InvalidDataException($"Bundled Codex file '{fileName}' has an invalid checksum.");
                 var path = Path.Combine(directory, fileName);
                 if (!File.Exists(path)) throw new InvalidDataException($"Bundled Codex file '{fileName}' is missing.");
-                var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
+                using var executableStream = File.OpenRead(path);
+                var hash = Convert.ToHexString(SHA256.HashData(executableStream));
                 if (!hash.Equals(file.Sha256, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException($"Bundled Codex file '{fileName}' failed verification.");
             }

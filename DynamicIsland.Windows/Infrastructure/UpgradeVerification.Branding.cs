@@ -20,8 +20,8 @@ internal static partial class UpgradeVerification
         check(app.FindResource("SutraIslandLogo") is BitmapSource { PixelWidth: 256 }
             && app.FindResource("SutraAssistantLogo") is BitmapSource { PixelWidth: 256 },
             "Both supplied logos load from the published app as shared decoded image resources");
-        check(window.FindName("AssistantBrandLogo") is null && ((TextBlock)window.FindName("AssistantBrandTitle")).Margin.Left == 0,
-            "Assistant header shows the Sutra Assistant title without a mascot icon");
+        check(window.FindName("AssistantBrandLogo") is SutraMascotView && ((TextBlock)window.FindName("AssistantBrandTitle")).Margin.Left > 0,
+            "Assistant header keeps the original Sutra mascot beside its title");
         check(window.FindName("QResponseMascot") is SutraMascotView { ShowThinkingBulb: true },
             "Assistant response row keeps the mascot and its floating lightbulb");
         using (var trayIcon = (System.Drawing.Icon)typeof(TrayService).GetMethod("CreateIcon", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, null)!)
@@ -47,10 +47,10 @@ internal static partial class UpgradeVerification
             window.Show(); await Layout();
             var providerSelector = (ComboBox)window.FindName("QProviderSelector"); providerSelector.ApplyTemplate();
             var providerLabel = (TextBlock)providerSelector.Template.FindName("SelectedLabel", providerSelector);
-            check(providerLabel.Text == vm.QSelectedProviderLabel && !string.IsNullOrWhiteSpace(providerLabel.Text), "Provider selector displays its saved provider identity");
+            check(providerLabel.Text == vm.QCompactProviderLabel && !string.IsNullOrWhiteSpace(providerLabel.Text), "Provider selector displays its saved provider identity");
             var selectedProvider = vm.Settings.QSelectedProvider;
             providerSelector.SelectedIndex = -1; await Layout();
-            check(vm.Settings.QSelectedProvider == selectedProvider && providerLabel.Text == vm.QSelectedProviderLabel, "Transient empty dropdown selection cannot erase the saved provider label");
+            check(vm.Settings.QSelectedProvider == selectedProvider && providerLabel.Text == vm.QCompactProviderLabel, "Transient empty dropdown selection cannot erase the saved provider label");
             providerSelector.GetBindingExpression(ComboBox.SelectedValueProperty)!.UpdateTarget();
             providerSelector.SetCurrentValue(FrameworkElement.TagProperty, "Codex · Subscription"); await Layout();
             check(providerLabel.Text == "Codex · Subscription", "Codex subscription identity is visible in the closed provider selector");

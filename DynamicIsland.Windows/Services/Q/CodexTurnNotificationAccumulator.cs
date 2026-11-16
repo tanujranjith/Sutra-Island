@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace DynamicIsland.Windows.Services.Q;
 
-internal enum CodexTurnUpdateKind { Text, Completed, Failed }
+internal enum CodexTurnUpdateKind { Text, Completed, Failed, Searching, SearchCompleted }
 
 internal sealed record CodexTurnUpdate(CodexTurnUpdateKind Kind, string? Value = null);
 
@@ -19,6 +19,9 @@ internal sealed class CodexTurnNotificationAccumulator(string threadId)
         var parameters = message.TryGetProperty("params", out var value) ? value : default;
         var messageThreadId = String(parameters, "threadId");
         if (messageThreadId is not null && !string.Equals(messageThreadId, threadId, StringComparison.Ordinal)) return null;
+
+        if (method is "item/started" or "item/completed" && parameters.ValueKind == JsonValueKind.Object && parameters.TryGetProperty("item", out var searchItem) && String(searchItem, "type") == "webSearch")
+            return new CodexTurnUpdate(method == "item/started" ? CodexTurnUpdateKind.Searching : CodexTurnUpdateKind.SearchCompleted);
 
         if (method == "item/agentMessage/delta")
         {

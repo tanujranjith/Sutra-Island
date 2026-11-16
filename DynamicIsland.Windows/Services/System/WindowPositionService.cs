@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Windows;
+using System.Windows.Threading;
 using System.Windows.Interop;
 using DynamicIsland.Windows.Infrastructure;
 using DynamicIsland.Windows.Interop;
@@ -81,6 +83,8 @@ public sealed class WindowPositionService
     }
 
     private readonly Dictionary<Window, (double Width, double Height)> _visibleSizes = [];
+    private readonly Dictionary<Window, bool> _notchModes = [];
+    private readonly Dictionary<Window, (DispatcherTimer Timer, int X, int Y, int Width, int Height)> _anchorMotions = [];
 
     public void PositionInitial(Window window, AppSettings settings, double? visiblePillWidthDip = null, double? visiblePillHeightDip = null)
     {
@@ -107,28 +111,57 @@ public sealed class WindowPositionService
         if (handle == nint.Zero) return;
         var screen = SelectScreen(settings);
         var scale = Math.Max(96u, NativeMethods.GetDpiForWindow(handle)) / 96d;
-        var area = screen.WorkingArea;
-        var horizontal = settings.DefaultPosition switch
+        var horizontal = settings.TopNotchMode ? 1 : settings.DefaultPosition switch
         {
             PositionMode.TopLeft or PositionMode.MiddleLeft or PositionMode.BottomLeft => 0,
             PositionMode.TopRight or PositionMode.MiddleRight or PositionMode.BottomRight => 2,
             _ => 1
         };
-        var vertical = settings.DefaultPosition switch
+        var vertical = settings.TopNotchMode ? 0 : settings.DefaultPosition switch
         {
             PositionMode.MiddleLeft or PositionMode.Center or PositionMode.MiddleRight => 1,
             PositionMode.BottomLeft or PositionMode.BottomCenter or PositionMode.BottomRight => 2,
             _ => 0
         };
-        var manual = settings.DefaultPosition == PositionMode.Manual;
+        var manual = !settings.TopNotchMode && settings.DefaultPosition == PositionMode.Manual;
+        // A top offset of zero means the visible pill touches the physical screen
+        // edge, including space occupied by the taskbar or other desktop toolbars.
+        var area = vertical == 0 || manual ? screen.Bounds : screen.WorkingArea;
         var position = IslandPlacement.Place(area.Left, area.Top, area.Width, area.Height,
             widthDip * scale, visibleWidth * scale, visibleHeight * scale, 8 * scale,
-            horizontal, vertical, settings.SideOffset * scale, settings.TopOffset * scale,
+            horizontal, vertical, settings.TopNotchMode ? 0 : settings.SideOffset * scale, settings.TopNotchMode ? 0 : settings.TopOffset * scale,
             manual ? settings.ManualLeftPixels : null, manual ? settings.ManualTopPixels : null);
         var x = (int)Math.Round(position.X);
         var y = (int)Math.Round(position.Y);
         var width = (int)Math.Round(widthDip * scale);
         var height = (int)Math.Round(heightDip * scale);
+        var modeChanged = _notchModes.TryGetValue(window, out var priorMode) && priorMode != settings.TopNotchMode;
+        _notchModes[window] = settings.TopNotchMode;
+        if (_anchorMotions.TryGetValue(window, out var motion))
+        {
+            if (!modeChanged && motion.X == x && motion.Y == y && motion.Width == width && motion.Height == height) return;
+            motion.Timer.Stop();
+            _anchorMotions.Remove(window);
+        }
+        if (modeChanged && settings.AnimationIntensity != AnimationIntensity.Reduced && window.IsVisible
+            && NativeMethods.GetWindowRect(handle, out var origin))
+        {
+            var watch = Stopwatch.StartNew();
+            var timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(16) };
+            _anchorMotions[window] = (timer, x, y, width, height);
+            timer.Tick += (_, _) =>
+            {
+                var p = Math.Clamp(watch.Elapsed.TotalMilliseconds / 380d, 0, 1);
+                var eased = p * p * (3 - 2 * p);
+                NativeMethods.SetWindowPos(handle, nint.Zero,
+                    (int)Math.Round(origin.Left + (x - origin.Left) * eased),
+                    (int)Math.Round(origin.Top + (y - origin.Top) * eased), width, height,
+                    NativeMethods.SwpNoActivate | NativeMethods.SwpNoZOrder);
+                if (p >= 1) { timer.Stop(); _anchorMotions.Remove(window); }
+            };
+            timer.Start();
+            return;
+        }
         if (NativeMethods.GetWindowRect(handle, out var current)
             && current.Left == x && current.Top == y && current.Width == width && current.Height == height)
             return;
@@ -183,7 +216,7 @@ public sealed class WindowPositionService
             if (pref is not null) return pref;
         }
 
-        if (!string.IsNullOrWhiteSpace(settings.ManualMonitorDeviceName))
+        if (!settings.TopNotchMode && settings.DefaultPosition == PositionMode.Manual && !string.IsNullOrWhiteSpace(settings.ManualMonitorDeviceName))
         {
             var match = Forms.Screen.AllScreens.FirstOrDefault(
                 s => string.Equals(s.DeviceName, settings.ManualMonitorDeviceName, StringComparison.OrdinalIgnoreCase));

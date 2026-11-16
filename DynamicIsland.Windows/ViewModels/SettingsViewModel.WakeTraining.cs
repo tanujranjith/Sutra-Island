@@ -24,6 +24,7 @@ public sealed partial class SettingsViewModel
         set => Set(v => _settings.WakeRequireTraining = v, value);
     }
     public bool IsWakeTraining => _wakeTrainingCancellation is not null;
+    public bool WakeTrainingComplete => !IsWakeTraining && _settings.WakeVoiceProfile?.IsValid == true && (string.IsNullOrEmpty(_wakeTrainingStatus) || _wakeTrainingStatus.StartsWith("Training complete.", StringComparison.Ordinal));
     public string WakeTrainingStatus => string.IsNullOrEmpty(_wakeTrainingStatus)
         ? _settings.WakeVoiceProfile?.IsValid == true
             ? $"Trained with {_settings.WakeVoiceProfile.SampleCount} examples. You can retrain if your microphone or surroundings change."
@@ -54,6 +55,7 @@ public sealed partial class SettingsViewModel
     private void RefreshWakeTraining()
     {
         RaisePropertyChanged(nameof(IsWakeTraining));
+        RaisePropertyChanged(nameof(WakeTrainingComplete));
         RaisePropertyChanged(nameof(WakeTrainingStatus));
         TrainWakeCommand.RaiseCanExecuteChanged();
         CancelWakeTrainingCommand.RaiseCanExecuteChanged();

@@ -38,8 +38,10 @@ public sealed class CommandRunner(
     ICommandPaletteHost host,
     IPaletteSeekControl? seekControl = null,
     IPaletteClipboard? clipboard = null,
-    IPaletteOutputControl? outputs = null)
+    IPaletteOutputControl? outputs = null,
+    IWindowsLauncher? windowsLauncher = null)
 {
+    private readonly IWindowsLauncher _windowsLauncher = windowsLauncher ?? new WindowsLauncher();
     public IPaletteAudioControl Audio => audio;
     public IPaletteSeekControl Seek => seekControl ?? media;
     public IslandViewModel Island => island;
@@ -74,6 +76,18 @@ public sealed class CommandRunner(
         var argument = match.Argument;
         switch (match.Command.Id)
         {
+            case PaletteCommand.OpenApp:
+            case PaletteCommand.OpenWindowsSettings:
+            case PaletteCommand.ListApps:
+            {
+                var launched = match.Command.Id switch
+                {
+                    PaletteCommand.OpenApp => await _windowsLauncher.OpenAppAsync(argument),
+                    PaletteCommand.OpenWindowsSettings => await _windowsLauncher.OpenSettingsAsync(argument),
+                    _ => await _windowsLauncher.ListAppsAsync(argument)
+                };
+                return new(Close: launched.Success && match.Command.Id != PaletteCommand.ListApps, Message: launched.Message, IsError: !launched.Success);
+            }
             case PaletteCommand.GoogleSearch:
                 if (!island.Settings.GoogleSearchEnabled) return Fail("Google search is disabled in Settings.");
                 if (string.IsNullOrWhiteSpace(argument) && !island.Settings.GoogleSearchOpenHomepageWhenEmpty)

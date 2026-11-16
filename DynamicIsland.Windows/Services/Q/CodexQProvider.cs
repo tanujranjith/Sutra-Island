@@ -22,14 +22,17 @@ public sealed class CodexQProvider(CodexAppServerClient client) : IQProvider
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var text = BuildPrompt(request);
+        if (request.WebSearch) text += "\nWhen current information is needed, use web search and cite sources as readable Markdown links with actual source URLs. Do not emit opaque citation reference IDs.";
+        var answer = new System.Text.StringBuilder();
         yield return new QStreamEvent.Started();
         var sawText = false;
-        await foreach (var delta in client.StreamTurnAsync(request.Model, request.ReasoningEffort, text,
-            request.IncludeImage ? request.ScreenContext?.PngBytes : null, cancellationToken).ConfigureAwait(false))
+        await foreach (var delta in client.StreamSearchTurnAsync(request.Model, request.ReasoningEffort, text,
+            request.IncludeImage ? request.ScreenContext?.PngBytes : null, request.WebSearch, cancellationToken).ConfigureAwait(false))
         {
-            sawText = true;
-            yield return new QStreamEvent.Text(delta);
+            if (delta is QStreamEvent.Text chunk) { sawText = true; answer.Append(chunk.Value); }
+            yield return delta;
         }
+        if (request.WebSearch) foreach (var source in QWebSearch.MarkdownSources(answer.ToString())) yield return new QStreamEvent.Source(source);
         if (sawText) yield return new QStreamEvent.Completed();
         else yield return new QStreamEvent.Failed("Codex returned no answer.");
     }

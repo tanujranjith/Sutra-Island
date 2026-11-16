@@ -310,9 +310,20 @@ internal sealed class ScreenshotPreview : Window
     }
     internal static System.Windows.DataObject ClipboardData(BitmapSource image)
     {
-        var data=new System.Windows.DataObject();data.SetImage(image);
-        data.SetData("CanIncludeInClipboardHistory",new MemoryStream(new byte[4]));
-        data.SetData("CanUploadToCloudClipboard",new MemoryStream(new byte[4]));
+        var data = new System.Windows.DataObject();
+        data.SetImage(image);
+        // Browsers and chat editors commonly request PNG, while Windows apps use DIB/Bitmap.
+        // Publish actual image bytes in both formats rather than relying on WPF auto-conversion.
+        var png = new PngBitmapEncoder(); png.Frames.Add(BitmapFrame.Create(image));
+        var pngBytes = new MemoryStream(); png.Save(pngBytes); pngBytes.Position = 0;
+        data.SetData("PNG", pngBytes, false);
+        var opaque = new FormatConvertedBitmap(image, PixelFormats.Bgr24, null, 0);
+        var bmp = new BmpBitmapEncoder(); bmp.Frames.Add(BitmapFrame.Create(opaque));
+        using var bitmapBytes = new MemoryStream(); bmp.Save(bitmapBytes);
+        data.SetData(System.Windows.DataFormats.Dib, new MemoryStream(bitmapBytes.ToArray()[14..]), false);
+        // Keep captures available in local Win+V history while excluding cloud clipboard upload.
+        data.SetData("CanIncludeInClipboardHistory", new MemoryStream(BitConverter.GetBytes(1)));
+        data.SetData("CanUploadToCloudClipboard", new MemoryStream(new byte[4]));
         return data;
     }
     private static void CopyLocal(BitmapSource image)=>System.Windows.Clipboard.SetDataObject(ClipboardData(image),true);

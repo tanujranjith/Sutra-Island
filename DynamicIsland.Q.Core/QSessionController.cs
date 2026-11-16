@@ -36,7 +36,7 @@ public sealed class QSessionController(IQProviderRegistry providers) : IQSession
     public async Task SubmitAsync(string prompt, QMode mode, string providerId, string model, string? credential, string? baseUrl,
         bool includeImage, Func<CancellationToken, Task<QScreenContext?>>? recapture = null,
         CancellationToken cancellationToken = default, int maxResponseTokens = 8192, string? customSystemPrompt = null,
-        string reasoningEffort = "auto", QContextPolicy contextPolicy = QContextPolicy.Existing)
+        string reasoningEffort = "auto", QContextPolicy contextPolicy = QContextPolicy.Existing, bool webSearch = false)
     {
         if (string.IsNullOrWhiteSpace(prompt)) return;
         Cancel();
@@ -66,11 +66,11 @@ public sealed class QSessionController(IQProviderRegistry providers) : IQSession
                 while (_history.Count > 8) _history.RemoveAt(0);
             }
             Emit(Snapshot with { State = QRunState.Complete, Prompt = prompt, Mode = mode, Context = context,
-                ProviderId = providerId, Model = model, Response = answer, Status = "Complete", Error = null });
+                ProviderId = providerId, Model = model, Response = answer, IsSearching = false, Status = "Complete", Error = null });
         }
         try
         {
-            Emit(Snapshot with { Action = null });
+            Emit(Snapshot with { Action = null, IsSearching = false, SearchUsed = false, Sources = null, SearchNotice = null, SearchSuggestionsHtml = null });
             var controls = mode == QMode.Ask && contextPolicy == QContextPolicy.None ? _controls : null;
             if (controls is not null && controls.CanHandleDirect(prompt))
             {
@@ -95,21 +95,39 @@ public sealed class QSessionController(IQProviderRegistry providers) : IQSession
             lock (_gate) history = _history.ToArray();
             var request = new QRequest(mode, prompt, context, history, model,
                 includeImage && context?.HasImage == true && provider.Info.Capabilities.HasFlag(QProviderCapabilities.Images),
-                Math.Clamp(maxResponseTokens, 2048, 32768), customSystemPrompt, reasoningEffort, controls?.Instructions);
+                Math.Clamp(maxResponseTokens, 2048, 32768), customSystemPrompt, reasoningEffort, controls?.Instructions, webSearch && QWebSearch.Supports(providerId, model));
             var response = new System.Text.StringBuilder();
+            if (webSearch && !QWebSearch.Supports(providerId, model))
+                Emit(Snapshot with { SearchNotice = QWebSearch.Description(providerId, model) });
             await foreach (var item in provider.StreamAsync(request, credential, baseUrl, token).ConfigureAwait(false))
             {
                 token.ThrowIfCancellationRequested();
                 switch (item)
                 {
                     case QStreamEvent.Started:
-                        Emit(Snapshot with { State = QRunState.Streaming, Status = "Sutra Assistant is responding…" });
+                        Emit(Snapshot with { State = QRunState.Streaming, Status = Snapshot.IsSearching ? Snapshot.Status : "Sutra Assistant is responding…" });
                         break;
                     case QStreamEvent.Text text:
                         response.Append(text.Value);
                         var currentResponse = response.ToString();
                         if (controls is null || !AssistantControlProtocol.MustBuffer(currentResponse))
-                            Emit(Snapshot with { State = QRunState.Streaming, Response = currentResponse, Status = "Sutra Assistant is responding…" });
+                            Emit(Snapshot with { State = QRunState.Streaming, Response = currentResponse, IsSearching = false, Status = "Sutra Assistant is responding…" });
+                        break;
+                    case QStreamEvent.Search search:
+                        Emit(Snapshot with { IsSearching = search.Active, SearchUsed = Snapshot.SearchUsed || search.Confirmed, Status = search.Detail ?? (search.Active ? "Searching the web…" : "Reading sources…") });
+                        break;
+                    case QStreamEvent.Source source:
+                        var sources = (Snapshot.Sources ?? []).ToList();
+                        var index = sources.FindIndex(s => s.Url == source.Value.Url && s.StartIndex == source.Value.StartIndex && s.EndIndex == source.Value.EndIndex);
+                        if (index >= 0) sources[index] = source.Value;
+                        else if (sources.Count < 100) sources.Add(source.Value);
+                        Emit(Snapshot with { Sources = sources.ToArray(), SearchUsed = true });
+                        break;
+                    case QStreamEvent.SearchNotice notice:
+                        Emit(Snapshot with { SearchNotice = notice.Message, IsSearching = false });
+                        break;
+                    case QStreamEvent.SearchSuggestions suggestions:
+                        Emit(Snapshot with { SearchSuggestionsHtml = suggestions.Html });
                         break;
                     case QStreamEvent.Failed failed:
                         throw failed.Exception ?? new InvalidOperationException(failed.Message);
@@ -137,11 +155,11 @@ public sealed class QSessionController(IQProviderRegistry providers) : IQSession
         }
         catch (OperationCanceledException)
         {
-            Emit(Snapshot with { State = QRunState.Cancelled, Status = "Cancelled", Action = Snapshot.Action is { Phase: AssistantActionPhase.Working } action ? action with { Phase = AssistantActionPhase.Cancelled, Message = "Action stopped." } : Snapshot.Action });
+            Emit(Snapshot with { State = QRunState.Cancelled, SearchNotice = Snapshot.IsSearching ? "Search stopped." : Snapshot.SearchNotice, IsSearching = false, Status = "Cancelled", Action = Snapshot.Action is { Phase: AssistantActionPhase.Working } action ? action with { Phase = AssistantActionPhase.Cancelled, Message = "Action stopped." } : Snapshot.Action });
         }
         catch (Exception ex)
         {
-            Emit(Snapshot with { State = QRunState.Error, Status = "Sutra Assistant could not respond", Error = ex.Message, Action = Snapshot.Action is { Phase: AssistantActionPhase.Working } action ? action with { Phase = AssistantActionPhase.Failed, Message = "Action could not be completed." } : Snapshot.Action });
+            Emit(Snapshot with { State = QRunState.Error, SearchNotice = Snapshot.IsSearching ? "Web search did not finish. " + ex.Message : Snapshot.SearchNotice, IsSearching = false, Status = "Sutra Assistant could not respond", Error = ex.Message, Action = Snapshot.Action is { Phase: AssistantActionPhase.Working } action ? action with { Phase = AssistantActionPhase.Failed, Message = "Action could not be completed." } : Snapshot.Action });
         }
         finally
         {
@@ -160,7 +178,7 @@ public sealed class QSessionController(IQProviderRegistry providers) : IQSession
             {
                 _activeCts = null;
                 active.Cancel();
-                _snapshot = cancelled = _snapshot with { State = QRunState.Cancelled, Status = "Cancelled", Action = _snapshot.Action is { Phase: AssistantActionPhase.Working } action ? action with { Phase = AssistantActionPhase.Cancelled, Message = "Action stopped." } : _snapshot.Action };
+                _snapshot = cancelled = _snapshot with { State = QRunState.Cancelled, IsSearching = false, Status = "Cancelled", Action = _snapshot.Action is { Phase: AssistantActionPhase.Working } action ? action with { Phase = AssistantActionPhase.Cancelled, Message = "Action stopped." } : _snapshot.Action };
             }
         }
         if (cancelled is not null) Changed?.Invoke(cancelled);

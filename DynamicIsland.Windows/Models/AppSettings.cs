@@ -16,6 +16,7 @@ public sealed class AppSettings
     public bool LaunchOnStartup { get; set; }
     public bool AlwaysOnTop { get; set; } = true;
     public bool LockPosition { get; set; }
+    public bool TopNotchMode { get; set; }
     public bool ClickThroughWhenCompact { get; set; }
     public bool ExpandOnHover { get; set; } = true;
     public bool ShowMedia { get; set; } = true;
@@ -187,6 +188,7 @@ public sealed class AppSettings
 
     // ===== Q visual assistant =====
     public bool QEnabled { get; set; } = true;
+    public bool QWebSearchEnabled { get; set; }
     public bool QAutoExpandIsland { get; set; } = true;
     public bool QAutoCloseAfterResponse { get; set; }
     public int QAutoCloseDelaySeconds { get; set; } = 10;

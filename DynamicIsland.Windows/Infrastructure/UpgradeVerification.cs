@@ -18,7 +18,7 @@ namespace DynamicIsland.Windows.Infrastructure;
 // Opt-in native fixture harness. No media, Bluetooth, microphone, screen capture or provider service is started.
 internal static partial class UpgradeVerification
 {
-    public static async Task RunAsync(bool providersOnly = false, bool comparisonOnly = false, bool notificationClickOnly = false)
+    public static async Task RunAsync(bool providersOnly = false, bool comparisonOnly = false, bool notificationClickOnly = false, bool taskbarOnly = false)
     {
         providersOnly |= comparisonOnly;
         if (!AppDataPaths.IsPreview) throw new InvalidOperationException("Verification requires ISLAND_PREVIEW=1.");
@@ -59,6 +59,13 @@ internal static partial class UpgradeVerification
         {
             await VerifyNotificationClicksAsync(settings, vm, window, Check);
             File.WriteAllLines(Path.Combine(output, "checks.txt"), report);
+            window.Close(); PresentationTraceSources.DataBindingSource.Listeners.Remove(bindingLog);
+            return;
+        }
+        if (taskbarOnly)
+        {
+            await VerifyPlacementAsync(settings, settingsService, vm, window, Check, output);
+            bindingLog.Flush(); File.WriteAllLines(Path.Combine(output, "checks.txt"), report);
             window.Close(); PresentationTraceSources.DataBindingSource.Listeners.Remove(bindingLog);
             return;
         }

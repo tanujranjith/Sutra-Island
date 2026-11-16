@@ -1,7 +1,9 @@
 <UserControl x:Class="DynamicIsland.Windows.Views.AssistantReplyView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:DynamicIsland.Windows.Views">
     <StackPanel>
+        <views:WebSearchView x:Name="WebActivity" />
         <Grid x:Name="ActivityRow" Height="0" Opacity="0" ClipToBounds="True" IsHitTestVisible="False">
             <!-- Port of Sutra floating chat's .chatbot-thinking-bubble (source kept in Assets/Brand). -->
             <Border x:Name="ThinkingChip" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="14" BorderThickness="1" BorderBrush="#38B9A5FD">

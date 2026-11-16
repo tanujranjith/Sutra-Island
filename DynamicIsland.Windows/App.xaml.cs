@@ -73,6 +73,14 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (e.Args.Contains("--verify-web-search") || e.Args.Contains("--verify-math"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            if (!Infrastructure.AppDataPaths.IsPreview) { Shutdown(2); return; }
+            try { if (e.Args.Contains("--verify-math")) await Infrastructure.MathRenderingVerification.RunAsync(); else await Infrastructure.WebSearchVerification.RunAsync(); Shutdown(0); }
+            catch (Exception ex) { Directory.CreateDirectory(Infrastructure.AppDataPaths.Root); File.WriteAllText(Path.Combine(Infrastructure.AppDataPaths.Root, "verification-error.txt"), ex.ToString()); Shutdown(1); }
+            return;
+        }
         if(e.Args.Contains("--verify-screenshots"))
         {
             if(!Infrastructure.AppDataPaths.IsPreview){Shutdown(2);return;}
@@ -81,11 +89,11 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             return;
         }
         Infrastructure.GraphiteMenuSupport.Initialize();
-        if (e.Args.Contains("--verify-notification-motion") || e.Args.Contains("--verify-graphite") || e.Args.Contains("--verify-mascot-bulb") || e.Args.Contains("--verify-composer-keys") || e.Args.Contains("--verify-command-panels") || e.Args.Contains("--verify-sutra-update") || e.Args.Contains("--verify-upgrades") || e.Args.Contains("--verify-q-providers") || e.Args.Contains("--verify-q-compare") || e.Args.Contains("--verify-notification-click"))
+        if (e.Args.Contains("--verify-taskbar") || e.Args.Contains("--verify-notification-motion") || e.Args.Contains("--verify-graphite") || e.Args.Contains("--verify-mascot-bulb") || e.Args.Contains("--verify-composer-keys") || e.Args.Contains("--verify-command-panels") || e.Args.Contains("--verify-sutra-update") || e.Args.Contains("--verify-upgrades") || e.Args.Contains("--verify-q-providers") || e.Args.Contains("--verify-q-compare") || e.Args.Contains("--verify-notification-click"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             if (!Infrastructure.AppDataPaths.IsPreview) { Shutdown(2); return; }
-            try { if (e.Args.Contains("--verify-notification-motion")) await Infrastructure.UpgradeVerification.RunSutraAsync(notificationMotionOnly: true); else if (e.Args.Contains("--verify-graphite")) await Infrastructure.UpgradeVerification.RunSutraAsync(graphiteOnly: true); else if (e.Args.Contains("--verify-mascot-bulb")) await Infrastructure.UpgradeVerification.RunSutraAsync(mascotOnly: true); else if (e.Args.Contains("--verify-composer-keys")) await Infrastructure.UpgradeVerification.RunSutraAsync(composerOnly: true); else if (e.Args.Contains("--verify-command-panels")) await Infrastructure.UpgradeVerification.RunSutraAsync(commandPanelsOnly: true); else if (e.Args.Contains("--verify-sutra-update")) await Infrastructure.UpgradeVerification.RunSutraAsync(); else await Infrastructure.UpgradeVerification.RunAsync(e.Args.Contains("--verify-q-providers"), e.Args.Contains("--verify-q-compare"), e.Args.Contains("--verify-notification-click")); Shutdown(0); }
+            try { if (e.Args.Contains("--verify-notification-motion")) await Infrastructure.UpgradeVerification.RunSutraAsync(notificationMotionOnly: true); else if (e.Args.Contains("--verify-graphite")) await Infrastructure.UpgradeVerification.RunSutraAsync(graphiteOnly: true); else if (e.Args.Contains("--verify-mascot-bulb")) await Infrastructure.UpgradeVerification.RunSutraAsync(mascotOnly: true); else if (e.Args.Contains("--verify-composer-keys")) await Infrastructure.UpgradeVerification.RunSutraAsync(composerOnly: true); else if (e.Args.Contains("--verify-command-panels")) await Infrastructure.UpgradeVerification.RunSutraAsync(commandPanelsOnly: true); else if (e.Args.Contains("--verify-sutra-update")) await Infrastructure.UpgradeVerification.RunSutraAsync(); else await Infrastructure.UpgradeVerification.RunAsync(e.Args.Contains("--verify-q-providers"), e.Args.Contains("--verify-q-compare"), e.Args.Contains("--verify-notification-click"), e.Args.Contains("--verify-taskbar")); Shutdown(0); }
             catch (Exception ex) { Directory.CreateDirectory(Infrastructure.AppDataPaths.Root); File.WriteAllText(Path.Combine(Infrastructure.AppDataPaths.Root, "verification-error.txt"), ex.ToString()); Shutdown(1); }
             return;
         }
@@ -659,6 +667,8 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _clock?.Dispose();
         _timerAlarm?.Dispose();
         _theme?.Dispose();
+        _settingsService?.FlushAsync().GetAwaiter().GetResult();
+        _log?.FlushAsync().GetAwaiter().GetResult();
         _singleInstance?.ReleaseMutex();
         _singleInstance?.Dispose();
         Shutdown();

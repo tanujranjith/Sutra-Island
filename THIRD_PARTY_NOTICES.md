@@ -1,5 +1,16 @@
 # Third-party notices
 
+## WPF-Math and XAML-Math Shared 2.1.0
+
+Native equation rendering uses https://github.com/ForNeVeR/xaml-math,
+Copyright (c) 2010 Alex Regueiro; Copyright (c) 2023 WPF-Math Contributors;
+Copyright (c) 2023 XAML-Math Contributors. Distributed under the MIT license.
+The original Computer Modern and AMS font files are distributed under their
+Knuth and SIL Open Font licenses. Complete license and font notices are
+preserved and embedded in the executable from
+`DynamicIsland.Windows/Assets/ThirdParty/WpfMath-LICENSE.txt` and
+`DynamicIsland.Windows/Assets/ThirdParty/WpfMath-FONT-LICENSES.txt`.
+
 The optional Codex test ZIP for Sutra Island redistributes unmodified Windows
 binaries from the official [OpenAI Codex release](https://github.com/openai/codex/releases/tag/rust-v0.151.0).
 

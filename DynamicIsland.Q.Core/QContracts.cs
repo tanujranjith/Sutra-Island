@@ -66,12 +66,17 @@ public sealed record QRequest(
     int MaxResponseTokens = 8192,
     string? CustomSystemPrompt = null,
     string ReasoningEffort = "auto",
-    string? ControlInstructions = null);
+    string? ControlInstructions = null,
+    bool WebSearch = false);
 
 public abstract record QStreamEvent
 {
     public sealed record Started : QStreamEvent;
     public sealed record Text(string Value) : QStreamEvent;
+    public sealed record Search(bool Active, string? Detail = null, bool Confirmed = true) : QStreamEvent;
+    public sealed record Source(QWebSource Value) : QStreamEvent;
+    public sealed record SearchNotice(string Message) : QStreamEvent;
+    public sealed record SearchSuggestions(string Html) : QStreamEvent;
     public sealed record Completed : QStreamEvent;
     public sealed record Failed(string Message, Exception? Exception = null) : QStreamEvent;
 }
@@ -114,7 +119,12 @@ public sealed record QSessionSnapshot(
     QScreenContext? Context,
     string ProviderId,
     string Model,
-    AssistantActionFeedback? Action = null);
+    AssistantActionFeedback? Action = null,
+    bool IsSearching = false,
+    bool SearchUsed = false,
+    IReadOnlyList<QWebSource>? Sources = null,
+    string? SearchNotice = null,
+    string? SearchSuggestionsHtml = null);
 
 public interface IQSessionController : IDisposable
 {
@@ -125,7 +135,7 @@ public interface IQSessionController : IDisposable
     Task SubmitAsync(string prompt, QMode mode, string providerId, string model, string? credential, string? baseUrl,
         bool includeImage, Func<CancellationToken, Task<QScreenContext?>>? recapture = null,
         CancellationToken cancellationToken = default, int maxResponseTokens = 8192, string? customSystemPrompt = null,
-        string reasoningEffort = "auto", QContextPolicy contextPolicy = QContextPolicy.Existing);
+        string reasoningEffort = "auto", QContextPolicy contextPolicy = QContextPolicy.Existing, bool webSearch = false);
     void Cancel();
     void Clear();
 }

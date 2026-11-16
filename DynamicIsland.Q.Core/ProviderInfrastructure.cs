@@ -39,10 +39,10 @@ public static class QProviderPolicy
             "openai" => new[] { "gpt-6-luna", "gpt-6.1-sol", "gpt-6-astra" },
             "anthropic" => new[] { "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-sonnet-5" },
             "gemini" => new[] { "gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-3.1-pro-preview" },
-            "groq" => new[] { "qwen/qwen3.8-27b", "qwen/qwen3.6-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b" },
+            "groq" => new[] { "groq/compound", "groq/compound-mini", "qwen/qwen3.8-27b", "qwen/qwen3.6-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b" },
             "xai" => new[] { "grok-4.6" },
             "openrouter" => new[] { "~openai/gpt-latest", "~anthropic/claude-sonnet-latest", "openrouter/auto", "openrouter/free" },
-            "deepseek" => new[] { "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-flash-vision-exp" },
+            "deepseek" => new[] { "deepseek-flash", "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-flash-vision-exp" },
             "ollama" => new[] { "llama3.2-vision", "gemma3", "qwen3" },
             _ => Array.Empty<string>()
         };
@@ -140,7 +140,7 @@ internal static class ProviderJson
     }
 }
 
-public abstract class HttpQProvider(HttpClient? httpClient = null) : IQProvider
+public abstract partial class HttpQProvider(HttpClient? httpClient = null) : IQProvider
 {
     protected readonly HttpClient Http = httpClient ?? new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
     public abstract QProviderInfo Info { get; }
@@ -229,16 +229,19 @@ public abstract class HttpQProvider(HttpClient? httpClient = null) : IQProvider
         IReadOnlyDictionary<string, object?>? additionalBody,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        var buffered = Info.Id == "groq" && request.Model.StartsWith("groq/compound", StringComparison.OrdinalIgnoreCase);
         var body = new Dictionary<string, object?>
         {
             ["model"] = request.Model,
             ["messages"] = OpenAiChatMessages(request),
-            ["stream"] = true,
+            ["stream"] = !buffered,
             [maxTokenParameter] = request.MaxResponseTokens
         };
         if (additionalBody is not null)
             foreach (var pair in additionalBody) body[pair.Key] = pair.Value;
 
+        if (request.WebSearch && Info.Id == "openrouter") yield return new QStreamEvent.Search(true);
+        if (request.WebSearch && Info.Id == "groq") yield return new QStreamEvent.Search(true, "Checking web sources…", false);
         using var message = new HttpRequestMessage(HttpMethod.Post, Endpoint(baseUrl, fallback, "/chat/completions")) { Content = Json(body) };
         AddBearer(message, credential);
         message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
@@ -246,8 +249,35 @@ public abstract class HttpQProvider(HttpClient? httpClient = null) : IQProvider
         await EnsureSuccessAsync(response, Info.DisplayName, cancellationToken).ConfigureAwait(false);
         yield return new QStreamEvent.Started();
 
+        if (buffered)
+        {
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+            var root = document.RootElement;
+            if (ProviderJson.ErrorMessage(root) is { } error) { yield return new QStreamEvent.Failed(Sanitize(error)); yield break; }
+            if (request.WebSearch)
+            {
+                foreach (var source in QWebSearch.ReadSources(root)) yield return new QStreamEvent.Source(source);
+                if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array)
+                    foreach (var choice in choices.EnumerateArray())
+                        if (choice.TryGetProperty("message", out var msg) && msg.TryGetProperty("executed_tools", out var tools) && tools.ValueKind == JsonValueKind.Array)
+                            foreach (var tool in tools.EnumerateArray())
+                            {
+                                var kind = ProviderJson.String(tool, "type");
+                                if (kind.Contains("search", StringComparison.OrdinalIgnoreCase) || kind == "visit_website") yield return new QStreamEvent.Search(false);
+                                foreach (var source in QWebSearch.MarkdownSources(ProviderJson.String(tool, "output"))) yield return new QStreamEvent.Source(source);
+                            }
+            }
+            var content = string.Concat(ProviderJson.ChatText(root));
+            if (TryFinishReason(root, out var finish) && finish == "length") { yield return new QStreamEvent.Failed("Groq reached the output-token limit before finishing."); yield break; }
+            if (content.Length == 0) { yield return new QStreamEvent.Failed("Groq completed without returning text."); yield break; }
+            yield return new QStreamEvent.Text(content);
+            if (request.WebSearch) foreach (var source in QWebSearch.MarkdownSources(content)) yield return new QStreamEvent.Source(source);
+            yield return new QStreamEvent.Completed(); yield break;
+        }
         var sawText = false;
         var sawReasoning = false;
+        var answer = new StringBuilder();
+        var seenSources = new HashSet<QWebSource>();
         await foreach (var data in SseDataAsync(response, cancellationToken).ConfigureAwait(false))
         {
             using var document = JsonDocument.Parse(data);
@@ -257,10 +287,26 @@ public abstract class HttpQProvider(HttpClient? httpClient = null) : IQProvider
                 yield return new QStreamEvent.Failed(Sanitize(error));
                 yield break;
             }
+            if (request.WebSearch)
+            {
+                if (root.TryGetProperty("choices", out var searchChoices) && searchChoices.ValueKind == JsonValueKind.Array)
+                    foreach (var choice in searchChoices.EnumerateArray())
+                    {
+                        if (choice.TryGetProperty("server_tool_event", out var toolEvent))
+                        {
+                            var eventType = ProviderJson.String(toolEvent, "type");
+                            if (eventType is "call_started" or "call_completed") yield return new QStreamEvent.Search(eventType == "call_started");
+                            foreach (var source in QWebSearch.ReadSources(toolEvent, answer.ToString()))
+                                if (seenSources.Add(source)) yield return new QStreamEvent.Source(source);
+                        }
+                    }
+                foreach (var source in QWebSearch.ReadSources(root, answer.ToString()))
+                    if (seenSources.Add(source)) yield return new QStreamEvent.Source(source);
+            }
             sawReasoning |= ProviderJson.HasChatReasoning(root);
             foreach (var text in ProviderJson.ChatText(root))
             {
-                sawText = true;
+                sawText = true; answer.Append(text);
                 yield return new QStreamEvent.Text(text);
             }
             if (TryFinishReason(root, out var reason) && string.Equals(reason, "length", StringComparison.OrdinalIgnoreCase))
@@ -270,6 +316,8 @@ public abstract class HttpQProvider(HttpClient? httpClient = null) : IQProvider
             }
         }
 
+        if (request.WebSearch)
+            foreach (var source in QWebSearch.MarkdownSources(answer.ToString())) if (seenSources.Add(source)) yield return new QStreamEvent.Source(source);
         if (!sawText && sawReasoning)
         {
             yield return new QStreamEvent.Failed("The model used its response budget for reasoning but returned no final answer. Increase the response budget or lower reasoning effort.");
