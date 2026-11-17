@@ -20,7 +20,7 @@ public static class SettingsSearchIndex
         new("IslandScreenshotHistoryLimit", "Screenshot history limit", "Choose the maximum captures retained in memory"),
         new("VoiceReadAloud", "Read voice replies aloud", "Speak replies to voice questions"),
         new("CompactVoiceMode", "Compact voice mode", "Voice turns stay in the compact island instead of the chat panel"),
-        new("VoiceName", "Assistant voice", "Choose an installed Windows voice"),
+        new("VoiceName", "Assistant voice", "Choose a local voice"),
         new("QSelectedProvider", "Assistant provider", "Choose an AI service or local model"),
         new("QSelectedModel", "Assistant model", "Choose the model for chat"),
         new("QIncludeScreenImage", "Screen images", "Include an image when screen help is requested"),

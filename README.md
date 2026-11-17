@@ -87,7 +87,7 @@ In assistant chat, Enter sends the prompt and Shift+Enter inserts a new line.
 
 ## Getting started
 
-Download **DynamicIsland.exe** from the [latest release](../../releases/latest). The self-contained Windows x64 executable includes the .NET runtime. Open it to start the island and use the tray menu to reach Settings or quit. Each release includes `SHA256SUMS.txt` for verifying the downloads.
+Download **Sutra-Island-Setup** from the [latest release](../../releases/latest) for a guided installation with local voices included. The self-contained **DynamicIsland.exe** is also available as a portable option; on its first spoken reply it downloads the approximately 126 MB local voice model. Once installed, voice synthesis runs offline. Each release includes `SHA256SUMS.txt` for verifying the downloads.
 
 For the assistant, open **Settings → Sutra Assistant**, choose a provider and model, and add an API key if required. The Codex provider uses an installed supported official Codex runtime or the separately packaged Codex test bundle. Read the [assistant guide](Q.md) before using sign-in or screen help.
 

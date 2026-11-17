@@ -21,7 +21,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow(SettingsViewModel settingsViewModel, IslandViewModel islandViewModel, IslandWindow islandWindow)
     {
         InitializeComponent();
-        Infrastructure.NativeFrostBackdrop.Attach(this,()=> (GraphiteSettingsShell,new Rect(GraphiteSettingsShell.RenderSize),25), (active,inset) => { var tint=new SolidColorBrush(System.Windows.Media.Color.FromArgb(active?(byte)225:(byte)255,23,24,29)); GraphiteSettingsShell.Background=active?Infrastructure.FrostedMaterial.WithOpaqueCaps(tint,inset):tint; },()=>true);
+
         SizeChanged += (_, _) => GraphiteSettingsShell.Clip = new RectangleGeometry(new Rect(0, 0, GraphiteSettingsShell.ActualWidth, GraphiteSettingsShell.ActualHeight), 25, 25);
         _islandViewModel = islandViewModel;
         _islandWindow = islandWindow;
@@ -67,10 +67,10 @@ public partial class SettingsWindow : Window
         if (_previewExpanded == expanded && animate) return;
         _previewExpanded = expanded;
 
-        CompactPreviewButton.Background = expanded ? System.Windows.Media.Brushes.Transparent : BrushFrom("#362F42");
-        ExpandedPreviewButton.Background = expanded ? BrushFrom("#362F42") : System.Windows.Media.Brushes.Transparent;
-        CompactPreviewButton.Foreground = expanded ? BrushFrom("#9998A4") : System.Windows.Media.Brushes.White;
-        ExpandedPreviewButton.Foreground = expanded ? System.Windows.Media.Brushes.White : BrushFrom("#9998A4");
+        CompactPreviewButton.Background = expanded ? System.Windows.Media.Brushes.Transparent : BrushFrom("#3A3A3C");
+        ExpandedPreviewButton.Background = expanded ? BrushFrom("#3A3A3C") : System.Windows.Media.Brushes.Transparent;
+        CompactPreviewButton.Foreground = expanded ? BrushFrom("#98989D") : System.Windows.Media.Brushes.White;
+        ExpandedPreviewButton.Foreground = expanded ? System.Windows.Media.Brushes.White : BrushFrom("#98989D");
 
         if (!animate)
         {
@@ -276,6 +276,7 @@ public partial class SettingsWindow : Window
         if (sender is not System.Windows.Controls.Primitives.ToggleButton { CommandParameter: string key }) return;
         if (DataContext is SettingsViewModel settings) settings.SelectedSectionKey = key;
         ShowSection(key);
+        SettingsContentScroller.ScrollToTop();
     }
 
     private void NavigateFromOverview_Click(object sender, RoutedEventArgs e)
@@ -283,6 +284,7 @@ public partial class SettingsWindow : Window
         if (sender is not FrameworkElement { Tag: string key }) return;
         if (DataContext is SettingsViewModel settings) settings.SelectedSectionKey = key;
         ShowSection(key);
+        SettingsContentScroller.ScrollToTop();
     }
 
     private void SettingsSearch_TextChanged(object sender, TextChangedEventArgs e)

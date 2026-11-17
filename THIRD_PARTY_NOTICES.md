@@ -1,5 +1,13 @@
 # Third-party notices
 
+## Local voice synthesis
+
+Sutra Island uses [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) and the
+[Kokoro model](https://huggingface.co/hexgrad/Kokoro-82M) for offline speech.
+The packaged model's Apache 2.0 license is included in the `SutraVoice` folder.
+The upstream archive also contains eSpeak NG data, which the bundled engine
+does not use and the installer excludes. sherpa-onnx is distributed under the Apache 2.0 license.
+
 ## WPF-Math and XAML-Math Shared 2.1.0
 
 Native equation rendering uses https://github.com/ForNeVeR/xaml-math,

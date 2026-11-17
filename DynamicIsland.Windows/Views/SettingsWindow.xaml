@@ -6,11 +6,13 @@
         FontFamily="Segoe UI Variable Text" UseLayoutRounding="True"
         PreviewKeyDown="SettingsWindow_PreviewKeyDown">
     <Window.Resources>
-        <SolidColorBrush x:Key="Surface" Color="#A01D1F25" />
-        <SolidColorBrush x:Key="SurfaceRaised" Color="#24242B" />
-        <SolidColorBrush x:Key="Hairline" Color="#35343E" />
-        <SolidColorBrush x:Key="Muted" Color="#9998A4" />
-        <SolidColorBrush x:Key="Blue" Color="#B9A5FD" />
+        <SolidColorBrush x:Key="Surface" Color="#FF1C1C1E" />
+        <SolidColorBrush x:Key="SurfaceRaised" Color="#2C2C2E" />
+        <SolidColorBrush x:Key="Hairline" Color="#38383A" />
+        <SolidColorBrush x:Key="Muted" Color="#98989D" />
+        <SolidColorBrush x:Key="Blue" Color="#F2F2F2" />
+
+        <Style x:Key="MonochromeSettingsButton" TargetType="Button" BasedOn="{StaticResource SettingsButton}"><Setter Property="Background" Value="#3A3A3C"/><Setter Property="Foreground" Value="White"/><Setter Property="Padding" Value="10,5"/></Style>
 
         <Style x:Key="PageTitle" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Segoe UI Variable Display" />
@@ -38,18 +40,18 @@
         </Style>
         <Style x:Key="PreferenceRow" TargetType="Border">
             <Setter Property="Padding" Value="15,11" /><Setter Property="MinHeight" Value="59" />
-            <Setter Property="BorderBrush" Value="#25303A45" />
+            <Setter Property="BorderBrush" Value="#38383838" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
         </Style>
         <Style x:Key="LastPreferenceRow" TargetType="Border" BasedOn="{StaticResource PreferenceRow}">
             <Setter Property="BorderThickness" Value="0" />
         </Style>
         <Style x:Key="RowTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="13" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style x:Key="RowDescription" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="FontSize" Value="11.5" />
             <Setter Property="Foreground" Value="{StaticResource Muted}" />
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="Margin" Value="0,2,24,0" />
@@ -63,13 +65,13 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
-                        <Border x:Name="Track" Width="34" Height="20" CornerRadius="10" Background="#3A4049">
+                        <Border x:Name="Track" Width="34" Height="20" CornerRadius="10" Background="#48484A">
                             <Ellipse x:Name="Thumb" Width="14" Height="14" Fill="#F5F5F7" HorizontalAlignment="Left" Margin="3,0,0,0" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Track" Property="Background" Value="{StaticResource Blue}" />
-                                <Setter TargetName="Thumb" Property="Fill" Value="#2A2238"/><Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="Thumb" Property="Fill" Value="#1C1C1E"/><Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
                                 <Setter TargetName="Thumb" Property="Margin" Value="0,0,3,0" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45" /></Trigger>
@@ -83,8 +85,8 @@
             <Setter Property="Height" Value="34" />
             <Setter Property="MinWidth" Value="154" />
             <Setter Property="Foreground" Value="#F5F5F7" />
-            <Setter Property="Background" Value="#24242B" />
-            <Setter Property="BorderBrush" Value="#3A3844" />
+            <Setter Property="Background" Value="#2C2C2E" />
+            <Setter Property="BorderBrush" Value="#48484A" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="FontSize" Value="12.5" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -99,8 +101,8 @@
                                 <ControlTemplate TargetType="ComboBoxItem">
                                     <Border x:Name="ItemChrome" Background="Transparent" CornerRadius="6" Margin="3,2" Padding="10,7"><ContentPresenter ContentSource="Content" /></Border>
                                     <ControlTemplate.Triggers>
-                                        <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="ItemChrome" Property="Background" Value="#362F42" /></Trigger>
-                                        <Trigger Property="IsSelected" Value="True"><Setter TargetName="ItemChrome" Property="Background" Value="#FF362F42" /></Trigger>
+                                        <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="ItemChrome" Property="Background" Value="#3A3A3C" /></Trigger>
+                                        <Trigger Property="IsSelected" Value="True"><Setter TargetName="ItemChrome" Property="Background" Value="#FF3A3A3C" /></Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
                             </Setter.Value>
@@ -116,10 +118,10 @@
                                           IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource AncestorType={x:Type ComboBox}}}">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
-                                        <Border x:Name="ComboChrome" Background="#24242B" BorderBrush="#3A3844" BorderThickness="1" CornerRadius="8" />
+                                        <Border x:Name="ComboChrome" Background="#2C2C2E" BorderBrush="#48484A" BorderThickness="1" CornerRadius="8" />
                                         <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ComboChrome" Property="BorderBrush" Value="#657385" /></Trigger>
-                                            <Trigger Property="IsChecked" Value="True"><Setter TargetName="ComboChrome" Property="BorderBrush" Value="#B9A5FD" /></Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ComboChrome" Property="BorderBrush" Value="#8E8E93" /></Trigger>
+                                            <Trigger Property="IsChecked" Value="True"><Setter TargetName="ComboChrome" Property="BorderBrush" Value="#F2F2F2" /></Trigger>
                                             <Trigger Property="IsEnabled" Value="False"><Setter TargetName="ComboChrome" Property="Opacity" Value="0.45" /></Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -130,11 +132,11 @@
                                        FontSize="12.5" TextTrimming="CharacterEllipsis" IsHitTestVisible="False" />
                             <TextBlock Text="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="9"
                                        HorizontalAlignment="Right" Margin="0,0,11,0" VerticalAlignment="Center"
-                                       Foreground="#9998A4" IsHitTestVisible="False" />
+                                       Foreground="#98989D" IsHitTestVisible="False" />
                             <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}"
                                    Placement="Bottom" PlacementTarget="{Binding ElementName=DropDownToggle}"
                                    AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
-                                <Border Background="#FF1D1F25" BorderBrush="#FF3A3743" BorderThickness="1"
+                                <Border Background="#FF1C1C1E" BorderBrush="#FF48484A" BorderThickness="1"
                                         CornerRadius="9" Margin="0,5,0,0" Padding="2"
                                         MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
                                     <Border.Effect><DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.45" Color="#000000" /></Border.Effect>
@@ -160,9 +162,9 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
                         <Grid Height="24" VerticalAlignment="Center">
-                            <Border Height="4" CornerRadius="2" Background="#39414C" VerticalAlignment="Center" />
+                            <Border Height="4" CornerRadius="2" Background="#48484A" VerticalAlignment="Center" />
                             <Track x:Name="PART_Track">
-                                <Track.DecreaseRepeatButton><RepeatButton Command="Slider.DecreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Height="4" CornerRadius="2" Background="#B9A5FD" VerticalAlignment="Center" /></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
+                                <Track.DecreaseRepeatButton><RepeatButton Command="Slider.DecreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Height="4" CornerRadius="2" Background="#F2F2F2" VerticalAlignment="Center" /></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
                                 <Track.IncreaseRepeatButton><RepeatButton Command="Slider.IncreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent" /></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
                                 <Track.Thumb><Thumb Width="16" Height="16"><Thumb.Template><ControlTemplate TargetType="Thumb"><Ellipse Fill="#F5F5F7" Stroke="#D8DEE6" StrokeThickness="1"><Ellipse.Effect><DropShadowEffect BlurRadius="5" ShadowDepth="1" Opacity="0.35" /></Ellipse.Effect></Ellipse></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
                             </Track>
@@ -174,7 +176,7 @@
 
         <Style x:Key="TopTab" TargetType="ToggleButton">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="#B2BAC5" />
+            <Setter Property="Foreground" Value="#AEAEB2" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="14,15,14,12" />
             <Setter Property="Cursor" Value="Hand" />
@@ -205,7 +207,7 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Margin" Value="0,2" />
             <Setter Property="Padding" Value="12,8" />
-            <Setter Property="Foreground" Value="#C1CAD5" />
+            <Setter Property="Foreground" Value="#C7C7CC" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -224,8 +226,8 @@
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#2C2E37" /><Setter Property="Foreground" Value="#F5F5F7" /></Trigger>
-                            <Trigger Property="IsChecked" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#362F42" /><Setter Property="Foreground" Value="#F5F5F7" /><Setter TargetName="SelectionMark" Property="Visibility" Value="Visible" /></Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#303032" /><Setter Property="Foreground" Value="#F5F5F7" /></Trigger>
+                            <Trigger Property="IsChecked" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#3A3A3C" /><Setter Property="Foreground" Value="#F5F5F7" /><Setter TargetName="SelectionMark" Property="Visibility" Value="Visible" /></Trigger>
                             <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45" /></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -236,13 +238,13 @@
             <Setter Property="MinHeight" Value="36" />
             <Setter Property="Margin" Value="0,2" />
             <Setter Property="Padding" Value="12,6" />
-            <Setter Property="Foreground" Value="#C1BDC9" />
+            <Setter Property="Foreground" Value="#C7C7CC" />
         </Style>
 
         <Style x:Key="ActionButton" TargetType="Button">
-            <Setter Property="Background" Value="#24242B" />
+            <Setter Property="Background" Value="#2C2C2E" />
             <Setter Property="Foreground" Value="#F5F5F7" />
-            <Setter Property="BorderBrush" Value="#3A3844" />
+            <Setter Property="BorderBrush" Value="#48484A" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="13,7" />
             <Setter Property="Cursor" Value="Hand" />
@@ -253,7 +255,7 @@
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#302D39" /></Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#3A3A3C" /></Trigger>
                             <Trigger Property="IsPressed" Value="True"><Setter TargetName="Chrome" Property="Opacity" Value="0.72" /></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -297,7 +299,7 @@
         </Setter>
     </Style></Window.Resources>
 
-    <Border x:Name="GraphiteSettingsShell" CornerRadius="25" Background="#FF17181D" BorderBrush="{StaticResource GlassRimBrush}" BorderThickness="1"><Grid>
+    <Border x:Name="GraphiteSettingsShell" CornerRadius="25" Background="#FF101010" BorderBrush="#FF38383A" BorderThickness="1"><Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="216" />
             <ColumnDefinition Width="*" />
@@ -305,7 +307,7 @@
         </Grid.ColumnDefinitions>
 
         <!-- Primary settings navigation -->
-        <Border Grid.Column="0" Background="#80191A20" BorderBrush="#35343E" BorderThickness="0,0,1,0">
+        <Border Grid.Column="0" Background="#FF151515" BorderBrush="#38383A" BorderThickness="0,0,1,0">
             <Grid Margin="12,24,12,17">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <StackPanel>
@@ -313,15 +315,16 @@
                         <Border x:Name="SettingsBrandLogo" Width="34" Height="34" CornerRadius="9" Background="{StaticResource SutraIslandBrandBrush}" VerticalAlignment="Center" Margin="0,0,10,0" AutomationProperties.Name="Sutra Island" />
                         <TextBlock Text="Sutra Island" FontFamily="Segoe UI Variable Display" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
                     </StackPanel>
-                    <TextBlock Text="Desktop companion" FontSize="11.5" Foreground="#9998A4" Margin="0,8,0,0" />
+                    <TextBlock Text="Desktop companion" FontSize="11.5" Foreground="#98989D" Margin="0,8,0,0" />
                 </StackPanel>
 
-                <Border Grid.Row="1" Height="40" Margin="0,20,0,13" CornerRadius="9" Background="#24252C" BorderBrush="#35343E" BorderThickness="1">
+                <Border Grid.Row="1" Height="40" Margin="0,20,0,13" CornerRadius="9" Background="#262626" BorderBrush="#38383A" BorderThickness="1">
                     <Grid>
-                        <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="14" Foreground="#9BA8B7" VerticalAlignment="Center" Margin="12,0,0,0" />
+                        <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="14" Foreground="#98989D" VerticalAlignment="Center" Margin="12,0,0,0" />
                         <TextBox x:Name="SettingsSearchBox" Margin="32,0,6,0" Padding="4,0" Background="Transparent" BorderThickness="0"
                                  Foreground="#F5F5F7" CaretBrush="White" FontSize="12.5" VerticalContentAlignment="Center"
-                                 ToolTip="Search settings" TextChanged="SettingsSearch_TextChanged" />
+                                 ToolTip="Search settings" AutomationProperties.Name="Search settings" TextChanged="SettingsSearch_TextChanged" />
+                        <TextBlock Text="Search settings" Margin="36,0,0,0" VerticalAlignment="Center" Foreground="#98989D" IsHitTestVisible="False"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=SettingsSearchBox}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
                     </Grid>
                 </Border>
 
@@ -342,14 +345,14 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <StackPanel Grid.Row="3" Margin="0,14,0,0"><Border Height="1" Background="#35343E" Margin="0,0,0,12"/><DockPanel LastChildFill="False"><Button DockPanel.Dock="Right" Content="Done" Click="Done_Click" Style="{StaticResource ActionButton}" Background="Transparent" Foreground="#C1BDC9" Padding="12,6"/><Button Content="&#xE81D;" FontFamily="Segoe Fluent Icons" Command="{Binding RecenterCommand}" Style="{StaticResource ActionButton}" Padding="8,6" Margin="0,0,6,0" ToolTip="Recenter island" AutomationProperties.Name="Recenter island"/><Button Content="&#xE916;" FontFamily="Segoe Fluent Icons" Click="OpenTimer_Click" Style="{StaticResource ActionButton}" Padding="8,6" ToolTip="Open timer" AutomationProperties.Name="Open timer"/></DockPanel></StackPanel>
+                <StackPanel Grid.Row="3" Margin="0,14,0,0"><Border Height="1" Background="#38383A" Margin="0,0,0,12"/><DockPanel LastChildFill="False"><Button DockPanel.Dock="Right" Content="Done" Click="Done_Click" Style="{StaticResource ActionButton}" Background="Transparent" Foreground="#C7C7CC" Padding="12,6"/><Button Content="&#xE81D;" FontFamily="Segoe Fluent Icons" Command="{Binding RecenterCommand}" Style="{StaticResource ActionButton}" Padding="8,6" Margin="0,0,6,0" ToolTip="Recenter island" AutomationProperties.Name="Recenter island"/><Button Content="&#xE916;" FontFamily="Segoe Fluent Icons" Click="OpenTimer_Click" Style="{StaticResource ActionButton}" Padding="8,6" ToolTip="Open timer" AutomationProperties.Name="Open timer"/></DockPanel></StackPanel>
             </Grid>
         </Border>
 
         <!-- Live preview workspace -->
-        <Border x:Name="PreviewPane" Grid.Column="2" BorderBrush="#35343E" BorderThickness="1,0,0,0" ClipToBounds="True">
+        <Border x:Name="PreviewPane" Grid.Column="2" BorderBrush="#38383A" BorderThickness="1,0,0,0" ClipToBounds="True">
             <Grid>
-                <Border><Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#701D1C25"/><GradientStop Color="#70211D29" Offset="1"/></LinearGradientBrush></Border.Background></Border>
+                <Border><Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#FF151515"/><GradientStop Color="#FF191919" Offset="1"/></LinearGradientBrush></Border.Background></Border>
                 <Grid Margin="22,34,22,22">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -359,22 +362,22 @@
                     </Grid.RowDefinitions>
                     <StackPanel>
                         <TextBlock Text="Live preview" FontFamily="Segoe UI Variable Display" FontSize="13" FontWeight="SemiBold" />
-                        <TextBlock Text="Changes appear here instantly." FontSize="12" Foreground="#9998A4" Margin="0,6,0,0" TextWrapping="Wrap" />
+                        <TextBlock Text="Changes appear here instantly." FontSize="12" Foreground="#98989D" Margin="0,6,0,0" TextWrapping="Wrap" />
                     </StackPanel>
 
-                    <Border Grid.Row="1" Width="258" Height="40" Margin="0,18,0,0" CornerRadius="11" Background="#FF111217" BorderBrush="#35343E" BorderThickness="1" HorizontalAlignment="Center">
+                    <Border Grid.Row="1" Width="258" Height="40" Margin="0,18,0,0" CornerRadius="11" Background="#FF101010" BorderBrush="#38383A" BorderThickness="1" HorizontalAlignment="Center">
                         <Grid Margin="3">
                             <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
-                            <Button x:Name="CompactPreviewButton" Content="Compact" Click="CompactPreview_Click" Background="#39414D" Foreground="White" BorderThickness="0" Cursor="Hand">
+                            <Button x:Name="CompactPreviewButton" Content="Compact" Click="CompactPreview_Click" Background="#3A3A3C" Foreground="White" BorderThickness="0" Cursor="Hand">
                                 <Button.Template><ControlTemplate TargetType="Button"><Border Background="{TemplateBinding Background}" CornerRadius="8"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" /></Border></ControlTemplate></Button.Template>
                             </Button>
-                            <Button x:Name="ExpandedPreviewButton" Grid.Column="1" Content="Expanded" Click="ExpandedPreview_Click" Background="Transparent" Foreground="#A7AFBA" BorderThickness="0" Cursor="Hand">
+                            <Button x:Name="ExpandedPreviewButton" Grid.Column="1" Content="Expanded" Click="ExpandedPreview_Click" Background="Transparent" Foreground="#98989D" BorderThickness="0" Cursor="Hand">
                                 <Button.Template><ControlTemplate TargetType="Button"><Border Background="{TemplateBinding Background}" CornerRadius="8"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" /></Border></ControlTemplate></Button.Template>
                             </Button>
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="2" Height="285" VerticalAlignment="Top" Margin="0,18,0,0" CornerRadius="13" BorderBrush="#39333F" BorderThickness="1"><Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#24252D"/><GradientStop Color="#32263C" Offset="1"/></LinearGradientBrush></Border.Background></Border><Grid x:Name="PreviewIslandData" Grid.Row="2" Height="285" VerticalAlignment="Top" Margin="12,18,12,0">
+                    <Border Grid.Row="2" Height="285" VerticalAlignment="Top" Margin="0,18,0,0" CornerRadius="13" BorderBrush="#38383A" BorderThickness="1"><Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#222222"/><GradientStop Color="#2A2A2A" Offset="1"/></LinearGradientBrush></Border.Background></Border><Grid x:Name="PreviewIslandData" Grid.Row="2" Height="285" VerticalAlignment="Top" Margin="12,18,12,0">
                         <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Center"><Viewbox.Style><Style TargetType="Viewbox"><Setter Property="VerticalAlignment" Value="Center" /><Style.Triggers><DataTrigger Binding="{Binding IsTopNotch}" Value="True"><Setter Property="VerticalAlignment" Value="Top" /></DataTrigger></Style.Triggers></Style></Viewbox.Style>
                         <views:NotchBorder IsNotch="{Binding IsTopNotch}" ReducedMotion="{Binding IsReducedMotion}" x:Name="PreviewPill" Width="230" Height="62" CornerRadius="{Binding IslandCornerRadius}" Background="{Binding IslandSurfaceBrush}" BorderBrush="{Binding PanelBorderBrush}" BorderThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Border.Resources>
@@ -441,7 +444,7 @@
                         </Viewbox>
                     </Grid>
 
-                    <StackPanel Grid.Row="2" VerticalAlignment="Top" Margin="0,330,0,0"><Border Height="1" Background="#35303E" Margin="0,0,0,18"/><TextBlock Text="Made for your desktop" FontSize="11" Foreground="#C1BDC9"/><TextBlock Text="Your live island, using the layout and controls you enable." FontSize="10" Foreground="#9998A4" TextWrapping="Wrap" LineHeight="17" Margin="0,7,0,0"/></StackPanel><Button x:Name="CollapsePreviewButton" Grid.Row="3" Content="Collapse preview" Click="TogglePreviewPane_Click"
+                    <StackPanel Grid.Row="2" VerticalAlignment="Top" Margin="0,330,0,0"><Border Height="1" Background="#38383A" Margin="0,0,0,18"/><TextBlock Text="Made for your desktop" FontSize="11" Foreground="#C7C7CC"/><TextBlock Text="Your live island, using the layout and controls you enable." FontSize="10" Foreground="#98989D" TextWrapping="Wrap" LineHeight="17" Margin="0,7,0,0"/></StackPanel><Button x:Name="CollapsePreviewButton" Grid.Row="3" Content="Collapse preview" Click="TogglePreviewPane_Click"
                             Style="{StaticResource ActionButton}" HorizontalAlignment="Center" Padding="14,8" Margin="0,12,0,0">
                         <Button.ContentTemplate><DataTemplate><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE70E;" FontFamily="Segoe Fluent Icons" Margin="0,0,8,0" /><TextBlock Text="Collapse preview" /></StackPanel></DataTemplate></Button.ContentTemplate>
                     </Button>
@@ -460,13 +463,13 @@
                         <TextBlock Text="  Changes apply instantly." FontSize="11.5" Foreground="{StaticResource Muted}" VerticalAlignment="Center" />
                     </StackPanel>
                     <Button x:Name="ShowPreviewButton" Grid.Column="1" Content="Show preview" Click="TogglePreviewPane_Click" Visibility="Collapsed"
-                            Style="{StaticResource ActionButton}" Foreground="#B9A5FD" Padding="11,6" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            Style="{StaticResource ActionButton}" Foreground="#F2F2F2" Padding="11,6" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Button.ContentTemplate><DataTemplate><StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A7;" FontFamily="Segoe Fluent Icons" Margin="0,0,7,0" /><TextBlock Text="Show preview" /></StackPanel></DataTemplate></Button.ContentTemplate>
                     </Button>
                 </Grid>
             </Border>
 
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="41,6,41,30">
+            <ScrollViewer x:Name="SettingsContentScroller" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="41,6,41,30">
                 <Grid>
                     <StackPanel x:Name="OverviewPage" Visibility="Collapsed">
                         <TextBlock Text="Overview" Style="{StaticResource PageTitle}" />
@@ -475,21 +478,21 @@
                         <Border Style="{StaticResource InsetGroup}"><StackPanel>
                             <Border Style="{StaticResource PreferenceRow}">
                                 <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                    <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="#B9A5FD" VerticalAlignment="Center" />
+                                    <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="#F2F2F2" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1"><TextBlock Text="Island content" Style="{StaticResource RowTitle}" /><TextBlock Text="Choose what appears in the island." Style="{StaticResource RowDescription}" /></StackPanel>
                                     <Button Grid.Column="2" Content="Open" Tag="content" Click="NavigateFromOverview_Click" Style="{StaticResource ActionButton}" />
                                 </Grid>
                             </Border>
                             <Border Style="{StaticResource PreferenceRow}">
                                 <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                    <TextBlock Text="&#xE790;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="#B9A5FD" VerticalAlignment="Center" />
+                                    <TextBlock Text="&#xE790;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="#F2F2F2" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1"><TextBlock Text="Appearance" Style="{StaticResource RowTitle}" /><TextBlock Text="Set the island's theme, size, colors, and motion." Style="{StaticResource RowDescription}" /></StackPanel>
                                     <Button Grid.Column="2" Content="Open" Tag="appearance" Click="NavigateFromOverview_Click" Style="{StaticResource ActionButton}" />
                                 </Grid>
                             </Border>
                             <Border Style="{StaticResource LastPreferenceRow}">
                                 <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                    <TextBlock Text="&#xE753;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="#B9A5FD" VerticalAlignment="Center" />
+                                    <TextBlock Text="&#xE753;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="#F2F2F2" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1"><TextBlock Text="Widgets &amp; connections" Style="{StaticResource RowTitle}" /><TextBlock Text="Manage live activities and Windows integrations." Style="{StaticResource RowDescription}" /></StackPanel>
                                     <Button Grid.Column="2" Content="Open" Tag="activities" Click="NavigateFromOverview_Click" Style="{StaticResource ActionButton}" />
                                 </Grid>
@@ -508,29 +511,29 @@
                         <TextBlock Text="Choose what appears in the island." Style="{StaticResource PageDescription}" />
                         <TextBlock Text="Always visible" Style="{StaticResource GroupLabel}" Margin="0,0,0,9" />
                         <Border Style="{StaticResource InsetGroup}"><StackPanel>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE8D6;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><TextBlock Grid.Column="1" Text="Media" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowMedia}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xEB9F;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><StackPanel Grid.Column="1"><TextBlock Text="Album art in compact" Style="{StaticResource RowTitle}" /><TextBlock Text="Show the track cover instead of the activity icon." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowAlbumArtInCompact}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE767;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><TextBlock Grid.Column="1" Text="Volume &amp; audio" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowVolume}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE850;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><TextBlock Grid.Column="1" Text="Battery" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowBattery}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE121;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><TextBlock Grid.Column="1" Text="Clock" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowClock}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE787;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><TextBlock Grid.Column="1" Text="Date" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowDate}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE8D6;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><TextBlock Grid.Column="1" Text="Media" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowMedia}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xEB9F;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><StackPanel Grid.Column="1"><TextBlock Text="Album art in compact" Style="{StaticResource RowTitle}" /><TextBlock Text="Show the track cover instead of the activity icon." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowAlbumArtInCompact}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE767;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><TextBlock Grid.Column="1" Text="Volume &amp; audio" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowVolume}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE850;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><TextBlock Grid.Column="1" Text="Battery" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowBattery}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE121;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><TextBlock Grid.Column="1" Text="Clock" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowClock}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE787;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><TextBlock Grid.Column="1" Text="Date" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowDate}" /></Grid></Border>
 <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Show date in compact island" Style="{StaticResource RowTitle}"/><TextBlock Text="Short date beneath the clock, replacing the compact battery line; expanded date has its own switch." Style="{StaticResource RowDescription}" TextWrapping="Wrap"/></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowCompactDate}"/></Grid></Border>
-                            <Border Style="{StaticResource LastPreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE916;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><TextBlock Grid.Column="1" Text="Timer &amp; alarm" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowTimerAlarm}" /></Grid></Border>
+                            <Border Style="{StaticResource LastPreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE916;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><TextBlock Grid.Column="1" Text="Timer &amp; alarm" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowTimerAlarm}" /></Grid></Border>
                         </StackPanel></Border>
 
                         <TextBlock Text="Live activities" Style="{StaticResource GroupLabel}" />
                         <Border Style="{StaticResource InsetGroup}"><StackPanel>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE9D9;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><StackPanel Grid.Column="1"><TextBlock Text="System monitor" Style="{StaticResource RowTitle}" /><TextBlock Text="RAM and network activity in the expanded island." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowSystemMonitor}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE950;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><StackPanel Grid.Column="1"><TextBlock Text="RAM in compact view" Style="{StaticResource RowTitle}" /><TextBlock Text="Keep memory usage visible while the island is collapsed." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowRamInCompact}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE767;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><StackPanel Grid.Column="1"><TextBlock Text="Equalizer in compact view" Style="{StaticResource RowTitle}" /><TextBlock Text="Show animated audio bars while the island is collapsed and audio is playing." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowEqualizerInCompact}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE753;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><TextBlock Grid.Column="1" Text="Weather" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowWeather}" /></Grid></Border>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xEA8F;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><TextBlock Grid.Column="1" Text="Notifications" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowNotifications}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE9D9;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><StackPanel Grid.Column="1"><TextBlock Text="System monitor" Style="{StaticResource RowTitle}" /><TextBlock Text="RAM and network activity in the expanded island." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowSystemMonitor}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE950;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><StackPanel Grid.Column="1"><TextBlock Text="RAM in compact view" Style="{StaticResource RowTitle}" /><TextBlock Text="Keep memory usage visible while the island is collapsed." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowRamInCompact}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE767;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><StackPanel Grid.Column="1"><TextBlock Text="Equalizer in compact view" Style="{StaticResource RowTitle}" /><TextBlock Text="Show animated audio bars while the island is collapsed and audio is playing." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowEqualizerInCompact}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE753;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><TextBlock Grid.Column="1" Text="Weather" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowWeather}" /></Grid></Border>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xEA8F;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><TextBlock Grid.Column="1" Text="Notifications" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowNotifications}" /></Grid></Border>
 <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Caps Lock feedback" Style="{StaticResource RowTitle}"/><TextBlock Text="Small On/Off banner using the island notification animation." Style="{StaticResource RowDescription}" TextWrapping="Wrap"/></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding CapsLockNotifications}"/></Grid></Border>
 <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Num Lock feedback" Style="{StaticResource RowTitle}"/><TextBlock Text="Independent of Windows notification mirroring." Style="{StaticResource RowDescription}" TextWrapping="Wrap"/></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding NumLockNotifications}"/></Grid></Border>
-<DockPanel Margin="16,0,16,10" DataContext="{Binding DataContext, ElementName=PreviewIslandData}"><Button DockPanel.Dock="Right" Content="Windows Settings" Command="{Binding NotificationSettingsCommand}" Style="{StaticResource SettingsButton}" Margin="6,0,0,0" /><Button DockPanel.Dock="Right" Content="Set up / Retry" Command="{Binding RetryNotificationsCommand}" Style="{StaticResource SettingsButton}" Margin="6,0,0,0" /><TextBlock Text="{Binding NotificationStatusText}" Foreground="#9FAABD" TextWrapping="Wrap" VerticalAlignment="Center" /></DockPanel>
-                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE72E;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><TextBlock Grid.Column="1" Text="Next meeting" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowNextMeeting}" /></Grid></Border>
-<DockPanel Margin="16,0,16,10" DataContext="{Binding DataContext, ElementName=PreviewIslandData}"><Button DockPanel.Dock="Right" Content="Windows Settings" Command="{Binding CalendarSettingsCommand}" Style="{StaticResource SettingsButton}" Margin="6,0,0,0" /><Button DockPanel.Dock="Right" Content="Set up / Retry" Command="{Binding RetryCalendarCommand}" Style="{StaticResource SettingsButton}" Margin="6,0,0,0" /><TextBlock Text="{Binding CalendarStatusText}" Foreground="#9FAABD" TextWrapping="Wrap" VerticalAlignment="Center" /></DockPanel>
-                            <Border Style="{StaticResource LastPreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE83D;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#C9D1DA" /><StackPanel Grid.Column="1"><TextBlock Text="Privacy indicators" Style="{StaticResource RowTitle}" /><TextBlock Text="Show when the microphone or camera is in use." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowPrivacyIndicators}" /></Grid></Border>
+<DockPanel Margin="16,0,16,10" DataContext="{Binding DataContext, ElementName=PreviewIslandData}"><Button DockPanel.Dock="Right" Content="Windows Settings" Command="{Binding NotificationSettingsCommand}" Style="{StaticResource MonochromeSettingsButton}" Margin="6,0,0,0" /><Button DockPanel.Dock="Right" Content="Set up / Retry" Command="{Binding RetryNotificationsCommand}" Style="{StaticResource MonochromeSettingsButton}" Margin="6,0,0,0" /><TextBlock Text="{Binding NotificationStatusText}" Foreground="#A1A1A6" TextWrapping="Wrap" VerticalAlignment="Center" /></DockPanel>
+                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE72E;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><TextBlock Grid.Column="1" Text="Next meeting" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowNextMeeting}" /></Grid></Border>
+<DockPanel Margin="16,0,16,10" DataContext="{Binding DataContext, ElementName=PreviewIslandData}"><Button DockPanel.Dock="Right" Content="Windows Settings" Command="{Binding CalendarSettingsCommand}" Style="{StaticResource MonochromeSettingsButton}" Margin="6,0,0,0" /><Button DockPanel.Dock="Right" Content="Set up / Retry" Command="{Binding RetryCalendarCommand}" Style="{StaticResource MonochromeSettingsButton}" Margin="6,0,0,0" /><TextBlock Text="{Binding CalendarStatusText}" Foreground="#A1A1A6" TextWrapping="Wrap" VerticalAlignment="Center" /></DockPanel>
+                            <Border Style="{StaticResource LastPreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="&#xE83D;" FontFamily="Segoe Fluent Icons" FontSize="16" VerticalAlignment="Center" Foreground="#D1D1D6" /><StackPanel Grid.Column="1"><TextBlock Text="Privacy indicators" Style="{StaticResource RowTitle}" /><TextBlock Text="Show when the microphone or camera is in use." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="2" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowPrivacyIndicators}" /></Grid></Border>
                         </StackPanel></Border>
                     </StackPanel>
 
@@ -623,9 +626,9 @@
                             <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="App list" Style="{StaticResource RowTitle}" /><TextBox Grid.Column="1" Style="{StaticResource FieldText}" Text="{Binding NotificationAppFilter, UpdateSourceTrigger=LostFocus}" /></Grid></Border>
                             <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Notification polling" Style="{StaticResource RowTitle}" /><TextBlock Text="Lower values surface new toasts sooner; higher values reduce background checks." Style="{StaticResource RowDescription}" /></StackPanel><StackPanel Grid.Column="1" Orientation="Horizontal"><Slider Style="{StaticResource FieldSlider}" Minimum="0.1" Maximum="30" TickFrequency="0.1" SmallChange="0.1" LargeChange="1" IsSnapToTickEnabled="True" Value="{Binding NotificationPollSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" /><TextBlock Text="{Binding NotificationPollSeconds, StringFormat={}{0:0.#}s}" Width="48" TextAlignment="Right" VerticalAlignment="Center" Foreground="{StaticResource Muted}" /></StackPanel></Grid></Border>
                             <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Next meeting with Join" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowNextMeeting}" /></Grid></Border>
-<DockPanel Margin="16,0,16,10" DataContext="{Binding DataContext, ElementName=PreviewIslandData}"><Button DockPanel.Dock="Right" Content="Windows Settings" Command="{Binding CalendarSettingsCommand}" Style="{StaticResource SettingsButton}" Margin="6,0,0,0" /><Button DockPanel.Dock="Right" Content="Set up / Retry" Command="{Binding RetryCalendarCommand}" Style="{StaticResource SettingsButton}" Margin="6,0,0,0" /><TextBlock Text="{Binding CalendarStatusText}" Foreground="#9FAABD" TextWrapping="Wrap" VerticalAlignment="Center" /></DockPanel>
+<DockPanel Margin="16,0,16,10" DataContext="{Binding DataContext, ElementName=PreviewIslandData}"><Button DockPanel.Dock="Right" Content="Windows Settings" Command="{Binding CalendarSettingsCommand}" Style="{StaticResource MonochromeSettingsButton}" Margin="6,0,0,0" /><Button DockPanel.Dock="Right" Content="Set up / Retry" Command="{Binding RetryCalendarCommand}" Style="{StaticResource MonochromeSettingsButton}" Margin="6,0,0,0" /><TextBlock Text="{Binding CalendarStatusText}" Foreground="#A1A1A6" TextWrapping="Wrap" VerticalAlignment="Center" /></DockPanel>
                             <Border Style="{StaticResource LastPreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Clipboard history button" Style="{StaticResource RowTitle}" /><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding ShowClipboard}" /></Grid></Border>
-<DockPanel Margin="16,0,16,10" DataContext="{Binding DataContext, ElementName=PreviewIslandData}"><Button DockPanel.Dock="Right" Content="Windows Settings" Command="{Binding ClipboardSettingsCommand}" Style="{StaticResource SettingsButton}" Margin="6,0,0,0" /><Button DockPanel.Dock="Right" Content="Set up / Retry" Command="{Binding RetryClipboardCommand}" Style="{StaticResource SettingsButton}" Margin="6,0,0,0" /><TextBlock Text="{Binding ClipboardStatusText}" Foreground="#9FAABD" TextWrapping="Wrap" VerticalAlignment="Center" /></DockPanel>
+<DockPanel Margin="16,0,16,10" DataContext="{Binding DataContext, ElementName=PreviewIslandData}"><Button DockPanel.Dock="Right" Content="Windows Settings" Command="{Binding ClipboardSettingsCommand}" Style="{StaticResource MonochromeSettingsButton}" Margin="6,0,0,0" /><Button DockPanel.Dock="Right" Content="Set up / Retry" Command="{Binding RetryClipboardCommand}" Style="{StaticResource MonochromeSettingsButton}" Margin="6,0,0,0" /><TextBlock Text="{Binding ClipboardStatusText}" Foreground="#A1A1A6" TextWrapping="Wrap" VerticalAlignment="Center" /></DockPanel>
                         </StackPanel></Border>
                     </StackPanel>
 
@@ -691,7 +694,7 @@
                             <Border Style="{StaticResource LastPreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel Margin="0,0,16,0"><TextBlock Text="Require voice training before wake listening" Style="{StaticResource RowTitle}" /><TextBlock Text="Wake listening waits until training is complete. Your saved examples always help filter detections when available." Style="{StaticResource RowDescription}" TextWrapping="Wrap" /></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding WakeRequireTraining}" /></Grid></Border>
                         </StackPanel></Border>
                         <TextBlock Text="GENERAL" Style="{StaticResource GroupLabel}" Margin="0,0,0,9" />
-                        <Border Style="{StaticResource InsetGroup}"><StackPanel><Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Listen for “Hey Sutra”" Style="{StaticResource RowTitle}"/><TextBlock Text="Opt in to local wake detection. Say “Hey Sutra” and your question, in one breath or after the dots appear. After voice training, say the wake phrase on its own and wait for the dots before asking. Uses Sutra Flow's local Whisper model, with Windows speech as a fallback." Style="{StaticResource RowDescription}" TextWrapping="Wrap"/></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding WakeListeningEnabled}"/></Grid></Border><Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Wake sensitivity" Style="{StaticResource RowTitle}"/><TextBlock Text="High hears quieter voices. Low needs clearer speech above background noise. Every setting requires the complete wake phrase." Style="{StaticResource RowDescription}" TextWrapping="Wrap"/></StackPanel><ComboBox Grid.Column="1" Width="120" VerticalAlignment="Center" ItemsSource="{Binding WakeSensitivityOptions}" SelectedItem="{Binding WakeSensitivity, Mode=TwoWay}" AutomationProperties.Name="Wake sensitivity"/></Grid></Border><Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Read voice replies aloud" Style="{StaticResource RowTitle}"/><TextBlock Text="Voice questions speak their replies; typed replies stay silent." Style="{StaticResource RowDescription}" TextWrapping="Wrap"/></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding VoiceReadAloud}"/></Grid></Border><Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Compact voice mode" Style="{StaticResource RowTitle}"/><TextBlock Text="Voice turns stay in the compact island: Sutra listens, answers in two lines, and shows system changes live. Turn off to use the chat panel for voice." Style="{StaticResource RowDescription}" TextWrapping="Wrap"/></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding CompactVoiceMode}" AutomationProperties.Name="Compact voice mode"/></Grid></Border><Border Style="{StaticResource PreferenceRow}"><StackPanel><TextBlock Text="Windows voice" Style="{StaticResource RowTitle}"/><ComboBox ItemsSource="{Binding InstalledVoices}" SelectedItem="{Binding VoiceName, Mode=TwoWay}" Margin="0,8,0,0" ToolTip="Leave unset to use the Windows default voice"/><TextBlock Text="{Binding DataContext.VoiceStatus, ElementName=PreviewIslandData}" Style="{StaticResource RowDescription}" Margin="0,8,0,0" TextWrapping="Wrap"/></StackPanel></Border>
+                        <Border Style="{StaticResource InsetGroup}"><StackPanel><Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Listen for “Hey Sutra”" Style="{StaticResource RowTitle}"/><TextBlock Text="Opt in to local wake detection. Say “Hey Sutra” and your question, in one breath or after the dots appear. After voice training, say the wake phrase on its own and wait for the dots before asking. Uses Sutra Flow's local Whisper model, with Windows speech as a fallback." Style="{StaticResource RowDescription}" TextWrapping="Wrap"/></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding WakeListeningEnabled}"/></Grid></Border><Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Wake sensitivity" Style="{StaticResource RowTitle}"/><TextBlock Text="High hears quieter voices. Low needs clearer speech above background noise. Every setting requires the complete wake phrase." Style="{StaticResource RowDescription}" TextWrapping="Wrap"/></StackPanel><ComboBox Grid.Column="1" Width="120" VerticalAlignment="Center" ItemsSource="{Binding WakeSensitivityOptions}" SelectedItem="{Binding WakeSensitivity, Mode=TwoWay}" AutomationProperties.Name="Wake sensitivity"/></Grid></Border><Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Read voice replies aloud" Style="{StaticResource RowTitle}"/><TextBlock Text="Voice questions speak their replies; typed replies stay silent." Style="{StaticResource RowDescription}" TextWrapping="Wrap"/></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding VoiceReadAloud}"/></Grid></Border><Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Compact voice mode" Style="{StaticResource RowTitle}"/><TextBlock Text="Voice turns stay in the compact island: Sutra listens, answers in two lines, and shows system changes live. Turn off to use the chat panel for voice." Style="{StaticResource RowDescription}" TextWrapping="Wrap"/></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding CompactVoiceMode}" AutomationProperties.Name="Compact voice mode"/></Grid></Border><Border Style="{StaticResource PreferenceRow}"><StackPanel><TextBlock Text="Local voice" Style="{StaticResource RowTitle}"/><ComboBox ItemsSource="{Binding InstalledVoices}" SelectedItem="{Binding VoiceName, Mode=TwoWay}" Margin="0,8,0,0" ToolTip="Choose a local voice for spoken replies"/><TextBlock Text="{Binding DataContext.VoiceStatus, ElementName=PreviewIslandData}" Style="{StaticResource RowDescription}" Margin="0,8,0,0" TextWrapping="Wrap"/></StackPanel></Border>
                            <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Enable Sutra Assistant" Style="{StaticResource RowTitle}" /><TextBlock Text="Show the Sutra Assistant action in the Island and enable its global shortcut." Style="{StaticResource RowDescription}" /></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding QEnabled}" /></Grid></Border>
                             <Border Style="{StaticResource PreferenceRow}">
                                 <StackPanel>
@@ -731,11 +734,11 @@
                                 <StackPanel>
                                     <TextBlock Text="Provider API keys" Style="{StaticResource RowTitle}" />
                                     <TextBlock Text="Save a separate key for each provider. Select another provider above to add its key; your other keys stay saved. Keys use Windows user-scoped encryption, outside settings.json." Style="{StaticResource RowDescription}" TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding QSavedKeyProviders}" Foreground="#FF64ADFF" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                    <TextBlock Text="{Binding QSavedKeyProviders}" Foreground="#D1D1D6" TextWrapping="Wrap" Margin="0,8,0,0" />
                                     <StackPanel Visibility="{Binding QShowApiKey, Converter={StaticResource BoolToVisibility}}">
                                         <TextBlock Text="{Binding QApiKeyStatus}" Style="{StaticResource RowDescription}" Margin="0,8,0,8" />
                                         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                            <PasswordBox x:Name="QApiKeyBox" MinWidth="180" Height="32" VerticalContentAlignment="Center" ToolTip="Paste a key for the selected provider, then click Save key" AutomationProperties.Name="Provider API key" />
+                                            <PasswordBox x:Name="QApiKeyBox" MinWidth="180" Height="34" Padding="10,0" Background="#2C2C2E" Foreground="White" CaretBrush="White" BorderBrush="#48484A" BorderThickness="1" VerticalContentAlignment="Center" ToolTip="Paste a key for the selected provider, then click Save key" AutomationProperties.Name="Provider API key" />
                                             <Button Grid.Column="1" Content="Save key" Click="SaveQApiKey_Click" Style="{StaticResource ActionButton}" Margin="8,0,0,0" />
                                             <Button Grid.Column="2" Content="Remove key" Click="RemoveQApiKey_Click" Style="{StaticResource ActionButton}" Margin="8,0,0,0" />
                                         </Grid>

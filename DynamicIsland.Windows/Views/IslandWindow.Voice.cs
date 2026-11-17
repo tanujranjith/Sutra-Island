@@ -108,7 +108,7 @@ public partial class IslandWindow
         GlassShell.Width = currentW; GlassShell.Height = currentH;
         SetSurfaceInMotion(GlassShell, true);
         UseFastPillShadow();
-        _frostBackdrop.SetSuspended(true);
+
         var ease = IslandMorphEase(expanded: opening);
         var width = new DoubleAnimation(currentW, targetW, duration) { EasingFunction = ease };
         var height = new DoubleAnimation(currentH, targetH, duration) { EasingFunction = ease };
@@ -121,7 +121,7 @@ public partial class IslandWindow
             GlassShell.Width = targetW; GlassShell.Height = targetH;
             SetSurfaceInMotion(GlassShell, false);
             RestorePillShadow();
-            _frostBackdrop.SetSuspended(false);
+
         };
         GlassShell.BeginAnimation(WidthProperty, width);
         GlassShell.BeginAnimation(HeightProperty, height);

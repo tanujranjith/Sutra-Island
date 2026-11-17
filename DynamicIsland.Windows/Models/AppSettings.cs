@@ -77,7 +77,7 @@ public sealed class AppSettings
     // Exclude the Island from supported Windows screenshot and capture APIs by default.
     public bool ShowIslandInScreenshots { get; set; }
     public bool ShowInAltTab { get; set; }
-    public int CollapseDelayMilliseconds { get; set; } = 400;
+    public int CollapseDelayMilliseconds { get; set; } = 200;
     public int TopOffset { get; set; } = 2; // vertical offset from the selected anchor (DIP)
     public int SideOffset { get; set; } // horizontal offset from the selected anchor (DIP)
     public double? ManualLeftPixels { get; set; }

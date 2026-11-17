@@ -60,13 +60,27 @@ jobs:
         run: dotnet test .\DynamicIsland.Windows.Tests\DynamicIsland.Windows.Tests.csproj -c Release -m:1
 
       - name: Publish self-contained single-file exe
-        run: dotnet publish .\DynamicIsland.Windows\DynamicIsland.Windows.csproj -c Release -r win-x64
+        run: dotnet publish .\DynamicIsland.Windows\DynamicIsland.Windows.csproj -c Release -r win-x64 -o .\artifacts\root-app-update
+
+      - name: Prepare local voice model
+        shell: pwsh
+        run: .\scripts\Prepare-VoiceModel.ps1
+
+      - name: Build Windows installer
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ steps.version.outputs.app_version }}
+        run: |
+          $compiler = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+          $compilerPath = if ($compiler) { $compiler.Source } else { "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          if (-not (Test-Path -LiteralPath $compilerPath)) { throw 'Inno Setup compiler not found.' }
+          & $compilerPath "/DAppVersion=$env:APP_VERSION" .\installer\SutraIsland.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
 
       - name: Stage asset as DynamicIsland.exe
         shell: pwsh
         run: |
-          $exe = Get-ChildItem -Recurse -Path .\DynamicIsland.Windows\bin\Release -Filter DynamicIsland.Windows.exe |
-                 Where-Object { $_.FullName -match '\\publish\\' } | Select-Object -First 1
+          $exe = Get-Item .\artifacts\root-app-update\DynamicIsland.Windows.exe
           if (-not $exe) { throw "published exe not found" }
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item $exe.FullName dist\DynamicIsland.exe
@@ -95,7 +109,7 @@ jobs:
         env:
           APP_VERSION: ${{ steps.version.outputs.app_version }}
         run: |
-          @('DynamicIsland.exe', "DynamicIsland-Codex-Test-v$env:APP_VERSION-win-x64.zip") |
+          @('DynamicIsland.exe', "Sutra-Island-Setup-v$env:APP_VERSION-win-x64.exe", "DynamicIsland-Codex-Test-v$env:APP_VERSION-win-x64.zip") |
             ForEach-Object {
               $hash = (Get-FileHash -LiteralPath (Join-Path 'dist' $_) -Algorithm SHA256).Hash.ToLowerInvariant()
               "$hash  $_"
@@ -114,5 +128,6 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             dist/DynamicIsland.exe
+            dist/Sutra-Island-Setup-v${{ steps.version.outputs.app_version }}-win-x64.exe
             dist/DynamicIsland-Codex-Test-v${{ steps.version.outputs.app_version }}-win-x64.zip
             dist/SHA256SUMS.txt

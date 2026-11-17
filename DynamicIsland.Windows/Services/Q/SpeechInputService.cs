@@ -6,12 +6,13 @@ namespace DynamicIsland.Windows.Services.Q;
 /// <summary>
 /// Sutra Assistant's voice input and output. Listening ("Hey Sutra" and questions) uses Sutra
 /// Flow's local Whisper model once it is installed, and falls back to the Windows recognizer
-/// until then. Speaking always uses Windows text-to-speech.
+/// until then. Replies use the local Kokoro voice model.
 /// </summary>
 public sealed class SpeechInputService : IQSpeechInputService, IWakeWordInput, ISpeechOutput, IDisposable
 {
     private readonly LoggingService _log;
     private readonly WindowsVoicePlatform _windows;
+    private readonly LocalSpeechOutput _speaker = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private WhisperVoiceInput? _whisper;
     private bool _wakeOnWhisper;
@@ -20,7 +21,7 @@ public sealed class SpeechInputService : IQSpeechInputService, IWakeWordInput, I
     private WakeConfiguration _wakeConfiguration = new(null, .86, 4, false);
     private bool _disposed;
 
-    public static IReadOnlyList<string> GetInstalledVoices() => WindowsVoicePlatform.GetInstalledVoices();
+    public static IReadOnlyList<string> GetInstalledVoices() => LocalSpeechOutput.Voices;
     public event Action? WakeDetected;
     /// <summary>Which recognizer listens right now, for the settings page.</summary>
     public string EngineName => UseWhisper ? "Whisper (local, shared with Sutra Flow)" : "Windows speech recognition";
@@ -130,14 +131,15 @@ public sealed class SpeechInputService : IQSpeechInputService, IWakeWordInput, I
         if (_wakeOnWindows) { await _windows.StopWakeAsync().ConfigureAwait(false); _wakeOnWindows = false; }
     }
 
-    public Task SpeakAsync(string text, string voice, CancellationToken cancellationToken) => _windows.SpeakAsync(text, voice, cancellationToken);
-    public void StopSpeaking() => _windows.StopSpeaking();
+    public Task SpeakAsync(string text, string voice, CancellationToken cancellationToken) => _speaker.SpeakAsync(text, voice, cancellationToken);
+    public void StopSpeaking() => _speaker.StopSpeaking();
 
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
         _whisper?.Dispose();
+        _speaker.Dispose();
         _windows.Dispose();
     }
 }

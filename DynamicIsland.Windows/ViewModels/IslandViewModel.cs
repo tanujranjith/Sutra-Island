@@ -456,10 +456,9 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public MediaBrush AccentTextBrush => AccentBrush;
     // Effective accent: album-art adaptive > custom > default. Drives the accent brush used across the island.
     private string EffectiveAccentHex =>
-        Settings.Theme == ThemeMode.Graphite && !Settings.UseCustomColors ? "#B9A5FD" :
         Settings.AdaptiveAccent && _adaptiveAccent is not null ? _adaptiveAccent
         : Settings.UseCustomColors ? Settings.AccentColorHex
-        : "#B9A5FD";
+        : IsDarkTheme ? "#F2F2F2" : "#252525";
     public MediaBrush AccentBrush => FrozenBrush(EffectiveAccentHex);
     public MediaBrush AccentSoftBrush => FrozenBrush(WithAlpha(EffectiveAccentHex, 0x33));
     public MediaBrush IslandSurfaceBrush => IsTopNotch && IsDarkTheme ? FrozenBrush("#FF000000") : Settings.Theme == ThemeMode.Graphite ? NativeFrostActive ? Infrastructure.FrostedMaterial.WithOpaqueCaps(FrozenBrush("#DC101114"),NativeFrostInset) : FrozenBrush("#FF101114") : IsCustomTheme ? FrozenBrush(QThemePalette.Surface) : IsDarkTheme ? FrozenBrush("#FF101114") : FrozenBrush("#FFF5F5F7");

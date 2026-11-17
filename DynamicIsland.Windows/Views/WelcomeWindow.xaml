@@ -1,0 +1,31 @@
+<Window x:Class="DynamicIsland.Windows.Views.WelcomeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Welcome to Sutra Island" Width="880" Height="620" MinWidth="760" MinHeight="540"
+        WindowStartupLocation="CenterScreen" Background="#111118" Foreground="#F6F4FC" FontFamily="Segoe UI">
+    <Window.Resources>
+        <Style TargetType="Button"><Setter Property="Padding" Value="22,12"/><Setter Property="Cursor" Value="Hand"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="White"/><Setter Property="Background" Value="#6758E8"/><Setter Property="BorderThickness" Value="0"/></Style>
+        <Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="Wrap"/></Style>
+    </Window.Resources>
+    <Grid Margin="44,34">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <DockPanel><TextBlock Text="✦  SUTRA ISLAND" FontWeight="Bold" FontSize="14" Foreground="#C5BCFF"/><TextBlock x:Name="ProgressLabel" DockPanel.Dock="Right" TextAlignment="Right" Foreground="#A39DB7"/></DockPanel>
+        <Grid Grid.Row="1" Margin="0,36,0,20"><Grid.ColumnDefinitions><ColumnDefinition Width="3*"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center" Margin="0,0,32,0">
+                <TextBlock x:Name="Eyebrow" Foreground="#A99DFF" FontSize="13" FontWeight="Bold" Margin="0,0,0,12"/>
+                <TextBlock x:Name="Headline" FontSize="36" FontWeight="Bold" LineHeight="43"/>
+                <TextBlock x:Name="Description" Foreground="#C1BDCC" FontSize="16" LineHeight="25" Margin="0,18,0,20"/>
+                <StackPanel x:Name="OptionsPanel" Visibility="Collapsed">
+                    <TextBlock Text="Choose your local voice" Foreground="#E2DEEE" Margin="0,0,0,8"/>
+                    <ComboBox x:Name="VoiceChoice" Width="235" HorizontalAlignment="Left" Padding="8"/>
+                    <CheckBox x:Name="WakeChoice" Margin="0,18,0,0" Foreground="White" Content="Listen for “Hey Sutra”"/>
+                    <TextBlock Text="Optional. Uses your microphone for local wake detection." Foreground="#AAA4B9" FontSize="12" Margin="22,5,0,0"/>
+                </StackPanel>
+            </StackPanel>
+            <Border Grid.Column="1" CornerRadius="24" Background="#1E1D2A" BorderBrush="#363246" BorderThickness="1" Padding="24" VerticalAlignment="Stretch">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"><Border CornerRadius="28" Background="#09090D" Padding="28,18"><TextBlock x:Name="Demo" FontSize="19" FontWeight="SemiBold" TextAlignment="Center" Foreground="#F1EEFF"/></Border><TextBlock x:Name="Hint" Foreground="#AAA4B9" TextAlignment="Center" Margin="0,22,0,0"/></StackPanel>
+            </Border>
+        </Grid>
+        <DockPanel Grid.Row="2"><Button x:Name="BackButton" Content="Back" Click="Back_Click" Background="#343141" DockPanel.Dock="Left"/><Button x:Name="NextButton" Content="Continue" Click="Next_Click" DockPanel.Dock="Right" HorizontalAlignment="Right"/></DockPanel>
+    </Grid>
+</Window>

@@ -1,3 +1,10 @@
+# Sutra Island v1.4.0
+
+- Give Sutra Assistant a choice of natural local voices for spoken replies.
+- Add a Windows installer and a guided first-run introduction to the island, Assistant, and Flow.
+- Restore Flow transcription when Windows prevents the speech runtime from being written to its usual folder.
+
+---
 # Sutra Island v1.3.7
 
 This release includes the desktop changes since v1.3.0, including the updates described in v1.3.1–v1.3.3 below.

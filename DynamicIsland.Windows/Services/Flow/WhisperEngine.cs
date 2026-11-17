@@ -216,6 +216,25 @@ public sealed class WhisperEngine : IDisposable
     {
         var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0";
         var root = Path.Combine(Folder, "runtime", version);
+        try { ExtractNativesTo(root); }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            // Restricted desktop processes may read LocalAppData but not create files there.
+            _log.Info($"Sutra Flow: speech runtime data folder unavailable ({ex.Message}); trying the app folder.");
+            root = Path.Combine(AppContext.BaseDirectory, "SutraFlowRuntime", version);
+            try { ExtractNativesTo(root); }
+            catch (Exception fallback) when (fallback is UnauthorizedAccessException or IOException)
+            {
+                _log.Error("Sutra Flow: could not extract speech engine files.", fallback);
+                throw new FlowException("Speech engine files cannot be written; check folder permissions");
+            }
+        }
+        RuntimeOptions.LibraryPath = Path.Combine(root, "whisper.dll");
+        RuntimeOptions.RuntimeLibraryOrder = [RuntimeLibrary.Cpu];
+    }
+
+    private static void ExtractNativesTo(string root)
+    {
         var target = Path.Combine(root, "runtimes", "win-x64");
         Directory.CreateDirectory(target);
         var assembly = Assembly.GetExecutingAssembly();
@@ -225,11 +244,16 @@ public sealed class WhisperEngine : IDisposable
             if (File.Exists(path) && new FileInfo(path).Length > 0) continue;
             using var stream = assembly.GetManifestResourceStream("SutraFlow.Native.win-x64." + name)
                 ?? throw new FlowException("Speech engine files are missing from this build");
-            using var file = File.Create(path);
-            stream.CopyTo(file);
+            // Publish only complete files, even when extraction is interrupted.
+            var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    stream.CopyTo(file);
+                File.Move(temporary, path, overwrite: true);
+            }
+            finally { try { File.Delete(temporary); } catch { } }
         }
-        RuntimeOptions.LibraryPath = Path.Combine(root, "whisper.dll");
-        RuntimeOptions.RuntimeLibraryOrder = [RuntimeLibrary.Cpu];
     }
 
     public void Dispose()

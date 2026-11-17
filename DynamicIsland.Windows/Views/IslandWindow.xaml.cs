@@ -80,8 +80,7 @@ public partial class IslandWindow : Window
         DataContext = _viewModel = viewModel;
         SyncNotificationBanner();
         ApplyQTheme();
-        // The timer panel is opaque; keep the glass behind the main shell during its morph.
-        _frostBackdrop = Infrastructure.NativeFrostBackdrop.Attach(this,() => (GlassShell,new Rect(GlassShell.RenderSize),GlassShell.CornerRadius.TopLeft), (active,inset) => { _viewModel.NativeFrostInset=inset; _viewModel.NativeFrostActive=active; },()=>_viewModel.Settings.ShowIslandInScreenshots);
+
         _timerViewModel = timerViewModel;
         TimerPanelContent.DataContext = timerViewModel;
         LiveTimerStrip.DataContext = timerViewModel;
@@ -230,15 +229,15 @@ public partial class IslandWindow : Window
 
     // Both surfaces use the same opening cadence and content handoff.
     private TimeSpan PillMorphDuration(bool expanded) => TimeSpan.FromMilliseconds(expanded
-        ? (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 440d : 360d)
-        : (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 300d : 230d));
+        ? (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 400d : 320d)
+        : (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 280d : 220d));
 
     // A gentle, monotonic ease lets the island settle without a width overshoot or flash.
     private TimeSpan IslandMorphDuration(bool expanded) => TimeSpan.FromMilliseconds(expanded
-        ? (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 410d : 320d)
-        : (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 320d : 250d));
+        ? (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 400d : 320d)
+        : (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 280d : 220d));
     private static IEasingFunction IslandMorphEase(bool expanded) => expanded
-        ? new QuarticEase { EasingMode = EasingMode.EaseOut }
+        ? new CubicEase { EasingMode = EasingMode.EaseOut }
         : new CubicEase { EasingMode = EasingMode.EaseInOut };
     private static IEasingFunction PillMorphEase(bool expanded) => expanded
         ? new QuarticEase { EasingMode = EasingMode.EaseOut }
@@ -263,7 +262,7 @@ public partial class IslandWindow : Window
     public void SetSettingsWindowOpen(bool open)
     {
         _settingsWindowOpen = open;
-        if (open) _frostBackdrop.SetSettingsSuppressed(true);
+
         if (_sourceReady)
         {
             var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
@@ -273,7 +272,7 @@ public partial class IslandWindow : Window
                     0, 0, 0, 0,
                     Interop.NativeMethods.SwpNoMove | Interop.NativeMethods.SwpNoSize | Interop.NativeMethods.SwpNoActivate);
         }
-        if (!open) _frostBackdrop.SetSettingsSuppressed(false);
+
     }
 
     /// <summary>Force the island back into view (used by the tray "Recenter").</summary>
@@ -300,7 +299,7 @@ public partial class IslandWindow : Window
     private ThemePalette? _lastQPalette;
     private bool _lastQTranslucent;
     private double _lastQFrostInset;
-    private Infrastructure.NativeFrostBackdrop _frostBackdrop = null!;
+
     private void ApplyQTheme()
     {
         var palette = _viewModel.QThemePalette;
@@ -1032,7 +1031,7 @@ public partial class IslandWindow : Window
         if (!keepVoiceMorph) _compactVoiceMorphing = false;
         if (!animate || reduced)
         {
-            _frostBackdrop.SetSuspended(keepVoiceMorph || _viewModel.IsTopNotch);
+
             SetPillAnimationCache(enabled: false, compactContent);
             if (!keepVoiceMorph)
             {
@@ -1056,9 +1055,7 @@ public partial class IslandWindow : Window
             return;
         }
 
-        // Expansion covers the full compact-to-editor distance. Give it enough time for the
-        // compositor to render a visibly fluid sequence of frames instead of making the first
-        // few frames carry most of a 900x600 resize. Collapse stays quick and familiar.
+        // Use a short, eased morph so the island responds promptly while retaining a smooth transition.
         var duration = IslandMorphDuration(expanded);
         // Keep the shell dimensions monotonic. A BackEase on the actual width made the island
         // overshoot horizontally, producing the wide flash visible in the frame captures before
@@ -1067,7 +1064,7 @@ public partial class IslandWindow : Window
         var ease = IslandMorphEase(expanded);
 
         _expandAnimating = true;
-        _frostBackdrop.SetSuspended(true);
+
         SetPillAnimationCache(enabled: true, compactContent);
         UseFastPillShadow();
         if (!_loggedAnimationStart)
@@ -1092,22 +1089,6 @@ public partial class IslandWindow : Window
         heightAnimation.Completed += (_, _) => FinishPillMorph(generation, targetW, targetH, expanded);
         GlassShell.BeginAnimation(WidthProperty, widthAnimation);
         GlassShell.BeginAnimation(HeightProperty, heightAnimation);
-        // Begin compositing the glass once the shell has covered most of its travel. Keeping
-        // the first part opaque avoids expensive backdrop resizes during the fastest growth.
-        if (expanded)
-        {
-            const double handoffFraction = 0.6;
-            var frostHandoff = new DispatcherTimer(DispatcherPriority.Render)
-            { Interval = TimeSpan.FromMilliseconds(duration.TotalMilliseconds * handoffFraction) };
-            frostHandoff.Tick += (_, _) =>
-            {
-                frostHandoff.Stop();
-                if (generation == _pillAnimationGeneration && _expandAnimating && _viewModel.IsExpanded)
-                    _frostBackdrop.SetSuspended(_viewModel.IsTopNotch);
-            };
-            frostHandoff.Start();
-        }
-
         if (expanded)
         {
             // Preserve a compact visual while the rounded clip begins widening, then hand off
@@ -1118,7 +1099,8 @@ public partial class IslandWindow : Window
             // Fade the main expanded surface after the shell starts widening. The timer overlay
             // has its own animation and is never mounted in this tree.
             ExpandedContent.Opacity = 0d;
-            ExpandedContent.IsHitTestVisible = false;
+            // The visible portion can accept input while the shell finishes opening.
+            ExpandedContent.IsHitTestVisible = true;
             var fade = new DoubleAnimation(0d, 1d, TimeSpan.FromMilliseconds(duration.TotalMilliseconds * 0.62))
             {
                 BeginTime = TimeSpan.FromMilliseconds(duration.TotalMilliseconds * 0.12),
@@ -1181,7 +1163,7 @@ public partial class IslandWindow : Window
         ApplyVisualMode();
         GlassShell.Opacity = 1d;
         _expandAnimating = false;
-        _frostBackdrop.SetSuspended(_viewModel.IsTopNotch);
+
         RestorePillShadow();
         if (!_loggedAnimationCompletion)
         {

@@ -292,14 +292,19 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _weather.Start();
         _stocks.Start();
         ApplyLiveActivitySettings();
-        // First-run onboarding: open the (new) settings so people can explore what's customisable.
-        if (!_settings.HasOnboarded || openSettingsFromCommandLine)
+        if (!_settings.HasOnboarded)
         {
-            if (!_settings.HasOnboarded)
+            var welcome = new WelcomeWindow(_settings);
+            if (welcome.ShowDialog() == true)
             {
                 _settings.HasOnboarded = true;
                 await _settingsService.SaveAsync(_settings);
+                _settingsViewModel?.RefreshRuntimePreferences();
+                await _islandViewModel.ConfigureVoiceAsync();
             }
+        }
+        if (openSettingsFromCommandLine)
+        {
             ShowSettings();
         }
         // WinRT media discovery is independent of the requested Settings window.
