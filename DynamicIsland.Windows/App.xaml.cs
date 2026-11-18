@@ -43,10 +43,12 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     private SettingsViewModel? _settingsViewModel;
     private IslandWindow? _islandWindow;
     private SettingsWindow? _settingsWindow;
+    private WelcomeWindow? _welcomeWindow;
     private TimerAlarmViewModel? _timerViewModel;
     private TrayService? _tray;
     private AppSettings? _settings;
     private volatile bool _isShuttingDown;
+    internal bool IsShuttingDown => _isShuttingDown;
     private ScreenContextService? _qScreen;
     private SpeechInputService? _qSpeech;
     private AssistantVoiceController? _voice;
@@ -89,11 +91,11 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             return;
         }
         Infrastructure.GraphiteMenuSupport.Initialize();
-        if (e.Args.Contains("--verify-taskbar") || e.Args.Contains("--verify-notification-motion") || e.Args.Contains("--verify-graphite") || e.Args.Contains("--verify-mascot-bulb") || e.Args.Contains("--verify-composer-keys") || e.Args.Contains("--verify-command-panels") || e.Args.Contains("--verify-sutra-update") || e.Args.Contains("--verify-upgrades") || e.Args.Contains("--verify-q-providers") || e.Args.Contains("--verify-q-compare") || e.Args.Contains("--verify-notification-click"))
+        if (e.Args.Contains("--verify-welcome") || e.Args.Contains("--verify-taskbar") || e.Args.Contains("--verify-notification-motion") || e.Args.Contains("--verify-graphite") || e.Args.Contains("--verify-mascot-bulb") || e.Args.Contains("--verify-composer-keys") || e.Args.Contains("--verify-command-panels") || e.Args.Contains("--verify-sutra-update") || e.Args.Contains("--verify-upgrades") || e.Args.Contains("--verify-q-providers") || e.Args.Contains("--verify-q-compare") || e.Args.Contains("--verify-notification-click"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             if (!Infrastructure.AppDataPaths.IsPreview) { Shutdown(2); return; }
-            try { if (e.Args.Contains("--verify-notification-motion")) await Infrastructure.UpgradeVerification.RunSutraAsync(notificationMotionOnly: true); else if (e.Args.Contains("--verify-graphite")) await Infrastructure.UpgradeVerification.RunSutraAsync(graphiteOnly: true); else if (e.Args.Contains("--verify-mascot-bulb")) await Infrastructure.UpgradeVerification.RunSutraAsync(mascotOnly: true); else if (e.Args.Contains("--verify-composer-keys")) await Infrastructure.UpgradeVerification.RunSutraAsync(composerOnly: true); else if (e.Args.Contains("--verify-command-panels")) await Infrastructure.UpgradeVerification.RunSutraAsync(commandPanelsOnly: true); else if (e.Args.Contains("--verify-sutra-update")) await Infrastructure.UpgradeVerification.RunSutraAsync(); else await Infrastructure.UpgradeVerification.RunAsync(e.Args.Contains("--verify-q-providers"), e.Args.Contains("--verify-q-compare"), e.Args.Contains("--verify-notification-click"), e.Args.Contains("--verify-taskbar")); Shutdown(0); }
+            try { if (e.Args.Contains("--verify-welcome")) await Infrastructure.UpgradeVerification.RunSutraAsync(welcomeOnly: true); else if (e.Args.Contains("--verify-notification-motion")) await Infrastructure.UpgradeVerification.RunSutraAsync(notificationMotionOnly: true); else if (e.Args.Contains("--verify-graphite")) await Infrastructure.UpgradeVerification.RunSutraAsync(graphiteOnly: true); else if (e.Args.Contains("--verify-mascot-bulb")) await Infrastructure.UpgradeVerification.RunSutraAsync(mascotOnly: true); else if (e.Args.Contains("--verify-composer-keys")) await Infrastructure.UpgradeVerification.RunSutraAsync(composerOnly: true); else if (e.Args.Contains("--verify-command-panels")) await Infrastructure.UpgradeVerification.RunSutraAsync(commandPanelsOnly: true); else if (e.Args.Contains("--verify-sutra-update")) await Infrastructure.UpgradeVerification.RunSutraAsync(); else await Infrastructure.UpgradeVerification.RunAsync(e.Args.Contains("--verify-q-providers"), e.Args.Contains("--verify-q-compare"), e.Args.Contains("--verify-notification-click"), e.Args.Contains("--verify-taskbar")); Shutdown(0); }
             catch (Exception ex) { Directory.CreateDirectory(Infrastructure.AppDataPaths.Root); File.WriteAllText(Path.Combine(Infrastructure.AppDataPaths.Root, "verification-error.txt"), ex.ToString()); Shutdown(1); }
             return;
         }
@@ -294,6 +296,8 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _weather.Start();
         _stocks.Start();
         ApplyLiveActivitySettings();
+        // Media discovery continues while the modeless walkthrough is open.
+        var mediaStart = _media.StartAsync();
         if (!_settings.HasOnboarded || openWelcomeFromCommandLine) await ShowWelcomeAsync();
         if (openSettingsFromCommandLine || openVoiceSettingsFromCommandLine)
         {
@@ -301,15 +305,22 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             if (openVoiceSettingsFromCommandLine) _settingsWindow?.OpenQSettings();
         }
         // WinRT media discovery is independent of the requested Settings window.
-        if (!_isShuttingDown) await _media.StartAsync();
+        if (!_isShuttingDown) await mediaStart;
     }
 
     public async Task ShowWelcomeAsync(Window? owner = null)
     {
-        if (_settings is null || _settingsService is null || _islandViewModel is null) return;
-        var welcome = new WelcomeWindow(_settings);
+        if (_settings is null || _settingsService is null || _islandViewModel is null || _islandWindow is null) return;
+        if (_welcomeWindow is { IsVisible: true }) { _welcomeWindow.Activate(); return; }
+        var welcome = new WelcomeWindow(_settings, _islandViewModel, _islandWindow, _flow);
+        _welcomeWindow = welcome;
         if (owner is { IsVisible: true }) { welcome.Owner = owner; welcome.WindowStartupLocation = WindowStartupLocation.CenterOwner; }
-        if (welcome.ShowDialog() != true) return;
+        var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        welcome.Closed += (_, _) => closed.TrySetResult();
+        welcome.Show();
+        await closed.Task;
+        if (ReferenceEquals(_welcomeWindow, welcome)) _welcomeWindow = null;
+        if (!welcome.Completed || _isShuttingDown) return;
         _settings.HasOnboarded = true;
         await _settingsService.SaveAsync(_settings);
         _settingsViewModel?.RefreshRuntimePreferences();
@@ -646,6 +657,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         if (_isShuttingDown) return;
         _isShuttingDown = true;
         _log?.Info("Application shutting down");
+        _welcomeWindow?.Close();
         _paletteWindow?.Close();
         _screenshots?.Dispose();
         _tray?.Dispose();

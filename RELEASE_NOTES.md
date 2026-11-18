@@ -1,3 +1,9 @@
+# Sutra Island v1.4.2
+
+- Rebuild the setup walkthrough with a live island view, real island controls, dictation practice, and local voice previews.
+- Fix the voice dropdown's contrast and make the island interactive while the walkthrough is open.
+
+---
 # Sutra Island v1.4.1
 
 - Put the Assistant reply voice choices at the top of its Settings page and make the default voice visible.

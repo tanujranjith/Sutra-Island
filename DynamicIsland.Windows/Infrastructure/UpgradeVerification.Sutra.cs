@@ -17,7 +17,7 @@ namespace DynamicIsland.Windows.Infrastructure;
 
 internal static partial class UpgradeVerification
 {
-    internal static async Task RunSutraAsync(bool commandPanelsOnly = false, bool composerOnly = false, bool mascotOnly = false, bool graphiteOnly = false, bool notificationMotionOnly = false)
+    internal static async Task RunSutraAsync(bool commandPanelsOnly = false, bool composerOnly = false, bool mascotOnly = false, bool graphiteOnly = false, bool notificationMotionOnly = false, bool welcomeOnly = false)
     {
         if (!AppDataPaths.IsPreview) throw new InvalidOperationException("Verification requires preview isolation.");
         var output = Path.Combine(AppDataPaths.Root, "captures"); Directory.CreateDirectory(output);
@@ -54,6 +54,15 @@ internal static partial class UpgradeVerification
         PresentationTraceSources.DataBindingSource.Listeners.Add(bindingLog); PresentationTraceSources.DataBindingSource.Switch.Level = SourceLevels.Warning;
         try
         {
+            if (welcomeOnly)
+            {
+                window.Show(); await Idle();
+                await VerifyWelcomeAsync(settings, vm, window, Check, output);
+                bindingLog.Flush(); PresentationTraceSources.DataBindingSource.Listeners.Remove(bindingLog);
+                bindingLog.Close(); bindingClosed = true;
+                Check(!File.ReadAllText(Path.Combine(output, "sutra-bindings.log")).Contains("Error:"), "Welcome has no WPF binding errors");
+                return;
+            }
             if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_PRIVACY")=="1")
             {
                 await VerifyPrivacyAsync(vm, window, privacy, state => privacyFixture = state, Check, output);
@@ -305,6 +314,43 @@ internal static partial class UpgradeVerification
             await Task.Delay(20);
         }
     }
+    private static async Task VerifyWelcomeAsync(AppSettings settings, IslandViewModel vm, IslandWindow island, Action<bool, string> check, string output)
+    {
+        var guide = new WelcomeWindow(settings, vm, island, null) { ShowInTaskbar = false };
+        async Task Idle() => await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        void Click(string name) => ((System.Windows.Controls.Button)guide.FindName(name)).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+        guide.Show();
+        try
+        {
+            await Idle(); await CaptureSutraAsync(guide, output, "welcome-intro");
+            Click("NextButton"); await Idle();
+            var expanded = vm.IsExpanded;
+            Click("ToggleIslandButton"); await Idle();
+            check(vm.IsExpanded != expanded, "Guide controls the real island expansion");
+            await CaptureSutraAsync(guide, output, "welcome-live-island");
+            Click("NextButton"); await Idle();
+            check(((System.Windows.Controls.TextBox)guide.FindName("PracticeText")).IsEnabled, "Dictation practice field is available");
+            await CaptureSutraAsync(guide, output, "welcome-flow");
+            Click("NextButton"); await Idle();
+            var combo = (System.Windows.Controls.ComboBox)guide.FindName("VoiceChoice");
+            check(combo.Items.Count >= 2 && combo.SelectedItem is string, "Voice choices and default are available");
+            await CaptureSutraAsync(guide, output, "welcome-voice");
+            combo.IsDropDownOpen = true; await Idle(); await Task.Delay(100); await Idle();
+            var popup = (System.Windows.Controls.Primitives.Popup)combo.Template.FindName("PART_Popup", combo);
+            check(popup.IsOpen && popup.Child is FrameworkElement, "Voice dropdown opens with its themed popup");
+            var child = (FrameworkElement)popup.Child;
+            var bitmap = new RenderTargetBitmap((int)Math.Ceiling(child.ActualWidth), (int)Math.Ceiling(child.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(child); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var file = File.Create(Path.Combine(output, "welcome-voice-dropdown.png"))) encoder.Save(file);
+            combo.IsDropDownOpen = false;
+            combo.SelectedIndex = 1;
+            Click("NextButton"); await Idle();
+            Click("NextButton");
+            check(guide.Completed && settings.VoiceName == LocalSpeechOutput.Voices[1], "Finishing saves the chosen local voice");
+        }
+        finally { if (guide.IsVisible) guide.Close(); }
+    }
+
     private static async Task VerifyWakeLifetimeAsync(AppSettings settings, IslandViewModel vm, Action<bool, string> check)
     {
         var previousAutoClose = settings.QAutoCloseAfterResponse;

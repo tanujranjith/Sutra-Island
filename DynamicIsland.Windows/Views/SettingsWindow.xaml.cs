@@ -20,7 +20,10 @@ public partial class SettingsWindow : Window
 
     private async void OpenWalkthrough_Click(object sender, RoutedEventArgs e)
     {
-        if (System.Windows.Application.Current is App app) await app.ShowWelcomeAsync(this);
+        if (System.Windows.Application.Current is not App app) return;
+        Hide(); // Keep the real island unobstructed and interactive during the guide.
+        try { await app.ShowWelcomeAsync(); }
+        finally { if (!app.IsShuttingDown && !Dispatcher.HasShutdownStarted) { Show(); Activate(); } }
     }
 
     public SettingsWindow(SettingsViewModel settingsViewModel, IslandViewModel islandViewModel, IslandWindow islandWindow)
