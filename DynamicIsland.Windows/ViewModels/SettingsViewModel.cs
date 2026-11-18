@@ -138,7 +138,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
     public bool VoiceReadAloud { get => _settings.VoiceReadAloud; set => Set(v => _settings.VoiceReadAloud = v, value); }
     public bool CompactVoiceMode { get => _settings.CompactVoiceMode; set => Set(v => _settings.CompactVoiceMode = v, value); }
-    public string VoiceName { get => _settings.VoiceName; set => Set(v => _settings.VoiceName = v, value); }
+    public string VoiceName { get => InstalledVoices.Contains(_settings.VoiceName) ? _settings.VoiceName : InstalledVoices[0]; set => Set(v => _settings.VoiceName = v, value); }
     public IReadOnlyList<string> InstalledVoices => Services.Q.SpeechInputService.GetInstalledVoices();
     public void RefreshRuntimePreferences()
     {

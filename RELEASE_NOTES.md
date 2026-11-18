@@ -1,3 +1,9 @@
+# Sutra Island v1.4.1
+
+- Put the Assistant reply voice choices at the top of its Settings page and make the default voice visible.
+- Add a button to reopen the setup walkthrough from Assistant settings.
+
+---
 # Sutra Island v1.4.0
 
 - Give Sutra Assistant a choice of natural local voices for spoken replies.

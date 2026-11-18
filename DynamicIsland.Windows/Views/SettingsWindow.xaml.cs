@@ -18,6 +18,11 @@ public partial class SettingsWindow : Window
 
     public event EventHandler? OpenTimerRequested;
 
+    private async void OpenWalkthrough_Click(object sender, RoutedEventArgs e)
+    {
+        if (System.Windows.Application.Current is App app) await app.ShowWelcomeAsync(this);
+    }
+
     public SettingsWindow(SettingsViewModel settingsViewModel, IslandViewModel islandViewModel, IslandWindow islandWindow)
     {
         InitializeComponent();

@@ -101,6 +101,8 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _log.Info($"Application startup entered: pid={Environment.ProcessId}, version={typeof(App).Assembly.GetName().Version}");
         var openSettingsFromCommandLine = e.Args
             .Any(arg => string.Equals(arg, "--settings", StringComparison.OrdinalIgnoreCase));
+        var openWelcomeFromCommandLine = e.Args.Any(arg => string.Equals(arg, "--welcome", StringComparison.OrdinalIgnoreCase));
+        var openVoiceSettingsFromCommandLine = e.Args.Any(arg => string.Equals(arg, "--voice-settings", StringComparison.OrdinalIgnoreCase));
         var showIslandFromCommandLine = e.Args
             .Any(arg => string.Equals(arg, "--show-island", StringComparison.OrdinalIgnoreCase));
         _singleInstance = new Mutex(true, "Local\\DynamicIsland.Windows.SingleInstance" + Infrastructure.AppDataPaths.InstanceSuffix, out var firstInstance);
@@ -292,23 +294,26 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _weather.Start();
         _stocks.Start();
         ApplyLiveActivitySettings();
-        if (!_settings.HasOnboarded)
-        {
-            var welcome = new WelcomeWindow(_settings);
-            if (welcome.ShowDialog() == true)
-            {
-                _settings.HasOnboarded = true;
-                await _settingsService.SaveAsync(_settings);
-                _settingsViewModel?.RefreshRuntimePreferences();
-                await _islandViewModel.ConfigureVoiceAsync();
-            }
-        }
-        if (openSettingsFromCommandLine)
+        if (!_settings.HasOnboarded || openWelcomeFromCommandLine) await ShowWelcomeAsync();
+        if (openSettingsFromCommandLine || openVoiceSettingsFromCommandLine)
         {
             ShowSettings();
+            if (openVoiceSettingsFromCommandLine) _settingsWindow?.OpenQSettings();
         }
         // WinRT media discovery is independent of the requested Settings window.
         if (!_isShuttingDown) await _media.StartAsync();
+    }
+
+    public async Task ShowWelcomeAsync(Window? owner = null)
+    {
+        if (_settings is null || _settingsService is null || _islandViewModel is null) return;
+        var welcome = new WelcomeWindow(_settings);
+        if (owner is { IsVisible: true }) { welcome.Owner = owner; welcome.WindowStartupLocation = WindowStartupLocation.CenterOwner; }
+        if (welcome.ShowDialog() != true) return;
+        _settings.HasOnboarded = true;
+        await _settingsService.SaveAsync(_settings);
+        _settingsViewModel?.RefreshRuntimePreferences();
+        await _islandViewModel.ConfigureVoiceAsync();
     }
 
     private void ShowSettings()
