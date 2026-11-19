@@ -1,3 +1,10 @@
+# Sutra Island v1.4.3
+
+- Make the island open and close more smoothly, including when you move the pointer back over it mid-close.
+- Keep notification banners and urgent alerts aligned with the island during transitions.
+- Reduce background audio work by screening wake audio before transcription, limiting wake checks to two CPU threads, and pausing spectrum analysis when the visualizer is hidden.
+
+---
 # Sutra Island v1.4.2
 
 - Rebuild the setup walkthrough with a live island view, real island controls, dictation practice, and local voice previews.
