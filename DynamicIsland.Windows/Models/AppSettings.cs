@@ -12,6 +12,9 @@ public enum QCaptureMode { ActiveWindow, ActiveMonitor }
 
 public sealed class AppSettings
 {
+    public IslandGlance PinnedGlance { get; set; }
+    public List<TrayItem> DropTrayItems { get; set; } = [];
+    public List<CapturedNote> CapturedNotes { get; set; } = [];
     public int SchemaVersion { get; set; } = 16;
     public bool LaunchOnStartup { get; set; }
     public bool AlwaysOnTop { get; set; } = true;

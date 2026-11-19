@@ -488,7 +488,16 @@
     </Window.Resources>
 
     <Grid Background="{x:Null}">
-        <views:NotchBorder x:Name="GlassShell" IsNotch="{Binding IsTopNotch}" ReducedMotion="{Binding IsReducedMotion}" Width="230" Height="62" Margin="0,8,0,0" HorizontalAlignment="Center" VerticalAlignment="Top" CornerRadius="{Binding IslandCornerRadius}" Background="{Binding IslandBaseSurfaceBrush}" BorderThickness="1" BorderBrush="{StaticResource GlassRimBrush}" RenderTransformOrigin="0.5,0" ClipToBounds="True" Panel.ZIndex="10" MouseEnter="Pill_MouseEnter" MouseLeave="Pill_MouseLeave" MouseLeftButtonDown="Pill_MouseLeftButtonDown">
+        <views:NotchBorder x:Name="GlassShell" IsNotch="{Binding IsTopNotch}" ReducedMotion="{Binding IsReducedMotion}" Width="230" Height="62" Margin="0,8,0,0" HorizontalAlignment="Center" VerticalAlignment="Top" CornerRadius="{Binding IslandCornerRadius}" Background="{Binding IslandBaseSurfaceBrush}" BorderThickness="1" BorderBrush="{StaticResource GlassRimBrush}" RenderTransformOrigin="0.5,0" ClipToBounds="True" Panel.ZIndex="10" MouseEnter="Pill_MouseEnter" MouseLeave="Pill_MouseLeave" MouseLeftButtonDown="Pill_MouseLeftButtonDown"
+                           AllowDrop="True" PreviewDragOver="WorkspaceShell_DragOver" PreviewDrop="WorkspaceShell_Drop">
+                <views:NotchBorder.ContextMenu>
+                    <ContextMenu Opened="IslandContextMenu_Opened" Closed="IslandContextMenu_Closed">
+                        <MenuItem Header="Drop Tray" Click="WorkspaceTray_Click"/>
+                        <MenuItem Header="Transfers" Click="WorkspaceTransfers_Click"/>
+                        <MenuItem Header="Pinned item" Click="WorkspacePinned_Click"/>
+                        <MenuItem Header="Quick Capture" Click="WorkspaceCapture_Click"/>
+                    </ContextMenu>
+                </views:NotchBorder.ContextMenu>
                 <views:NotchBorder.Effect>
                     <DropShadowEffect BlurRadius="28" ShadowDepth="8" Opacity="0.5" Color="#000000" Direction="90" />
                 </views:NotchBorder.Effect>
@@ -1227,6 +1236,13 @@
                     </Popup>
 
                 </Grid></ScrollViewer>
+
+                <Border x:Name="WorkspaceGlanceOverlay" Panel.ZIndex="15" Background="{Binding IslandSurfaceBrush}"
+                        CornerRadius="{Binding IslandInnerCornerRadius}" Visibility="Collapsed" IsHitTestVisible="False">
+                    <TextBlock x:Name="WorkspaceGlanceLabel" Margin="10,0" FontSize="12" FontWeight="SemiBold"
+                               FontFamily="{Binding UiFontFamily}" Foreground="{Binding PrimaryTextBrush}"
+                               VerticalAlignment="Center" TextAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                </Border>
 
                 <!-- Compact voice mode: the island itself becomes the Sutra Assistant voice orb (docs/voice-orb). -->
                 <views:CompactVoiceView x:Name="CompactVoice" Panel.ZIndex="480" Margin="-1"

@@ -267,6 +267,9 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             ToggleDefaultTimer);
         _hotkeys.Register("Focus mode", Interop.NativeMethods.HotkeyModifierControl | Interop.NativeMethods.HotkeyModifierAlt, (uint)'F',
             ToggleFocus);
+        _hotkeys.Register("Quick capture", Interop.NativeMethods.HotkeyModifierControl | Interop.NativeMethods.HotkeyModifierAlt, (uint)'N',
+            () => _islandWindow.ShowWorkspace(WorkspaceTab.Capture));
+        _islandWindow.WorkspacePinChanged += ApplySystemMonitorSettings;
         _hotkeys.Register("Open settings", GlobalHotkeyService.SettingsModifiers, GlobalHotkeyService.SettingsKey,
             ShowSettings);
         RegisterQHotkey();
@@ -519,6 +522,13 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     void ICommandPaletteHost.RecenterIsland() => Recenter();
     Task ICommandPaletteHost.OpenClipboardAsync() => ShowClipboardAsync();
     Task ICommandPaletteHost.OpenCommandPanelAsync(string command) => OpenCommandPaletteAsync(command);
+    void ICommandPaletteHost.ShowWorkspace(PaletteCommand command) => Dispatcher.BeginInvoke(() => _islandWindow?.ShowWorkspace(command switch
+    {
+        PaletteCommand.Transfers => WorkspaceTab.Transfers,
+        PaletteCommand.PinWidget => WorkspaceTab.Pinned,
+        PaletteCommand.QuickCapture => WorkspaceTab.Capture,
+        _ => WorkspaceTab.Tray
+    }));
     void ICommandPaletteHost.ShowNotificationHistory() => Dispatcher.BeginInvoke(() => _islandWindow?.ShowHistory());
     async Task ICommandPaletteHost.SetNotificationsAsync(bool enabled)
     { _settings!.ShowNotifications = enabled; await SaveAndApplyAsync(); }
@@ -597,8 +607,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _privacy?.ConfigurePolling(TimeSpan.FromSeconds(_settings.PrivacyPollSeconds));
         _theme?.ConfigurePolling(TimeSpan.FromSeconds(_settings.ThemePollSeconds));
         _airPods?.ConfigurePolling(TimeSpan.FromSeconds(_settings.AirPodsPollSeconds));
-        if (_settings.ShowSystemMonitor || _settings.ShowRamInCompact) _sysMon?.Start();
-        else _sysMon?.Stop();
+        ApplySystemMonitorSettings();
         if (_settings.RealAudioSpectrum) _spectrum?.Start();
         else _spectrum?.Stop();
         _calendar?.ConfigurePolling(TimeSpan.FromMinutes(_settings.CalendarPollMinutes));
@@ -607,6 +616,14 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         if (_settings.ShowNotifications) _ = _notifications!.StartAsync(_liveSettingsApplied); else _notifications!.Stop();
         if (!_liveSettingsApplied || _clipboardEnabled != _settings.ShowClipboard) { _clipboardEnabled = _settings.ShowClipboard; _clipboard!.Configure(_clipboardEnabled); }
         _liveSettingsApplied = true;
+    }
+
+    private void ApplySystemMonitorSettings()
+    {
+        if (_settings is null) return;
+        if (_settings.ShowSystemMonitor || _settings.ShowRamInCompact || _settings.PinnedGlance is IslandGlance.Cpu or IslandGlance.Memory)
+            _sysMon?.Start();
+        else _sysMon?.Stop();
     }
 
     // Use the same image-aware history from the island menu and command palette.

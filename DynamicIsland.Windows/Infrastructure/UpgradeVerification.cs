@@ -55,6 +55,15 @@ internal static partial class UpgradeVerification
         var shell = (NotchBorder)window.FindName("GlassShell");
         var report = new List<string>();
         void Check(bool value, string description) { if (!value) throw new InvalidOperationException(description); report.Add("PASS " + description); }
+        if (Environment.GetEnvironmentVariable("ISLAND_VERIFY_WORKSPACE") == "1")
+        {
+            await VerifyWorkspaceAsync(window, settingsService, Check, output);
+            bindingLog.Flush();
+            File.WriteAllLines(Path.Combine(output, "checks.txt"), report);
+            window.Close();
+            PresentationTraceSources.DataBindingSource.Listeners.Remove(bindingLog);
+            return;
+        }
         if (notificationClickOnly)
         {
             await VerifyNotificationClicksAsync(settings, vm, window, Check);

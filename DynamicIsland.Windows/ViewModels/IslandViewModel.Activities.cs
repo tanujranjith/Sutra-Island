@@ -1,6 +1,7 @@
 using System.Windows.Input;
 using DynamicIsland.Windows.Infrastructure;
 using DynamicIsland.Windows.Models;
+using DynamicIsland.Windows.Services;
 
 namespace DynamicIsland.Windows.ViewModels;
 
@@ -29,6 +30,8 @@ public sealed partial class IslandViewModel
     private bool SuppressOrdinaryBanners => TimerEditorOpen || IsQActive || HasUrgentAlert;
     public bool DeferOrdinaryBanners => InteractionProtected || SuppressOrdinaryBanners;
     public TimerState? DisplayTimer => _timerAlarmService.DisplayTimer(Settings.PinnedActivity == IslandActivity.Timer ? Settings.PinnedTimerId : null);
+    internal string PinnedGlanceTimerText => DisplayTimer is { } timer
+        ? $"Timer  {TimerAlarmService.FormatDuration(_timerAlarmService.Remaining(timer))}" : "No active timer";
     public string TimerOrbGlyph => DisplayTimer?.Phase == TimerPhase.Paused ? "\uE768" : "\uE916";
     public string TimerOrbTooltip => DisplayTimer?.Phase == TimerPhase.Paused ? "Paused timer" : "Running timer";
     private TimerState PrimaryTimer => _timerAlarmService.State.Timers.FirstOrDefault(t => t.Phase == TimerPhase.Completed && !t.CompletionAcknowledged) ?? DisplayTimer ?? _timerAlarmService.State.Timer;

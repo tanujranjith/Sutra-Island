@@ -9,7 +9,8 @@ public enum PaletteCommand
     StartStopwatch, PauseStopwatch, ResumeStopwatch, ResetStopwatch,
     FocusOn, FocusOff, Expand, Collapse, OpenSettings,
     Help, Convert, Volume, OpenMedia, Recenter, Clipboard, NotificationHistory, NotificationsOn, NotificationsOff, RetryNotifications, DismissBanner, Chat, VoiceInput, StopAssistant, ReadReply, WakeOn, WakeOff, AskScreen, SearchSettings,
-    Stopwatch, Focus, AudioOutput, Screenshot, GoogleSearch, OpenApp, OpenWindowsSettings, ListApps
+    Stopwatch, Focus, AudioOutput, Screenshot, GoogleSearch, OpenApp, OpenWindowsSettings, ListApps,
+    DropTray, Transfers, PinWidget, QuickCapture
 }
 
 public sealed record CommandDefinition(
@@ -77,6 +78,10 @@ public static class CommandCatalog
         new(PaletteCommand.OpenMedia, "open media", [], "Open the current media app", "open media"),
         new(PaletteCommand.Recenter, "recenter", [], "Recenter the island", "recenter"),
         new(PaletteCommand.Clipboard, "clipboard", [], "Open clipboard history", "clipboard"),
+        new(PaletteCommand.DropTray, "drop tray", ["tray"], "Hold files, screenshots and links for dragging later", "drop tray"),
+        new(PaletteCommand.Transfers, "transfers", ["downloads", "copy files"], "Download or copy files and see progress", "transfers"),
+        new(PaletteCommand.PinWidget, "pin widget", ["pin", "pinned item"], "Choose a timer, stopwatch or system stat for the compact island", "pin widget"),
+        new(PaletteCommand.QuickCapture, "quick capture", ["notes", "quick note"], "Write or reopen a local note", "quick capture"),
         new(PaletteCommand.Screenshot, "screenshot", ["capture", "snip", "screen shot"], "Capture a region, a window, or all screens locally", "Enter to open the capture overlay"),
         new(PaletteCommand.GoogleSearch, "google", ["google search", "search google", "web search", "search", "g"], "Search Google in your default browser", "google best coffee near me · Enter without a query opens Google"),
         new(PaletteCommand.NotificationHistory, "notifications", ["notification history", "history"], "Review notifications and mirroring controls", "Enter to review"),
@@ -111,6 +116,10 @@ public static class CommandCatalog
         ById(PaletteCommand.Stopwatch),
         ById(PaletteCommand.Focus),
         ById(PaletteCommand.Clipboard),
+        ById(PaletteCommand.DropTray),
+        ById(PaletteCommand.Transfers),
+        ById(PaletteCommand.PinWidget),
+        ById(PaletteCommand.QuickCapture),
         ById(PaletteCommand.Screenshot),
         ById(PaletteCommand.AudioOutput),
         ById(PaletteCommand.NotificationHistory),

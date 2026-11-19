@@ -1,3 +1,11 @@
+# Sutra Island v1.4.4
+
+- Hold files, folders, screenshots, and links in the Drop Tray, then drag them back into another app.
+- Start downloads from direct web links and copy files through Transfers. See progress in the compact island, cancel a running transfer, or open its destination when it finishes.
+- Pin a timer, stopwatch, clock, or system stat to the compact island.
+- Save and revisit local notes in Quick Capture. Press Ctrl+Alt+N to open it and Ctrl+Enter to save. All four tools are available in the island menu and command palette.
+
+---
 # Sutra Island v1.4.3
 
 - Make the island open and close more smoothly, including when you move the pointer back over it mid-close.

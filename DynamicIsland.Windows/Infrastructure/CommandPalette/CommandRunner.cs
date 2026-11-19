@@ -11,6 +11,7 @@ public interface ICommandPaletteHost
 {
     void ShowSettings();
     void ShowScreenshotTool() { }
+    void ShowWorkspace(PaletteCommand command) { }
     void OpenDefaultBrowser(Uri destination) => throw new NotSupportedException("Opening the default browser is unavailable in this window.");
     void ShowTimerPanel();
     void ShowAlarmPanel();
@@ -76,6 +77,12 @@ public sealed class CommandRunner(
         var argument = match.Argument;
         switch (match.Command.Id)
         {
+            case PaletteCommand.DropTray:
+            case PaletteCommand.Transfers:
+            case PaletteCommand.PinWidget:
+            case PaletteCommand.QuickCapture:
+                host.ShowWorkspace(match.Command.Id);
+                return Ok();
             case PaletteCommand.OpenApp:
             case PaletteCommand.OpenWindowsSettings:
             case PaletteCommand.ListApps:

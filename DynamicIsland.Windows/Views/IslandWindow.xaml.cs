@@ -93,6 +93,7 @@ public partial class IslandWindow : Window
         _settingsService = settingsService;
         _log = log;
         _qScreen = qScreen;
+        InitializeWorkspace();
         _collapseTimer.Tick += (_, _) =>
         {
             _collapseTimer.Stop();
