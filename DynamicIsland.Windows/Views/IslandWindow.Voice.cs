@@ -82,7 +82,7 @@ public partial class IslandWindow
         // Keep the island anchored the same way an expansion does (edge and corner positions).
         _position.PositionInitial(this, _viewModel.Settings, m.cW, m.cH);
         UpdateTimerOrbLayout(m.cW, m.cH);
-        UpdatePrivacyIndicatorLayout(m.cW, m.cH, animate: false);
+        UpdatePrivacyIndicatorLayout(m.cW, m.cH);
         var duration = widening ? IslandMorphDuration(expanded: true)
             : growing || tall ? CompactVoiceTimings.Grow
             : CompactVoiceTimings.ExitMascot;

@@ -122,14 +122,15 @@ public partial class IslandWindow : Window
         {
             ApplyLayout(animate: false);
             ApplyFrost();
-            ApplyRoundedShellClip();
+
             UpdateQPromptComposer();
             // Re-fit the pill whenever the expanded content's size changes (live CPU/RAM/weather/title text).
             ExpandedContent.SizeChanged += (_, _) => UpdateAutoGrow();
             QContent.SizeChanged += (_, _) => UpdateAutoGrow();
             StatsExpandedContent.SizeChanged += (_, _) => UpdateAutoGrow();
             StatsOverlay.SizeChanged += (_, _) => UpdateAutoGrow();
-            GlassShell.SizeChanged += (_, _) => { ApplyRoundedShellClip(); UrgentAlertStrip.Margin = new Thickness(12, GlassShell.ActualHeight + 12, 12, 0); UrgentAlertStrip.MaxWidth = Math.Max(1, Math.Min(650, ActualWidth - 24)); PositionNotifBannerUnderShell(); };
+            GlassShell.VisibleSizeChanged += (_, _) => PositionShellAlerts();
+            SizeChanged += (_, _) => UrgentAlertStrip.MaxWidth = Math.Max(1, Math.Min(650, ActualWidth - 24));
             TimerPanelHost.SizeChanged += (_, _) => ApplyRoundedTimerPanelClip();
             SyncUrgentAlertStrip(animate: false);
             // Let the first real render commit the compact HWND/content geometry before accepting
@@ -189,17 +190,17 @@ public partial class IslandWindow : Window
         _position.ApplyWindowStyles(this, _viewModel.Settings, _viewModel.IsCompact);
         ApplyCaptureAffinity();
         ApplyLayout(animate: false);
-        ApplyRoundedShellClip();
+
         ApplyFrost();
         EnsureHealthy();
     }
 
-    // WPF Border.ClipToBounds clips to a rectangle, not to CornerRadius. Without an explicit
-    // rounded geometry, the media artwork below Q can show through the transparent corner pixels.
-    // Apply the same physical clip to the entire shell so every presentation layer shares one mask.
-    private void ApplyRoundedShellClip()
+    private void PositionShellAlerts()
     {
-        // The shell refreshes its geometry on size, radius and notch-progress changes.
+        if (UrgentAlertStrip.Visibility == Visibility.Visible)
+            UrgentAlertStrip.Margin = new Thickness(12, GlassShell.VisibleSize.Height + 12, 12, 0);
+        if (NotifBanner.Visibility == Visibility.Visible)
+            PositionNotifBannerUnderShell();
     }
 
     private void ApplyRoundedTimerPanelClip()
@@ -234,11 +235,11 @@ public partial class IslandWindow : Window
 
     // A gentle, monotonic ease lets the island settle without a width overshoot or flash.
     private TimeSpan IslandMorphDuration(bool expanded) => TimeSpan.FromMilliseconds(expanded
-        ? (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 400d : 320d)
-        : (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 280d : 220d));
+        ? (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 360d : 255d)
+        : (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 260d : 205d));
     private static IEasingFunction IslandMorphEase(bool expanded) => expanded
         ? new CubicEase { EasingMode = EasingMode.EaseOut }
-        : new CubicEase { EasingMode = EasingMode.EaseInOut };
+        : new QuadraticEase { EasingMode = EasingMode.EaseInOut };
     private static IEasingFunction PillMorphEase(bool expanded) => expanded
         ? new QuarticEase { EasingMode = EasingMode.EaseOut }
         : new CubicEase { EasingMode = EasingMode.EaseInOut };
@@ -376,7 +377,6 @@ public partial class IslandWindow : Window
             if (_timerPanelOpen) return;
             if (_lastQSurface == _viewModel.ShowQSurface && _lastQActive == _viewModel.IsQActive && _lastQComparison == _viewModel.QCompareEnabled) return;
             _lastQSurface = _viewModel.ShowQSurface; _lastQActive = _viewModel.IsQActive; _lastQComparison = _viewModel.QCompareEnabled;
-            ApplyVisualMode();
             ApplyLayout(animate: false);
             if (_viewModel.ShowQSurface && _viewModel.IsExpanded)
             {
@@ -397,7 +397,6 @@ public partial class IslandWindow : Window
             if (showAirPodsCard == _lastShowAirPodsCard) return;
             _lastShowAirPodsCard = showAirPodsCard;
             if (_timerPanelOpen) return;
-            ApplyVisualMode();
             // Keep the transparent host ready even when the card connects while compact. The next
             // expansion must not inherit the smaller host height that was calculated at startup.
             ApplyLayout(animate: _viewModel.IsExpanded);
@@ -409,7 +408,6 @@ public partial class IslandWindow : Window
             if (showWidgetsPanel == _lastShowWidgetsPanel) return;
             _lastShowWidgetsPanel = showWidgetsPanel;
             if (_timerPanelOpen) return;
-            ApplyVisualMode();
             ApplyLayout(animate: _viewModel.IsExpanded);
             Dispatcher.BeginInvoke(() => UpdateLiveWidgetsOverflow(LiveWidgetsScroller), DispatcherPriority.Loaded);
         }
@@ -432,7 +430,7 @@ public partial class IslandWindow : Window
             {
                 var metrics = Metrics();
                 UpdateTimerOrbLayout(metrics.cW, metrics.cH);
-                UpdatePrivacyIndicatorLayout(metrics.cW, metrics.cH, animate: true);
+                UpdatePrivacyIndicatorLayout(metrics.cW, metrics.cH);
             }
         }
         else if (e.PropertyName == nameof(IslandViewModel.QState) ||
@@ -463,8 +461,6 @@ public partial class IslandWindow : Window
         {
             // The banner hangs below the shell: re-anchor it and grow/shrink the HWND with it.
             SyncNotificationBanner();
-            PositionNotifBannerUnderShell();
-            ApplyLayout(animate: false);
         }
         else if (e.PropertyName == nameof(IslandViewModel.BannerApp) ||
                  e.PropertyName == nameof(IslandViewModel.BannerTitle) ||
@@ -497,6 +493,7 @@ public partial class IslandWindow : Window
         }
 
         _urgentAlertVisible = shouldShow;
+        UrgentAlertStrip.Margin = new Thickness(12, GlassShell.VisibleSize.Height + 12, 12, 0);
         UrgentAlertStrip.BeginAnimation(UIElement.OpacityProperty, null);
         UrgentAlertScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         UrgentAlertScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
@@ -670,7 +667,7 @@ public partial class IslandWindow : Window
     // expanded states (same pattern as UrgentAlertStrip).
     private void PositionNotifBannerUnderShell()
     {
-        NotifBanner.Margin = new Thickness(0, GlassShell.Margin.Top + Math.Max(0d, GlassShell.ActualHeight) + 12d, 0, 0);
+        NotifBanner.Margin = new Thickness(0, GlassShell.Margin.Top + GlassShell.VisibleSize.Height + 12d, 0, 0);
     }
 
     private void SyncNotificationBanner()
@@ -690,7 +687,8 @@ public partial class IslandWindow : Window
         NotifAppText.Text = visible ? app : string.Empty;
         NotifTitleText.Text = visible ? title : string.Empty;
         NotifBodyText.Text = visible ? body : string.Empty;
-        var becomingVisible = visible && NotifBanner.Visibility != Visibility.Visible;
+        var visibilityChanged = visible != (NotifBanner.Visibility == Visibility.Visible);
+        var becomingVisible = visible && visibilityChanged;
         if (!visible || becomingVisible)
         {
             _notificationAnimationGeneration++;
@@ -698,9 +696,9 @@ public partial class IslandWindow : Window
             NotifBanner.RevealProgress = 0d;
         }
         NotifBanner.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        if (visible)
+        if (visibilityChanged)
         {
-            NotifBanner.Measure(new System.Windows.Size(Math.Max(300, Width), double.PositiveInfinity));
+            PositionShellAlerts();
             ApplyLayout(animate: false);
         }
         if (visible && _initialLayoutStabilized && (becomingVisible || _lastAnimatedBannerSequence != _viewModel.BannerSeq)) PlayNotificationIntro();
@@ -743,8 +741,10 @@ public partial class IslandWindow : Window
     // stacked tiles instead of one compact row). Reserve this space even when the user
     // turns auto-grow off so the bottom of the dashboard can never be clipped.
     private const double StatsDashboardExtraHeight = 64d;
-    private (double cW, double cH, double eW, double eH, double winW, double winH) Metrics()
+    private (double cW, double cH, double eW, double eH, double winW, double winH) Metrics(
+        (double Width, double Height)? workArea = null)
     {
+        var available = workArea ?? AvailableWorkArea;
         var quoteSpace = _viewModel.ShowQuoteInExpanded ? QuoteFooterHeight : 0d;
         var timerSpace = _liveTimerVisible ? LiveTimerExtraHeight : 0d;
         var statsSpace = _viewModel.IsStatsStyle ? StatsDashboardExtraHeight : 0d;
@@ -761,7 +761,7 @@ public partial class IslandWindow : Window
             (compactWidth, compactHeight) = Infrastructure.CompactVoicePolicy.Size(compactWidth, compactHeight, _viewModel.CompactVoiceTall);
         if (_viewModel.QShowCompactComparison)
         {
-            compactWidth = Math.Min(Math.Max(compactWidth, 480), Math.Max(72, AvailableWorkArea.Width - 24));
+            compactWidth = Math.Min(Math.Max(compactWidth, 480), Math.Max(72, available.Width - 24));
             compactHeight = Math.Max(compactHeight, 68);
         }
         var (expandedWidth, expandedHeight) = _viewModel.Settings.IslandSize switch
@@ -778,16 +778,16 @@ public partial class IslandWindow : Window
         // The transparent HWND must be at least as tall as the pill, otherwise WPF clips
         // a correctly measured Stats dashboard at the canvas boundary.
         var windowHeight = Math.Max(BaseCanvasH + quoteSpace + timerSpace, expandedHeight + 40d);
-                var available = AvailableWorkArea;
         expandedWidth = WindowSizingPolicy.BoundedDimension(expandedWidth, available.Width);
         expandedHeight = WindowSizingPolicy.BoundedDimension(expandedHeight, available.Height, 76);
         return (compactWidth, compactHeight, expandedWidth, expandedHeight, Math.Min(CanvasW, available.Width), Math.Min(available.Height, Math.Max(windowHeight, expandedHeight + 64)));
     }
 
     // When auto-grow is on, size the expanded pill to its content so nothing clips.
-    private (double W, double H) ExpandedPillSize()
+    private (double W, double H) ExpandedPillSize(
+        (double cW, double cH, double eW, double eH, double winW, double winH) m,
+        (double Width, double Height) available)
     {
-        var m = Metrics();
         // Q has a fixed interaction frame. Letting the answer text determine the whole pill height
         // pushes the composer and footer below the shell after a long response. The response card
         // owns a ScrollViewer, so keep the prompt/actions/footer pinned in the reserved Q height.
@@ -798,17 +798,17 @@ public partial class IslandWindow : Window
             // StatsOverlay lives inside ExpandedContent, so this measures the exact surface the
             // user sees in either visual style.  The old detached Stats grid is intentionally no
             // longer part of sizing or visibility decisions.
-            var content = _viewModel.ShowQSurface ? QContent : ExpandedContent;
+            var content = ExpandedContent;
             content.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
             var d = content.DesiredSize;
             // Auto-grow off keeps the configured width, but it must never suppress mandatory
             // vertical growth. Dynamic rows (AirPods, timer, quotes) can otherwise be arranged
             // below the fixed shell and get cut in half even though the host window is tall enough.
             var w = _viewModel.Settings.AutoGrowPill
-                ? Math.Clamp(d.Width + 2, m.eW, Math.Max(m.eW, Math.Min(CanvasW - 24, AvailableWorkArea.Width - 24)))
+                ? Math.Clamp(d.Width + 2, m.eW, Math.Max(m.eW, Math.Min(CanvasW - 24, available.Width - 24)))
                 : m.eW;
             var h = WindowSizingPolicy.AntiClippingDimension(m.eH, d.Height + 2, m.winH - 12);
-            return (WindowSizingPolicy.BoundedDimension(w, AvailableWorkArea.Width), WindowSizingPolicy.BoundedDimension(h, AvailableWorkArea.Height, 76));
+            return (WindowSizingPolicy.BoundedDimension(w, available.Width), WindowSizingPolicy.BoundedDimension(h, available.Height, 76));
         }
         catch { return (m.eW, m.eH); }
     }
@@ -825,7 +825,8 @@ public partial class IslandWindow : Window
         _inAutoGrow = true;
         try
         {
-            var (w, h) = ExpandedPillSize();
+            var available = AvailableWorkArea;
+            var (w, h) = ExpandedPillSize(Metrics(available), available);
             if (Math.Abs(GlassShell.Width - w) > 0.5 || Math.Abs(GlassShell.Height - h) > 0.5)
             {
                 // Clear any held open-animation values so the new size actually takes effect.
@@ -841,28 +842,29 @@ public partial class IslandWindow : Window
 
     private void ApplyLayout(bool animate)
     {
-        // Keep the expanded tree mounted so it can be measured, but do not let it render at full
-        // opacity before AnimatePill has installed its fade clock. That one-frame reveal was the
-        // flash seen at the very beginning of an expansion.
-        var animateMain = animate && !_timerPanelOpen;
-        var deferExpandedReveal = animateMain && !_viewModel.IsReducedMotion && _viewModel.IsExpanded;
-        var deferCompactReveal = animateMain && !_viewModel.IsReducedMotion && !_viewModel.IsExpanded;
-        ApplyVisualMode(deferExpandedReveal, deferCompactReveal);
-        var m = Metrics();
+        var expanded = _viewModel.IsExpanded;
+        var available = AvailableWorkArea;
+        var m = Metrics(available);
+        ConfigureExpandedContent(m.eW, m.eH);
+        if (expanded)
+        {
+            ExpandedViewport.Visibility = Visibility.Visible;
+            ExpandedContent.Visibility = Visibility.Visible;
+        }
+
+        var (targetPillWidth, targetPillHeight) = expanded ? ExpandedPillSize(m, available) : (m.cW, m.cH);
         UpdateTimerOrbLayout(m.cW, m.cH);
-        UpdatePrivacyIndicatorLayout(m.cW, m.cH, animate);
+        UpdatePrivacyIndicatorLayout(targetPillWidth, targetPillHeight);
         // The timer panel carries no drop shadow; keep just enough edge room for its 8px
         // top offset so the panel never clips at the HWND boundary.
         const double timerEdgePadding = 12d;
-        (double W, double H)? expandedBounds = null;
-        (double W, double H) ExpandedOnce() => expandedBounds ??= ExpandedPillSize();
         var desiredWindowHeight = _timerPanelOpen ? Math.Max(m.winH, TimerPanelHeight + timerEdgePadding) : m.winH;
         var desiredWindowWidth = _timerPanelOpen ? Math.Max(m.winW, TimerPanelWidth + timerEdgePadding) : m.winW;
         if (NotifBanner.Visibility == Visibility.Visible && !_timerPanelOpen)
         {
             // The notification banner hangs below the shell: reserve room for it while visible
             // so the card never clips at the HWND edge (ShowBanner changes re-run ApplyLayout).
-            var shellH = _viewModel.IsExpanded ? ExpandedOnce().H : m.cH;
+            var shellH = Math.Max(GlassShell.VisibleSize.Height, targetPillHeight);
             const double bannerReserve = 170d;
             desiredWindowHeight = Math.Max(desiredWindowHeight, GlassShell.Margin.Top + shellH + bannerReserve);
         }
@@ -874,16 +876,14 @@ public partial class IslandWindow : Window
         // The transparent HWND stays anchored to the user's main-island position even while the
         // timer host is open. The timer surface is a sibling overlay; using its width here moves
         // the main island for TopLeft/TopRight layouts and makes the overlay look like its owner.
-        var targetPillWidth = _viewModel.IsExpanded ? ExpandedOnce().W : m.cW;
-        var targetPillHeight = _viewModel.IsExpanded ? ExpandedOnce().H : m.cH;
         _position.PositionInitial(this, _viewModel.Settings,
             _timerPanelOpen ? Math.Max(targetPillWidth, TimerPanelWidth) : targetPillWidth,
             _timerPanelOpen ? Math.Max(targetPillHeight, TimerPanelHeight) : targetPillHeight);
         // The timer host may be opening or closing while the main shell is changing state. Its
         // overlay owns that transition, so the main shell must settle synchronously and never
         // inherit the timer orb's geometry.
-        AnimatePill(animateMain, targetPillWidth, targetPillHeight);
-        ApplyTimerPanelHostLayout(animate);
+        AnimatePill(animate && !_timerPanelOpen, targetPillWidth, targetPillHeight, m.cW, m.cH);
+        if (_timerPanelOpen || _timerPanelHostShown) ApplyTimerPanelHostLayout(animate);
     }
 
     private void UpdateTimerOrbLayout(double compactWidth, double compactHeight)
@@ -896,20 +896,13 @@ public partial class IslandWindow : Window
         TimerOrbTranslate.X = compactWidth / 2d + 12d + size / 2d + airPodsGap;
     }
 
-    private void UpdatePrivacyIndicatorLayout(double compactWidth, double compactHeight, bool animate)
+    private void UpdatePrivacyIndicatorLayout(double activeWidth, double activeHeight)
     {
-        // Privacy belongs to the compact island/orb composition, never to the timer panel's
-        // expanded bounds. Keeping this coordinate space stable prevents the dot from flying to
-        // the panel's far edge and then returning when TimerEditorOpen changes the orb visibility.
-        var (activeWidth, activeHeight) = _viewModel.IsExpanded
-            ? ExpandedPillSize()
-            : (compactWidth, compactHeight);
-
         // Follow the shell's trailing edge. Expanded mode keeps the orb near the top controls.
         var targetX = activeWidth / 2d + 12d;
         if (!_viewModel.IsExpanded && !_timerPanelOpen && _viewModel.ShowTimerOrb)
         {
-            var timerOrbSize = Math.Clamp(compactHeight, 38d, 62d);
+            var timerOrbSize = Math.Clamp(activeHeight, 38d, 62d);
             var timerOrbRight = TimerOrbTranslate.X + timerOrbSize / 2d;
             // Place privacy to the right of the timer orb with a small optical gap.
             targetX = timerOrbRight + 6d + 9d;
@@ -926,31 +919,30 @@ public partial class IslandWindow : Window
         PrivacyDotTranslate.Y = targetY;
     }
 
-    private void ApplyVisualMode(bool deferExpandedReveal = false, bool deferCompactReveal = false)
+    private void ConfigureExpandedContent(double expandedWidth, double expandedHeight)
     {
-        var apple = _viewModel.IsAppleStyle;
-        var expanded = _viewModel.IsExpanded;
         var q = _viewModel.ShowQSurface;
         ExpandedContent.Margin = new Thickness(0);
         GraphiteDeck.Visibility = q ? Visibility.Collapsed : Visibility.Visible;
         // Give Q its own bounded layout viewport. Without an explicit height, the parent Grid can
         // arrange the response card at its natural text height and clip the prompt/footer below it.
-        var qHeight = q ? Metrics().eH : double.NaN;
+        var qHeight = q ? expandedHeight : double.NaN;
         QContent.Height = qHeight;
         QContent.MaxHeight = q ? qHeight : double.PositiveInfinity;
         QContent.VerticalAlignment = q ? VerticalAlignment.Top : VerticalAlignment.Stretch;
-        SetModeContent(CompactContent, !expanded && (apple || _viewModel.IsEdgePill || _viewModel.IsHolePunchMode || _viewModel.QShowCompactComparison), deferCompactReveal);
-        // The full Apple activity deck is the stable shared expanded surface. The compact Stats
-        // layout still provides the dense glanceable alternative, while this prevents Stats mode
-        // from ever opening into an empty shell during rapid hover/settings transitions.
-        // TimerPanelContent is deliberately not part of this tree. The timer has its own sibling
-        // host so its transform and hit testing can never change the main island's geometry.
+        ExpandedContent.Width = Math.Max(q ? 600 : 850, expandedWidth);
+        ExpandedContent.Height = qHeight;
+        SetModeContent(QContent, q);
+    }
+
+    private void ApplyVisualMode()
+    {
+        var expanded = _viewModel.IsExpanded;
+        SetModeContent(CompactContent, !expanded && ActiveCompactContent == CompactContent);
+        SetModeContent(StatsCompactContent, !expanded && ActiveCompactContent == StatsCompactContent);
         ExpandedViewport.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
-        ExpandedContent.Width = Math.Max(q ? 600 : 850, Metrics().eW);
-        ExpandedContent.Height = q ? Metrics().eH : double.NaN;
-        SetModeContent(ExpandedContent, expanded, deferExpandedReveal);
-        SetModeContent(QContent, expanded && q);
-        SetModeContent(StatsCompactContent, !apple && !_viewModel.IsEdgePill && !_viewModel.IsHolePunchMode && !expanded && !_viewModel.QShowCompactComparison, deferCompactReveal);
+        SetModeContent(ExpandedContent, expanded);
+        SetModeContent(QContent, expanded && _viewModel.ShowQSurface);
         SetModeContent(StatsExpandedContent, false);
         SetModeContent(StatsOverlay, false);
     }
@@ -958,29 +950,16 @@ public partial class IslandWindow : Window
     // Switching visual modes while the shell is expanded previously changed Visibility only. If an
     // in-flight transition had left the new content at opacity 0, the result was a large blank pill.
     // Reset the full presentation state together so either layout is always immediately usable.
-    private static void SetModeContent(UIElement content, bool visible, bool deferReveal = false)
+    private static void SetModeContent(UIElement content, bool visible)
     {
         content.BeginAnimation(UIElement.OpacityProperty, null);
         content.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        content.Opacity = visible && !deferReveal ? 1d : 0d;
-        content.IsHitTestVisible = visible && !deferReveal;
+        content.Opacity = visible ? 1d : 0d;
+        content.IsHitTestVisible = visible;
     }
 
-    private void SetPillAnimationCache(bool enabled, UIElement compactContent)
-    {
-        SetSurfaceInMotion(GlassShell, enabled);
-        // Keep expanded content as live vectors so it stays sharp throughout the morph.
-        ExpandedContent.CacheMode = null;
-        compactContent.CacheMode = enabled ? new BitmapCache() : null;
-        if (!enabled)
-        {
-            CompactContent.CacheMode = null;
-            StatsCompactContent.CacheMode = null;
-        }
-    }
-
-    private Grid ActiveCompactContent => _viewModel.IsStatsStyle ? StatsCompactContent : CompactContent;
-    private Grid ActiveExpandedContent => _viewModel.ShowQSurface ? QContent : ExpandedContent;
+    private Grid ActiveCompactContent => _viewModel.IsAppleStyle || _viewModel.IsEdgePill ||
+        _viewModel.IsHolePunchMode || _viewModel.QShowCompactComparison ? CompactContent : StatsCompactContent;
 
     // Lay out the expanded subtree once at its destination size. The shell's rounded clip
     // reveals it during the morph without resizing a ScrollViewer and all its children per frame.
@@ -1011,167 +990,146 @@ public partial class IslandWindow : Window
         _animatedShellShadow = null;
     }
 
-    // Animate the clipped shell itself while the expanded viewport stays pinned at its destination
-    // size. Scaling a transparent WPF Border exposed a full-width composition frame on some GPUs
-    // before its transform clock was applied, which read as a distracting flash during expansion.
-    private void AnimatePill(bool animate, double targetW, double targetH)
-    {
-        var generation = ++_pillAnimationGeneration;
-        var expanded = _viewModel.IsExpanded;
-        var reduced = _viewModel.Settings.AnimationIntensity == AnimationIntensity.Reduced;
-        if (_viewModel.IsExpanded) SizeExpandedViewport(targetW, targetH);
-        var compactContent = ActiveCompactContent;
-        var expandedContent = ActiveExpandedContent;
-        var currentWidth = Math.Max(1d, GlassShell.ActualWidth);
-        var currentHeight = Math.Max(1d, GlassShell.ActualHeight);
+    private (bool Expanded, bool Q, Grid Compact, double Width, double Height)? _pillTarget;
+    private bool _settledExpanded;
+    private bool _refreshPillAfterMotion;
 
-        // A compact voice orb morph already heading to this compact size keeps running; a layout pass
-        // (for example the voice session starting) must not snap it to the end.
+    private void AnimatePill(bool animate, double targetW, double targetH, double compactW, double compactH)
+    {
+        var expanded = _viewModel.IsExpanded;
+        var compactContent = ActiveCompactContent;
+        var q = _viewModel.ShowQSurface;
+        var target = (expanded, q, compactContent, targetW, targetH);
+        var canAnimate = !_viewModel.IsReducedMotion && !_timerPanelOpen;
+        if (_expandAnimating && canAnimate && _pillTarget is { } running &&
+            running.Expanded == expanded && running.Q == q && running.Compact == compactContent)
+        {
+            // Keep the arranged viewport stable while the outline is moving. A widget,
+            // notification, or pending binding can report a different extent mid-frame.
+            _refreshPillAfterMotion = Math.Abs(running.Width - targetW) > 0.1 ||
+                Math.Abs(running.Height - targetH) > 0.1;
+            return;
+        }
+        _refreshPillAfterMotion = false;
+
+        var current = GlassShell.VisibleSize;
+        if (expanded) SizeExpandedViewport(targetW, targetH);
+
+        // A layout refresh can retarget an active morph or leave it running. It must not
+        // start a new content fade for an idle, already-open panel.
+        var generation = ++_pillAnimationGeneration;
+        var to = new System.Windows.Size(targetW, targetH);
         var keepVoiceMorph = !expanded && IsCompactVoiceMorphTo(targetW, targetH);
         if (!keepVoiceMorph) _compactVoiceMorphing = false;
-        if (!animate || reduced)
+        if (!canAnimate || (!animate && !_expandAnimating) || current.IsEmpty ||
+            current.Width <= 0 || current.Height <= 0 || current == to || keepVoiceMorph)
         {
-
-            SetPillAnimationCache(enabled: false, compactContent);
-            if (!keepVoiceMorph)
-            {
-                GlassShell.BeginAnimation(WidthProperty, null);
-                GlassShell.BeginAnimation(HeightProperty, null);
-            }
-            GlassShell.BeginAnimation(UIElement.OpacityProperty, null);
-            PillScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-            PillScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-            PillScale.ScaleX = PillScale.ScaleY = 1d;
-            if (!keepVoiceMorph)
-            {
-                GlassShell.Width = targetW;
-                GlassShell.Height = targetH;
-            }
-            GlassShell.Opacity = 1d;
-            ApplyVisualMode();
-            _expandAnimating = false;
-            RestorePillShadow();
-            if (_viewModel.IsExpanded && !_timerPanelOpen) UpdateAutoGrow();
+            FinishPillMorph(generation, to, keepVoiceMorph);
             return;
         }
 
-        // Use a short, eased morph so the island responds promptly while retaining a smooth transition.
-        var duration = IslandMorphDuration(expanded);
-        // Keep the shell dimensions monotonic. A BackEase on the actual width made the island
-        // overshoot horizontally, producing the wide flash visible in the frame captures before
-        // it settled back to the intended size. Apple-like motion here comes from a fast ease-out,
-        // while the content fade provides the softer handoff.
-        var ease = IslandMorphEase(expanded);
-
+        var crossFade = _expandAnimating || _settledExpanded != expanded;
+        var compactOpacity = compactContent.Visibility == Visibility.Visible ? compactContent.Opacity : 0d;
+        var expandedOpacity = ExpandedContent.Visibility == Visibility.Visible ? ExpandedContent.Opacity : 0d;
         _expandAnimating = true;
+        _pillTarget = target;
 
-        SetPillAnimationCache(enabled: true, compactContent);
-        UseFastPillShadow();
-        if (!_loggedAnimationStart)
-        {
-            _loggedAnimationStart = true;
-            _log.Info($"Real island animation started: expanded={expanded}, from={GlassShell.ActualWidth:0.#}x{GlassShell.ActualHeight:0.#}, target={targetW:0.#}x{targetH:0.#}, duration={duration.TotalMilliseconds:0}ms");
-        }
-
-        // Freeze an interrupted morph at its currently rendered bounds, then continue from there.
-        // This keeps rapid pointer reversals smooth without a scale reset or a full-width flash.
-        PillScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-        PillScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        PillScale.ScaleX = PillScale.ScaleY = 1d;
         GlassShell.BeginAnimation(WidthProperty, null);
         GlassShell.BeginAnimation(HeightProperty, null);
-        GlassShell.BeginAnimation(UIElement.OpacityProperty, null);
-        GlassShell.Width = currentWidth;
-        GlassShell.Height = currentHeight;
-        GlassShell.Opacity = 1d;
-        var widthAnimation = new DoubleAnimation(targetW, duration) { EasingFunction = ease };
-        var heightAnimation = new DoubleAnimation(targetH, duration) { EasingFunction = ease };
-        heightAnimation.Completed += (_, _) => FinishPillMorph(generation, targetW, targetH, expanded);
-        GlassShell.BeginAnimation(WidthProperty, widthAnimation);
-        GlassShell.BeginAnimation(HeightProperty, heightAnimation);
-        if (expanded)
+        GlassShell.Width = Math.Max(current.Width, targetW);
+        GlassShell.Height = Math.Max(current.Height, targetH);
+        SetSurfaceInMotion(GlassShell, moving: true);
+        UseFastPillShadow();
+
+        if (crossFade)
         {
-            // Preserve a compact visual while the rounded clip begins widening, then hand off
-            // promptly to the expanded surface. This avoids a black or full-width flash.
-            compactContent.Visibility = Visibility.Visible;
-            compactContent.Opacity = 1d;
-            compactContent.IsHitTestVisible = false;
-            // Fade the main expanded surface after the shell starts widening. The timer overlay
-            // has its own animation and is never mounted in this tree.
-            ExpandedContent.Opacity = 0d;
-            // The visible portion can accept input while the shell finishes opening.
-            ExpandedContent.IsHitTestVisible = true;
-            var fade = new DoubleAnimation(0d, 1d, TimeSpan.FromMilliseconds(duration.TotalMilliseconds * 0.62))
-            {
-                BeginTime = TimeSpan.FromMilliseconds(duration.TotalMilliseconds * 0.12),
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            ExpandedContent.BeginAnimation(UIElement.OpacityProperty, fade);
-            compactContent.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0d, TimeSpan.FromMilliseconds(duration.TotalMilliseconds * 0.25))
-            {
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
-            });
+            ExpandedViewport.Visibility = Visibility.Visible;
+            var compactMargin = compactContent.Margin;
+            compactContent.Width = Math.Max(1, compactW - compactMargin.Left - compactMargin.Right - 2d);
+            compactContent.Height = Math.Max(1, compactH - 2d);
+            compactContent.HorizontalAlignment = System.Windows.HorizontalAlignment.Center;
+            compactContent.VerticalAlignment = VerticalAlignment.Top;
+            var otherCompact = compactContent == CompactContent ? StatsCompactContent : CompactContent;
+            SetModeContent(otherCompact, false);
+            var fadeDuration = TimeSpan.FromMilliseconds(IslandMorphDuration(expanded).TotalMilliseconds * 0.55);
+            FadePillContent(ExpandedContent, expandedOpacity, expanded ? 1d : 0d, fadeDuration,
+                expanded ? TimeSpan.FromMilliseconds(25) : TimeSpan.FromMilliseconds(45), expanded,
+                expanded ? EasingMode.EaseOut : EasingMode.EaseIn);
+            FadePillContent(compactContent, compactOpacity, expanded ? 0d : 1d, fadeDuration,
+                expanded ? TimeSpan.Zero : TimeSpan.FromMilliseconds(65), !expanded);
         }
         else
         {
-            // Keep the expanded surface mounted while the shell narrows. Switching to the compact
-            // tree before the animation starts makes collapse look like a clipped replacement.
-            // Cross-fade the compact tree near the end, then ApplyVisualMode commits the compact
-            // layout after the shell reaches its final bounds.
-            ExpandedViewport.Visibility = Visibility.Visible;
-            ExpandedContent.Visibility = Visibility.Visible;
-            ExpandedContent.Opacity = 1d;
-            ExpandedContent.IsHitTestVisible = false;
-            expandedContent.Visibility = Visibility.Visible;
-            expandedContent.Opacity = 1d;
-            expandedContent.IsHitTestVisible = false;
-            compactContent.Visibility = Visibility.Visible;
-            compactContent.Opacity = 0d;
-            compactContent.IsHitTestVisible = false;
+            ApplyVisualMode();
+        }
 
-            // Reveal the compact island only near the end of the shrink. Showing it at the
-            // beginning makes the timer panel look like it turns into a large normal island
-            // before performing a second resize.
-            var fadeDuration = TimeSpan.FromMilliseconds(duration.TotalMilliseconds * 0.4);
-            var expandedFade = new DoubleAnimation(0d, fadeDuration)
-            {
-                BeginTime = TimeSpan.FromMilliseconds(duration.TotalMilliseconds * 0.4),
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
-            };
-            var compactFade = new DoubleAnimation(1d, fadeDuration)
-            {
-                BeginTime = TimeSpan.FromMilliseconds(duration.TotalMilliseconds * 0.6),
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
-            };
-            expandedContent.BeginAnimation(UIElement.OpacityProperty, expandedFade);
-            compactContent.BeginAnimation(UIElement.OpacityProperty, compactFade);
+        var duration = IslandMorphDuration(expanded);
+        GlassShell.BeginReveal(current, to, duration, IslandMorphEase(expanded),
+            () => FinishPillMorph(generation, to, keepVoiceMorph: false));
+        if (!_loggedAnimationStart)
+        {
+            _loggedAnimationStart = true;
+            _log.Info($"Island morph started: expanded={expanded}, from={current.Width:0.#}x{current.Height:0.#}, target={targetW:0.#}x{targetH:0.#}, duration={duration.TotalMilliseconds:0}ms");
         }
     }
 
-    private void FinishPillMorph(int generation, double targetW, double targetH, bool expanded)
+    private static void FadePillContent(UIElement content, double from, double to, TimeSpan duration, TimeSpan delay, bool hitTest,
+        EasingMode easing = EasingMode.EaseOut)
+    {
+        content.Visibility = Visibility.Visible;
+        content.IsHitTestVisible = hitTest;
+        content.Opacity = from;
+        content.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(from, to, duration)
+        {
+            BeginTime = delay,
+            EasingFunction = new QuadraticEase { EasingMode = easing }
+        });
+    }
+
+    private void FinishPillMorph(int generation, System.Windows.Size target, bool keepVoiceMorph)
     {
         if (generation != _pillAnimationGeneration) return;
-        SetPillAnimationCache(enabled: false, CompactContent);
-        PillScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-        PillScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        PillScale.ScaleX = PillScale.ScaleY = 1d;
-        GlassShell.BeginAnimation(WidthProperty, null);
-        GlassShell.BeginAnimation(HeightProperty, null);
-        GlassShell.BeginAnimation(UIElement.OpacityProperty, null);
-        GlassShell.Width = targetW;
-        GlassShell.Height = targetH;
-        ApplyVisualMode();
-        GlassShell.Opacity = 1d;
-        _expandAnimating = false;
-
-        RestorePillShadow();
-        if (!_loggedAnimationCompletion)
+        var wasAnimating = _expandAnimating;
+        var refreshLayout = _refreshPillAfterMotion;
+        _refreshPillAfterMotion = false;
+        if (!keepVoiceMorph)
         {
-            _loggedAnimationCompletion = true;
-            _log.Info($"Real island animation completed: expanded={expanded}, final={GlassShell.ActualWidth:0.#}x{GlassShell.ActualHeight:0.#}");
+            GlassShell.BeginAnimation(WidthProperty, null);
+            GlassShell.BeginAnimation(HeightProperty, null);
+            GlassShell.Width = target.Width;
+            GlassShell.Height = target.Height;
+            GlassShell.EndReveal();
+            SetSurfaceInMotion(GlassShell, moving: false);
         }
-        if (_viewModel.IsExpanded && !_timerPanelOpen) UpdateAutoGrow();
-        LogAirPodsLayoutSnapshot();
+        if (wasAnimating)
+        {
+            foreach (var compact in new[] { CompactContent, StatsCompactContent })
+            {
+                compact.Width = double.NaN;
+                compact.Height = double.NaN;
+                compact.HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch;
+                compact.VerticalAlignment = VerticalAlignment.Stretch;
+            }
+        }
+
+        ApplyVisualMode();
+        _settledExpanded = _viewModel.IsExpanded;
+        _expandAnimating = false;
+        _pillTarget = null;
+        RestorePillShadow();
+        if (wasAnimating)
+        {
+            if (!_loggedAnimationCompletion)
+            {
+                _loggedAnimationCompletion = true;
+                _log.Info($"Island morph completed: expanded={_settledExpanded}, target={target.Width:0.#}x{target.Height:0.#}");
+            }
+            if (refreshLayout)
+                ApplyLayout(animate: false);
+            else if (_settledExpanded && !_timerPanelOpen)
+                UpdateAutoGrow();
+            LogAirPodsLayoutSnapshot();
+        }
     }
 
     private void ApplyTimerPanelHostLayout(bool animate)

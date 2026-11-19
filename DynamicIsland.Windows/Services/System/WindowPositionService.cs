@@ -70,14 +70,15 @@ public sealed class WindowPositionService
     {
         var handle = new WindowInteropHelper(window).Handle;
         if (handle == nint.Zero) return;
-        var style = NativeMethods.GetWindowLongPtr(handle, NativeMethods.GwlExStyle).ToInt64();
-        style = settings.ShowInAltTab
-            ? (style | NativeMethods.WsExAppWindow) & ~NativeMethods.WsExToolWindow
-            : (style | NativeMethods.WsExToolWindow) & ~NativeMethods.WsExAppWindow;
+        var currentStyle = NativeMethods.GetWindowLongPtr(handle, NativeMethods.GwlExStyle).ToInt64();
+        var style = settings.ShowInAltTab
+            ? (currentStyle | NativeMethods.WsExAppWindow) & ~NativeMethods.WsExToolWindow
+            : (currentStyle | NativeMethods.WsExToolWindow) & ~NativeMethods.WsExAppWindow;
         style = settings.ClickThroughWhenCompact && compact
             ? style | NativeMethods.WsExTransparent
             : style & ~NativeMethods.WsExTransparent;
-        NativeMethods.SetWindowLongPtr(handle, NativeMethods.GwlExStyle, new nint(style));
+        if (style != currentStyle)
+            NativeMethods.SetWindowLongPtr(handle, NativeMethods.GwlExStyle, new nint(style));
         window.Topmost = settings.AlwaysOnTop;
 
     }

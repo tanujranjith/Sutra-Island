@@ -492,11 +492,6 @@
                 <views:NotchBorder.Effect>
                     <DropShadowEffect BlurRadius="28" ShadowDepth="8" Opacity="0.5" Color="#000000" Direction="90" />
                 </views:NotchBorder.Effect>
-                <views:NotchBorder.RenderTransform>
-                    <TransformGroup>
-                        <ScaleTransform x:Name="PillScale" ScaleX="1" ScaleY="1" />
-                    </TransformGroup>
-                </views:NotchBorder.RenderTransform>
             <Grid>
                 <Border x:Name="BackgroundLayer" Background="Transparent" CornerRadius="{Binding IslandInnerCornerRadius}" IsHitTestVisible="False" />
 

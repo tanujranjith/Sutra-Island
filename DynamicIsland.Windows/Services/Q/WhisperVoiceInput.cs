@@ -124,11 +124,10 @@ public sealed class WhisperVoiceInput : IDisposable
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(wakeToken);
             limit.CancelAfter(TimeSpan.FromSeconds(10));
             var configuration = Volatile.Read(ref _wakeConfiguration);
-            if (configuration.RequireTraining && configuration.Profile is null) return;
-            // A wake-word prompt can be hallucinated on background sounds. Let Whisper
-            // transcribe freely, then validate its actual transcript and recorded audio.
-            var text = await _engine.TranscribeAsync(utterance, [], limit.Token).ConfigureAwait(false);
-            var match = WhisperWakePolicy.Check(text, utterance, Rate, configuration.Profile, configuration.RequireTraining);
+            // Apply the same audio acceptance criteria before starting background inference.
+            if (!WhisperWakePolicy.CanMatchAudio(utterance, Rate, configuration.Profile, configuration.RequireTraining)) return;
+            var text = await _engine.TranscribeAsync(utterance, [], limit.Token, maxThreads: 2).ConfigureAwait(false);
+            var match = WhisperWakePolicy.CheckCandidateTranscript(text, configuration.Profile);
             if (!match.Woke) return;
             lock (_gate)
             {

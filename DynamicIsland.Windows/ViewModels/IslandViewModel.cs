@@ -1047,6 +1047,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     {
         var animate = !_disposed && VisualizerSurfaceVisible && IsAudioActive &&
             (IsExpanded ? ShowMusicVisualizer : ShowCompactEqualizer);
+        _spectrumService.SetAnalysisRequested(animate && Settings.RealAudioSpectrum && !ShowQSurface && !TimerEditorOpen);
         if (animate == _visualizerTimer.IsEnabled) return;
         if (animate)
         {

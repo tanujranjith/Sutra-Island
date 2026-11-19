@@ -10,7 +10,13 @@ public sealed partial class IslandViewModel
     public bool TimerEditorOpen
     {
         get => _timerEditorOpen;
-        set { if (SetProperty(ref _timerEditorOpen, value)) { RaiseMany(nameof(ShowTimerOrb), nameof(ShowQSurface)); PumpNotifications(); } }
+        set
+        {
+            if (!SetProperty(ref _timerEditorOpen, value)) return;
+            SyncVisualizerTicker();
+            RaiseMany(nameof(ShowTimerOrb), nameof(ShowQSurface));
+            PumpNotifications();
+        }
     }
     private bool _interactionProtected;
     public bool InteractionProtected

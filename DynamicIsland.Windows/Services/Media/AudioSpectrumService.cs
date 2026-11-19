@@ -24,12 +24,15 @@ public sealed class AudioSpectrumService(LoggingService log) : IDisposable
     private Thread? _thread;
     private readonly double[] _bands = new double[BandCount];
     private readonly float[] _buffer = new float[Window];
+    private volatile bool _analysisRequested;
     private int _bufferPos;
     private double _loudness;
     private long _lastEmit;
 
     public event EventHandler<double[]>? BandsChanged;
     public bool IsActive { get; private set; }
+
+    internal void SetAnalysisRequested(bool requested) => _analysisRequested = requested;
 
     public void Start()
     {
@@ -73,8 +76,13 @@ public sealed class AudioSpectrumService(LoggingService log) : IDisposable
         {
             while (!token.IsCancellationRequested)
             {
+                if (!_analysisRequested)
+                {
+                    token.WaitHandle.WaitOne(80);
+                    continue;
+                }
                 CaptureOnce(token);
-                if (token.WaitHandle.WaitOne(TimeSpan.FromSeconds(2)))
+                if (_analysisRequested && token.WaitHandle.WaitOne(TimeSpan.FromSeconds(2)))
                     break;
             }
         }
@@ -126,7 +134,10 @@ public sealed class AudioSpectrumService(LoggingService log) : IDisposable
             var channels = Math.Max(1, (int)format.nChannels);
             var sampleRate = format.nSamplesPerSec;
 
-            while (!token.IsCancellationRequested)
+            _bufferPos = 0;
+            _loudness = 0;
+            Array.Clear(_bands);
+            while (_analysisRequested && !token.IsCancellationRequested)
             {
                 Marshal.ThrowExceptionForHR(capture.GetNextPacketSize(out var packetFrames));
                 if (packetFrames == 0) { token.WaitHandle.WaitOne(12); continue; }

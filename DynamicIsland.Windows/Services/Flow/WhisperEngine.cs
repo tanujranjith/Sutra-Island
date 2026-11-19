@@ -147,7 +147,7 @@ public sealed class WhisperEngine : IDisposable
 
     /// <summary>Transcribes 16 kHz mono samples. The vocabulary nudges spelling of names and terms.</summary>
     /// <param name="expressive">Prompts Whisper with written-out hesitations so it keeps "uhh" and "ohhh" instead of dropping them.</param>
-    public async Task<string> TranscribeAsync(float[] samples, IReadOnlyList<string> vocabulary, CancellationToken token, bool expressive = false, string? hint = null)
+    public async Task<string> TranscribeAsync(float[] samples, IReadOnlyList<string> vocabulary, CancellationToken token, bool expressive = false, string? hint = null, int? maxThreads = null)
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         if (!IsModelInstalled) throw new FlowException("Speech model still downloading");
@@ -158,7 +158,7 @@ public sealed class WhisperEngine : IDisposable
             var factory = GetFactory();
             var builder = factory.CreateBuilder()
                 .WithLanguage(Language)
-                .WithThreads(Math.Clamp(Environment.ProcessorCount - 1, 2, 8))
+                .WithThreads(Math.Clamp(Environment.ProcessorCount - 1, 1, maxThreads ?? 8))
                 .WithNoContext()
                 .WithSingleSegment();
             var prompt = new List<string>();

@@ -25,16 +25,27 @@ public static partial class WhisperWakePolicy
     public static WakePhrase.Match Check(string? transcript, float[] audio, int sampleRate,
         WakeVoiceProfile? profile, bool requireTraining)
     {
-        var match = CheckTranscript(transcript);
-        if (!match.Woke || (requireTraining && profile is not { IsValid: true })) return new(false, "");
-        if (!TrySpeechRange(audio, sampleRate, out var start, out var length)) return new(false, "");
-        // A trained template covers the phrase itself. Ask the question after the wake pause.
-        // Without a profile, retain the cloud version's one-breath wake + command behavior.
-        if (profile is not { IsValid: true }) return match;
-        if (match.Command.Length != 0) return new(false, "");
-        var features = Features(audio.AsSpan(start, length), sampleRate);
-        return features is not null && WakeDetectionPolicy.Matches(profile, features, length / (double)sampleRate)
+        var match = CheckCandidateTranscript(transcript, profile);
+        return match.Woke && CanMatchAudio(audio, sampleRate, profile, requireTraining)
             ? match : new(false, "");
+    }
+
+    internal static WakePhrase.Match CheckCandidateTranscript(string? transcript, WakeVoiceProfile? profile)
+    {
+        var match = CheckTranscript(transcript);
+        // A trained template covers the phrase itself. Untrained listening also supports a command.
+        return profile is { IsValid: true } && match.Command.Length != 0 ? new(false, "") : match;
+    }
+
+    internal static bool CanMatchAudio(float[] audio, int sampleRate, WakeVoiceProfile? profile, bool requireTraining)
+    {
+        if (requireTraining && profile is not { IsValid: true }) return false;
+        if (!TrySpeechRange(audio, sampleRate, out var start, out var length)) return false;
+        if (profile is not { IsValid: true }) return true;
+        var duration = length / (double)sampleRate;
+        if (duration < profile.MinimumDurationSeconds || duration > profile.MaximumDurationSeconds) return false;
+        var features = Features(audio.AsSpan(start, length), sampleRate);
+        return features is not null && WakeDetectionPolicy.Matches(profile, features, duration);
     }
 
     public static bool TryTrainingSample(string? transcript, float[] audio, int sampleRate,

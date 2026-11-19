@@ -52,7 +52,7 @@ internal static partial class UpgradeVerification
         var window = new IslandWindow(vm, timerVm, position, settingsService, log, screen)
         { Opacity = 0, ShowActivated = false, ShowInTaskbar = false };
         window.Show();
-        var shell = (FrameworkElement)window.FindName("GlassShell");
+        var shell = (NotchBorder)window.FindName("GlassShell");
         var report = new List<string>();
         void Check(bool value, string description) { if (!value) throw new InvalidOperationException(description); report.Add("PASS " + description); }
         if (notificationClickOnly)
@@ -123,11 +123,15 @@ internal static partial class UpgradeVerification
         var compactContent = (FrameworkElement)window.FindName("CompactContent");
         settings.AnimationIntensity = AnimationIntensity.Expressive;
         vm.IsExpanded = false; window.ApplySettings();
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         vm.IsExpanded = true; window.UpdateLayout();
         var stableShellClip = shell.Clip;
         Check(!shell.UseLayoutRounding && !shell.SnapsToDevicePixels, "Main island permits fractional motion during expansion");
         Check(expandedContent.CacheMode is null, "Expanded content stays sharp without a temporary bitmap cache");
         var stableViewport = viewport.RenderSize;
+        var stableShellSize = shell.RenderSize;
+        Check(shell.VisibleSize.Width < stableShellSize.Width, "Expansion starts at compact visual bounds");
+        var samples = new List<double> { shell.VisibleSize.Width };
         var contentResizes = 0;
         SizeChangedEventHandler countResize = (_, _) => contentResizes++;
         expandedContent.SizeChanged += countResize;
@@ -136,8 +140,12 @@ internal static partial class UpgradeVerification
             await Task.Delay(50); window.UpdateLayout();
             Check(viewport.ComputedVerticalScrollBarVisibility != Visibility.Visible && viewport.ComputedHorizontalScrollBarVisibility != Visibility.Visible,
                 $"Expansion frame {frame}: no outer scrollbar");
-            Check(viewport.RenderSize == stableViewport, $"Expansion frame {frame}: stable content viewport");
+            Check(viewport.RenderSize == stableViewport, $"Expansion frame {frame}: stable content viewport ({stableViewport} to {viewport.RenderSize})");
+            Check(shell.RenderSize == stableShellSize, $"Expansion frame {frame}: shell layout stays fixed");
+            samples.Add(shell.VisibleSize.Width);
         }
+        Check(samples.Zip(samples.Skip(1)).All(pair => pair.First <= pair.Second)
+            && samples.Distinct().Count() >= 3, "The shell clip advances monotonically through intermediate widths");
         await Task.Delay(240); window.UpdateLayout();
         expandedContent.SizeChanged -= countResize;
         Check(contentResizes <= 1, "Expanded content avoids per-frame layout resizing");
@@ -146,18 +154,27 @@ internal static partial class UpgradeVerification
         Check(Math.Abs(shell.ActualWidth - viewport.ActualWidth) < 1 && Math.Abs(shell.ActualHeight - viewport.ActualHeight) < 1,
             "Expansion lands on the content viewport bounds");
         await Capture("expansion-settled");
-        vm.IsExpanded = false; await Task.Delay(50); vm.IsExpanded = true;
+        vm.IsExpanded = false; await Task.Delay(70); window.UpdateLayout();
+        var midCollapse = shell.VisibleSize;
+        var midCollapseOpacity = expandedContent.Opacity;
+        window.ApplySettings();
+        Check(shell.VisibleSize == midCollapse && Math.Abs(expandedContent.Opacity - midCollapseOpacity) < 0.001,
+            "An unrelated layout refresh leaves the running collapse intact");
+        vm.IsExpanded = true;
+        Check(shell.VisibleSize == midCollapse && Math.Abs(expandedContent.Opacity - midCollapseOpacity) < 0.001,
+            "Reversing a collapse continues from the visible shape and content opacity");
         await Task.Delay(490); window.UpdateLayout();
         Check(Math.Abs(shell.ActualWidth - viewport.ActualWidth) < 1, "Interrupted morph returns to the expanded bounds");
         vm.IsExpanded = false; window.UpdateLayout();
         await Task.Delay(90); window.UpdateLayout();
-        Check(expandedContent.Visibility == Visibility.Visible && expandedContent.Opacity > 0.1,
-            $"Collapse keeps the expanded surface mounted during the shrink (visibility={expandedContent.Visibility}, opacity={expandedContent.Opacity:0.00}, expanded={vm.IsExpanded}, q={vm.ShowQSurface}, width={shell.ActualWidth:0.0})");
-        Check(viewport.Visibility == Visibility.Visible && shell.ActualWidth > settings.IslandWidth,
+        Check(expandedContent.Visibility == Visibility.Visible && !expandedContent.IsHitTestVisible,
+            "Collapse keeps the outgoing content mounted and disables its controls during the shrink");
+        Check(viewport.Visibility == Visibility.Visible && shell.VisibleSize.Width > settings.IslandWidth && shell.VisibleSize.Width < shell.ActualWidth,
             "Collapse uses the expanded layout bounds until the morph completes");
         await Task.Delay(360); window.UpdateLayout();
         Check(Math.Abs(shell.ActualWidth - settings.IslandWidth) < 1 && compactContent.Visibility == Visibility.Visible,
             "Collapse commits the compact layout after the morph");
+        File.WriteAllLines(Path.Combine(output, "motion-checks.txt"), report);
         await VerifyNotificationListenerAsync(log, Check);
         await VerifyTimerMotionAsync(settings, vm, window, Check, output);
         await VerifyNotificationMotionAsync(settings, vm, window, Check, output);
