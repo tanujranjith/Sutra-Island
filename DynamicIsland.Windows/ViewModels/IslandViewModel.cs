@@ -670,20 +670,22 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     }
 
     // ===== Per-element font sizes (each = default × element% × interface%) =====
-    private double Scaled(int elementPercent, double baseSize) =>
-        baseSize * Math.Clamp(elementPercent, 60, 160) / 100.0 * Math.Clamp(Settings.InterfaceScale, 70, 150) / 100.0;
+    private double Scaled(int elementPercent, double baseSize, bool isGlyph = false) =>
+        baseSize * Math.Clamp(elementPercent, 60, 160) / 100.0 * InterfaceScaleFactor * (isGlyph ? 1 : IslandFontSizeFactor);
+    public double IslandFontSizeFactor => Math.Clamp(Settings.IslandFontSizePercent,
+        AppSettings.MinimumIslandFontSizePercent, AppSettings.MaximumIslandFontSizePercent) / 100d;
     public double InterfaceScaleFactor => Math.Clamp(Settings.InterfaceScale, 70, 150) / 100.0;
     public double ClockFontSize => Scaled(Settings.ClockSize, 17);
     public double DateFontSize => Scaled(Settings.DateSize, 10);
-    public double BatteryGlyphFontSize => Scaled(Settings.BatterySize, 11);
+    public double BatteryGlyphFontSize => Scaled(Settings.BatterySize, 11, isGlyph: true);
     public double BatteryTextFontSize => Scaled(Settings.BatterySize, 10);
-    public double ChargingGlyphFontSize => Scaled(Settings.BatterySize, 11);
+    public double ChargingGlyphFontSize => Scaled(Settings.BatterySize, 11, isGlyph: true);
     public double ChargingTextFontSize => Scaled(Settings.BatterySize, 11);
     public double CompactChargingTextFontSize => Scaled(Settings.BatterySize, 10);
     public double MediaTitleFontSize => Scaled(Settings.MediaTitleSize, 14);
     public double MediaArtistFontSize => Scaled(Settings.MediaArtistSize, 11);
     public double VolumeFontSize => Scaled(Settings.VolumeSize, 13);
-    public double CompactGlyphFontSize => Scaled(Settings.CompactTextSize, 12);
+    public double CompactGlyphFontSize => Scaled(Settings.CompactTextSize, 12, isGlyph: true);
     public double CompactPrimaryFontSize => Scaled(Settings.CompactTextSize, 13);
     public double CompactSecondaryFontSize => Scaled(Settings.CompactTextSize, 11);
     public double CompactClockFontSize => Scaled(Settings.CompactTextSize, 11);
@@ -1938,7 +1940,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             nameof(CompactIconCorner), nameof(ExpandedIconCorner), nameof(PreviewCompactIconCorner), nameof(PreviewExpandedIconCorner),
             nameof(CompactRingGeometry), nameof(ExpandedRingGeometry), nameof(CompactRingPerimeterUnits), nameof(ExpandedRingPerimeterUnits),
             nameof(AlbumScale), nameof(ExpandedAlbumScale), nameof(PreviewIslandWidth), nameof(PreviewIslandHeight),
-            nameof(MediaColumn), nameof(VolumeColumn), nameof(StatusColumn), nameof(InterfaceScaleFactor),
+            nameof(MediaColumn), nameof(VolumeColumn), nameof(StatusColumn), nameof(InterfaceScaleFactor), nameof(IslandFontSizeFactor),
             nameof(ClockFontSize), nameof(DateFontSize), nameof(BatteryGlyphFontSize), nameof(BatteryTextFontSize),
             nameof(ChargingGlyphFontSize), nameof(ChargingTextFontSize), nameof(CompactChargingTextFontSize),
             nameof(MediaTitleFontSize), nameof(MediaArtistFontSize), nameof(VolumeFontSize),

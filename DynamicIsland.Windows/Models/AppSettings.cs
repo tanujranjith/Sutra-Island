@@ -73,6 +73,9 @@ public sealed class AppSettings
     public int IslandWidth { get; set; } = 230;
     public int IslandHeight { get; set; } = 62;
     public AnimationIntensity AnimationIntensity { get; set; } = AnimationIntensity.Normal;
+    public const int MinimumIslandOpeningSpeedPercent = 50;
+    public const int MaximumIslandOpeningSpeedPercent = 150;
+    public int IslandOpeningSpeedPercent { get; set; } = 100;
     public PositionMode DefaultPosition { get; set; } = PositionMode.TopCenter;
     public string SelectedMediaApp { get; set; } = "Automatic";
     public bool DebugOverlay { get; set; }
@@ -104,6 +107,9 @@ public sealed class AppSettings
     public string TextColorHex { get; set; } = "";   // empty = follow theme
     public bool AdaptiveAccent { get; set; } = true; // pull accent from album art
     public string FontFamilyName { get; set; } = "Segoe UI Variable Text";
+    public const int MinimumIslandFontSizePercent = 80;
+    public const int MaximumIslandFontSizePercent = 140;
+    public int IslandFontSizePercent { get; set; } = 100;
 
     // ===== Behaviour =====
     public bool AlwaysExpanded { get; set; }

@@ -102,12 +102,14 @@ public partial class IslandWindow
         {
             _compactVoiceMorphing = false;
             GlassShell.Width = targetW; GlassShell.Height = targetH;
+            SetSurfaceInMotion(GlassShell, false);
+            RestorePillShadow();
             return;
         }
         _compactVoiceMorphing = true;
         GlassShell.Width = currentW; GlassShell.Height = currentH;
         SetSurfaceInMotion(GlassShell, true);
-        UseFastPillShadow();
+        SuspendPillShadow();
 
         var ease = IslandMorphEase(expanded: opening);
         var width = new DoubleAnimation(currentW, targetW, duration) { EasingFunction = ease };

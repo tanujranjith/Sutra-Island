@@ -180,6 +180,7 @@ public partial class IslandWindow : Window
             _fullscreenTimer.Stop();
             _idleTimer.Stop();
             _timerPanelLeaveTimer.Stop();
+            StopPillFrames();
             _notificationAnimationGeneration++;
             NotifBanner.BeginAnimation(NotificationMorphHost.RevealProgressProperty, null);
         };
@@ -199,7 +200,7 @@ public partial class IslandWindow : Window
     private void PositionShellAlerts()
     {
         if (UrgentAlertStrip.Visibility == Visibility.Visible)
-            UrgentAlertStrip.Margin = new Thickness(12, GlassShell.VisibleSize.Height + 12, 12, 0);
+            UrgentAlertAnchor.Y = GlassShell.VisibleSize.Height + 12d;
         if (NotifBanner.Visibility == Visibility.Visible)
             PositionNotifBannerUnderShell();
     }
@@ -229,17 +230,22 @@ public partial class IslandWindow : Window
         surface.SnapsToDevicePixels = !moving;
     }
 
-    // Both surfaces use the same opening cadence and content handoff.
+    // The timer editor is a separate surface with its own cadence.
     private TimeSpan PillMorphDuration(bool expanded) => TimeSpan.FromMilliseconds(expanded
         ? (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 400d : 320d)
         : (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 280d : 220d));
 
     // A gentle, monotonic ease lets the island settle without a width overshoot or flash.
     private TimeSpan IslandMorphDuration(bool expanded) => TimeSpan.FromMilliseconds(expanded
-        ? (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 360d : 255d)
-        : (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 260d : 205d));
+        ? (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 265d : 190d)
+        : (_viewModel.Settings.AnimationIntensity == AnimationIntensity.Expressive ? 205d : 150d));
+    internal TimeSpan MainIslandMorphDuration(bool expanded)
+    {
+        var duration = IslandMorphDuration(expanded);
+        return expanded ? duration * (100d / _viewModel.Settings.IslandOpeningSpeedPercent) : duration;
+    }
     private static IEasingFunction IslandMorphEase(bool expanded) => expanded
-        ? new CubicEase { EasingMode = EasingMode.EaseOut }
+        ? new QuadraticEase { EasingMode = EasingMode.EaseOut }
         : new QuadraticEase { EasingMode = EasingMode.EaseInOut };
     private static IEasingFunction PillMorphEase(bool expanded) => expanded
         ? new QuarticEase { EasingMode = EasingMode.EaseOut }
@@ -494,7 +500,7 @@ public partial class IslandWindow : Window
         }
 
         _urgentAlertVisible = shouldShow;
-        UrgentAlertStrip.Margin = new Thickness(12, GlassShell.VisibleSize.Height + 12, 12, 0);
+        UrgentAlertAnchor.Y = GlassShell.VisibleSize.Height + 12d;
         UrgentAlertStrip.BeginAnimation(UIElement.OpacityProperty, null);
         UrgentAlertScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         UrgentAlertScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
@@ -668,7 +674,7 @@ public partial class IslandWindow : Window
     // expanded states (same pattern as UrgentAlertStrip).
     private void PositionNotifBannerUnderShell()
     {
-        NotifBanner.Margin = new Thickness(0, GlassShell.Margin.Top + GlassShell.VisibleSize.Height + 12d, 0, 0);
+        NotificationAnchor.Y = GlassShell.Margin.Top + GlassShell.VisibleSize.Height + 12d;
     }
 
     private void SyncNotificationBanner()
@@ -847,11 +853,8 @@ public partial class IslandWindow : Window
         var available = AvailableWorkArea;
         var m = Metrics(available);
         ConfigureExpandedContent(m.eW, m.eH);
-        if (expanded)
-        {
-            ExpandedViewport.Visibility = Visibility.Visible;
-            ExpandedContent.Visibility = Visibility.Visible;
-        }
+        if (!expanded && double.IsNaN(ExpandedViewport.Width))
+            SizeExpandedViewport(m.eW, m.eH);
 
         var (targetPillWidth, targetPillHeight) = expanded ? ExpandedPillSize(m, available) : (m.cW, m.cH);
         UpdateTimerOrbLayout(m.cW, m.cH);
@@ -941,8 +944,10 @@ public partial class IslandWindow : Window
         var expanded = _viewModel.IsExpanded;
         SetModeContent(CompactContent, !expanded && ActiveCompactContent == CompactContent);
         SetModeContent(StatsCompactContent, !expanded && ActiveCompactContent == StatsCompactContent);
-        ExpandedViewport.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
-        SetModeContent(ExpandedContent, expanded);
+        // Keep the expanded panel laid out while compact so current widget sizes are ready
+        // before the opening animation. Hidden content stays out of rendering and hit testing.
+        ExpandedViewport.Visibility = expanded ? Visibility.Visible : Visibility.Hidden;
+        SetModeContent(ExpandedContent, expanded, Visibility.Hidden);
         SetModeContent(QContent, expanded && _viewModel.ShowQSurface);
         SetModeContent(StatsExpandedContent, false);
         SetModeContent(StatsOverlay, false);
@@ -951,10 +956,10 @@ public partial class IslandWindow : Window
     // Switching visual modes while the shell is expanded previously changed Visibility only. If an
     // in-flight transition had left the new content at opacity 0, the result was a large blank pill.
     // Reset the full presentation state together so either layout is always immediately usable.
-    private static void SetModeContent(UIElement content, bool visible)
+    private static void SetModeContent(UIElement content, bool visible, Visibility inactiveVisibility = Visibility.Collapsed)
     {
         content.BeginAnimation(UIElement.OpacityProperty, null);
-        content.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        content.Visibility = visible ? Visibility.Visible : inactiveVisibility;
         content.Opacity = visible ? 1d : 0d;
         content.IsHitTestVisible = visible;
     }
@@ -971,29 +976,27 @@ public partial class IslandWindow : Window
         ExpandedViewport.Height = height;
     }
 
-    // The drop shadow is the most expensive part of each software-composited animation frame. Retain it
-    // visually, but use WPF's lower-cost rendering mode until the zoom lands.
-    private System.Windows.Media.Effects.DropShadowEffect? _animatedShellShadow;
-    private System.Windows.Media.Effects.RenderingBias _savedShellShadowBias;
-    private void UseFastPillShadow()
+    // A WPF effect on the layered shell composites the whole changing subtree. Keep
+    // the shadow on the settled shell and render the content directly during motion.
+    private System.Windows.Media.Effects.Effect? _settledShellEffect;
+    private void SuspendPillShadow()
     {
-        if (_animatedShellShadow is not null) return;
-        if (GlassShell.Effect is not System.Windows.Media.Effects.DropShadowEffect shadow || shadow.IsFrozen) return;
-        _animatedShellShadow = shadow;
-        _savedShellShadowBias = shadow.RenderingBias;
-        shadow.RenderingBias = System.Windows.Media.Effects.RenderingBias.Performance;
+        if (GlassShell.Effect is not { } effect) return;
+        _settledShellEffect = effect;
+        GlassShell.Effect = null;
     }
 
     private void RestorePillShadow()
     {
-        if (_animatedShellShadow is null) return;
-        _animatedShellShadow.RenderingBias = _savedShellShadowBias;
-        _animatedShellShadow = null;
+        if (_settledShellEffect is not { } effect) return;
+        GlassShell.Effect = effect;
+        _settledShellEffect = null;
     }
 
     private (bool Expanded, bool Q, Grid Compact, double Width, double Height)? _pillTarget;
     private bool _settledExpanded;
     private bool _refreshPillAfterMotion;
+    private EventHandler? _pillRender;
 
     private void AnimatePill(bool animate, double targetW, double targetH, double compactW, double compactH)
     {
@@ -1040,8 +1043,9 @@ public partial class IslandWindow : Window
         GlassShell.Width = Math.Max(current.Width, targetW);
         GlassShell.Height = Math.Max(current.Height, targetH);
         SetSurfaceInMotion(GlassShell, moving: true);
-        UseFastPillShadow();
+        SuspendPillShadow();
 
+        var duration = MainIslandMorphDuration(expanded);
         if (crossFade)
         {
             ExpandedViewport.Visibility = Visibility.Visible;
@@ -1052,21 +1056,44 @@ public partial class IslandWindow : Window
             compactContent.VerticalAlignment = VerticalAlignment.Top;
             var otherCompact = compactContent == CompactContent ? StatsCompactContent : CompactContent;
             SetModeContent(otherCompact, false);
-            var fadeDuration = TimeSpan.FromMilliseconds(IslandMorphDuration(expanded).TotalMilliseconds * 0.55);
-            FadePillContent(ExpandedContent, expandedOpacity, expanded ? 1d : 0d, fadeDuration,
-                expanded ? TimeSpan.FromMilliseconds(25) : TimeSpan.FromMilliseconds(45), expanded,
-                expanded ? EasingMode.EaseOut : EasingMode.EaseIn);
-            FadePillContent(compactContent, compactOpacity, expanded ? 0d : 1d, fadeDuration,
-                expanded ? TimeSpan.Zero : TimeSpan.FromMilliseconds(65), !expanded);
+            ExpandedContent.Visibility = compactContent.Visibility = Visibility.Visible;
+            ExpandedContent.IsHitTestVisible = expanded;
+            compactContent.IsHitTestVisible = !expanded;
+            ExpandedContent.Opacity = expandedOpacity;
+            compactContent.Opacity = compactOpacity;
         }
         else
         {
             ApplyVisualMode();
         }
 
-        var duration = IslandMorphDuration(expanded);
-        GlassShell.BeginReveal(current, to, duration, IslandMorphEase(expanded),
-            () => FinishPillMorph(generation, to, keepVoiceMorph: false));
+        StopPillFrames();
+        GlassShell.BeginReveal(current, to);
+        var ease = IslandMorphEase(expanded);
+        var total = duration.TotalMilliseconds;
+        var fadeDuration = total * 0.55;
+        TimeSpan? lastFrame = null;
+        var elapsed = 0d;
+        _pillRender = (_, args) =>
+        {
+            var frame = ((RenderingEventArgs)args).RenderingTime;
+            if (frame == lastFrame) return;
+            // Start moving on the first render, even after the compositor has been idle.
+            // A delayed render advances by at most one 60 Hz frame so the pill cannot jump.
+            elapsed += lastFrame is { } previous
+                ? Math.Clamp((frame - previous).TotalMilliseconds, 0d, 1000d / 60)
+                : 1000d / 120;
+            lastFrame = frame;
+            GlassShell.SetRevealProgress(ease.Ease(Math.Min(1d, elapsed / total)));
+            if (crossFade)
+            {
+                ExpandedContent.Opacity = PillFadeOpacity(expandedOpacity, expanded, elapsed - (expanded ? 16 : 24),
+                    fadeDuration, easeIn: !expanded);
+                compactContent.Opacity = PillFadeOpacity(compactOpacity, !expanded, elapsed - (expanded ? 0 : 38), fadeDuration);
+            }
+            if (elapsed >= total) FinishPillMorph(generation, to, keepVoiceMorph: false);
+        };
+        CompositionTarget.Rendering += _pillRender;
         if (!_loggedAnimationStart)
         {
             _loggedAnimationStart = true;
@@ -1074,22 +1101,24 @@ public partial class IslandWindow : Window
         }
     }
 
-    private static void FadePillContent(UIElement content, double from, double to, TimeSpan duration, TimeSpan delay, bool hitTest,
-        EasingMode easing = EasingMode.EaseOut)
+    private static double PillFadeOpacity(double from, bool fadeIn, double elapsed, double duration, bool easeIn = false)
     {
-        content.Visibility = Visibility.Visible;
-        content.IsHitTestVisible = hitTest;
-        content.Opacity = from;
-        content.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(from, to, duration)
-        {
-            BeginTime = delay,
-            EasingFunction = new QuadraticEase { EasingMode = easing }
-        });
+        var progress = Math.Clamp(elapsed / duration, 0d, 1d);
+        var eased = easeIn ? progress * progress : 1d - (1d - progress) * (1d - progress);
+        return from + ((fadeIn ? 1d : 0d) - from) * eased;
+    }
+
+    private void StopPillFrames()
+    {
+        if (_pillRender is null) return;
+        CompositionTarget.Rendering -= _pillRender;
+        _pillRender = null;
     }
 
     private void FinishPillMorph(int generation, System.Windows.Size target, bool keepVoiceMorph)
     {
         if (generation != _pillAnimationGeneration) return;
+        StopPillFrames();
         var wasAnimating = _expandAnimating;
         var refreshLayout = _refreshPillAfterMotion;
         _refreshPillAfterMotion = false;
@@ -1117,7 +1146,7 @@ public partial class IslandWindow : Window
         _settledExpanded = _viewModel.IsExpanded;
         _expandAnimating = false;
         _pillTarget = null;
-        RestorePillShadow();
+        if (!keepVoiceMorph) RestorePillShadow();
         if (wasAnimating)
         {
             if (!_loggedAnimationCompletion)

@@ -1,3 +1,10 @@
+# Sutra Island v1.4.5
+
+- Make the Island open smoothly after it has been closed for a while.
+- Adjust opening speed from 50% to 150% in Appearance settings.
+- Choose Times New Roman and adjust Island text size independently of the selected font.
+
+---
 # Sutra Island v1.4.4
 
 - Hold files, folders, screenshots, and links in the Drop Tray, then drag them back into another app.

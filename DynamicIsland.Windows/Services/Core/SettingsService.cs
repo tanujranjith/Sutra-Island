@@ -148,6 +148,8 @@ public sealed class SettingsService(LoggingService log)
         settings.IslandWidth = Math.Clamp(settings.IslandWidth, 72, 360);
         settings.IslandHeight = Math.Clamp(settings.IslandHeight, 38, 90);
         if (!Enum.IsDefined(settings.AnimationIntensity)) settings.AnimationIntensity = AnimationIntensity.Normal;
+        settings.IslandOpeningSpeedPercent = Math.Clamp(settings.IslandOpeningSpeedPercent,
+            AppSettings.MinimumIslandOpeningSpeedPercent, AppSettings.MaximumIslandOpeningSpeedPercent);
         if (!Enum.IsDefined(settings.DefaultPosition)) settings.DefaultPosition = PositionMode.TopCenter;
         if (settings.DefaultPosition == PositionMode.Manual &&
             (settings.ManualLeftPixels is null || settings.ManualTopPixels is null))
@@ -164,6 +166,8 @@ public sealed class SettingsService(LoggingService log)
         settings.IdleOpacityPercent = Math.Clamp(settings.IdleOpacityPercent, 20, 100);
         if (string.IsNullOrWhiteSpace(settings.AccentColorHex)) settings.AccentColorHex = "#5AA7FF";
         if (string.IsNullOrWhiteSpace(settings.FontFamilyName)) settings.FontFamilyName = "Segoe UI Variable Text";
+        settings.IslandFontSizePercent = Math.Clamp(settings.IslandFontSizePercent,
+            AppSettings.MinimumIslandFontSizePercent, AppSettings.MaximumIslandFontSizePercent);
         if (string.IsNullOrWhiteSpace(settings.ExpandedOrder)) settings.ExpandedOrder = "media,volume,status";
         settings.LowBatteryThreshold = Math.Clamp(settings.LowBatteryThreshold, 5, 50);
         settings.VolumeWarningThreshold = Math.Clamp(settings.VolumeWarningThreshold, 10, 100);

@@ -14,33 +14,32 @@ public sealed class NotchBorder : Border
     public static readonly DependencyProperty IsNotchProperty = DependencyProperty.Register(nameof(IsNotch), typeof(bool), typeof(NotchBorder), new PropertyMetadata(false, ModeChanged));
     public static readonly DependencyProperty ReducedMotionProperty = DependencyProperty.Register(nameof(ReducedMotion), typeof(bool), typeof(NotchBorder), new PropertyMetadata(false));
     public static readonly DependencyProperty NotchProgressProperty = DependencyProperty.Register(nameof(NotchProgress), typeof(double), typeof(NotchBorder), new PropertyMetadata(0d, ShapeChanged));
-    private static readonly DependencyProperty RevealProgressProperty = DependencyProperty.Register(
-        "RevealProgress", typeof(double), typeof(NotchBorder),
-        new PropertyMetadata(0d, ShapeChanged));
-
     private readonly RectangleGeometry _roundReveal = new();
     private Geometry? _shape;
     private Size _revealFrom;
     private Size _revealTo;
+    private double _revealProgress;
     private bool _revealing;
     private readonly GeometryDrawing _shellDrawing = new();
 
     internal Size VisibleSize { get; private set; }
     internal event EventHandler? VisibleSizeChanged;
 
-    internal void BeginReveal(Size from, Size to, TimeSpan duration, IEasingFunction ease, Action completed)
+    internal void BeginReveal(Size from, Size to)
     {
-        BeginAnimation(RevealProgressProperty, null);
-        SetValue(RevealProgressProperty, 0d);
         _revealFrom = from;
         _revealTo = to;
+        _revealProgress = 0d;
         _revealing = true;
         RefreshDrawingStyle();
         InvalidateVisual();
         UpdateShape();
-        var animation = new DoubleAnimation(0d, 1d, duration) { EasingFunction = ease };
-        animation.Completed += (_, _) => completed();
-        BeginAnimation(RevealProgressProperty, animation);
+    }
+
+    internal void SetRevealProgress(double progress)
+    {
+        _revealProgress = progress;
+        UpdateShape();
     }
 
     internal void EndReveal()
@@ -48,7 +47,6 @@ public sealed class NotchBorder : Border
         if (!_revealing) return;
         _revealing = false;
         InvalidateVisual();
-        BeginAnimation(RevealProgressProperty, null);
         UpdateShape();
     }
     public bool IsNotch { get => (bool)GetValue(IsNotchProperty); set => SetValue(IsNotchProperty, value); }
@@ -98,10 +96,9 @@ public sealed class NotchBorder : Border
         var size = new Size(ActualWidth, ActualHeight);
         if (_revealing)
         {
-            var progress = (double)GetValue(RevealProgressProperty);
             size = new Size(
-                _revealFrom.Width + (_revealTo.Width - _revealFrom.Width) * progress,
-                _revealFrom.Height + (_revealTo.Height - _revealFrom.Height) * progress);
+                _revealFrom.Width + (_revealTo.Width - _revealFrom.Width) * _revealProgress,
+                _revealFrom.Height + (_revealTo.Height - _revealFrom.Height) * _revealProgress);
         }
 
         var offset = (ActualWidth - size.Width) / 2;

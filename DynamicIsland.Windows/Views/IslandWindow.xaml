@@ -1,5 +1,6 @@
 <Window x:Class="DynamicIsland.Windows.Views.IslandWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:DynamicIsland.Windows.Views" Title="Sutra Island" Icon="{StaticResource SutraIslandLogo}" Width="1200" Height="220" WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent" ShowInTaskbar="False" Topmost="True" UseLayoutRounding="True" SnapsToDevicePixels="True">
     <Window.Resources>
+        <views:IslandFontSizeConverter x:Key="IslandFontSize"/>
         <SolidColorBrush x:Key="AppleBlack" Color="#FA000000" />
         <SolidColorBrush x:Key="AppleWhite" Color="#FFF5F5F7" />
         <SolidColorBrush x:Key="AppleSecondary" Color="#FF98989D" />
@@ -536,10 +537,10 @@
                     <Grid x:Name="QCompactComparison" Grid.Column="1" Grid.ColumnSpan="2" Margin="8,0,8,0" VerticalAlignment="Center" Visibility="{Binding QShowCompactComparison, Converter={StaticResource BoolToVisibility}}">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="22" /></Grid.ColumnDefinitions>
                         <Grid.RowDefinitions><RowDefinition Height="23" /><RowDefinition Height="23" /></Grid.RowDefinitions>
-                        <TextBlock Text="{Binding QLeftLabel}" Foreground="{DynamicResource QAccent}" FontFamily="Segoe UI Variable Text" FontWeight="SemiBold" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center" />
-                        <TextBlock Grid.Row="1" Text="{Binding QRightLabel}" Foreground="{DynamicResource QAccent}" FontFamily="Segoe UI Variable Text" FontWeight="SemiBold" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Text="{Binding QLeftCompact}" ToolTip="{Binding QLeftAnswer}" Foreground="{DynamicResource QText}" FontFamily="Segoe UI Variable Text" FontSize="14" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding QRightCompact}" ToolTip="{Binding QRightAnswer}" Foreground="{DynamicResource QText}" FontFamily="Segoe UI Variable Text" FontSize="14" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding QLeftLabel}" Foreground="{DynamicResource QAccent}" FontFamily="{Binding UiFontFamily, Mode=OneWay}" FontWeight="SemiBold" FontSize="{Binding IslandFontSizeFactor, Mode=OneWay, Converter={StaticResource IslandFontSize}, ConverterParameter=14}" Margin="0,0,10,0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="1" Text="{Binding QRightLabel}" Foreground="{DynamicResource QAccent}" FontFamily="{Binding UiFontFamily, Mode=OneWay}" FontWeight="SemiBold" FontSize="{Binding IslandFontSizeFactor, Mode=OneWay, Converter={StaticResource IslandFontSize}, ConverterParameter=14}" Margin="0,0,10,0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding QLeftCompact}" ToolTip="{Binding QLeftAnswer}" Foreground="{DynamicResource QText}" FontFamily="{Binding UiFontFamily, Mode=OneWay}" FontSize="{Binding IslandFontSizeFactor, Mode=OneWay, Converter={StaticResource IslandFontSize}, ConverterParameter=14}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding QRightCompact}" ToolTip="{Binding QRightAnswer}" Foreground="{DynamicResource QText}" FontFamily="{Binding UiFontFamily, Mode=OneWay}" FontSize="{Binding IslandFontSizeFactor, Mode=OneWay, Converter={StaticResource IslandFontSize}, ConverterParameter=14}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                         <TextBlock Grid.Column="2" Grid.RowSpan="2" Text="" FontFamily="Segoe Fluent Icons" Foreground="{DynamicResource QMuted}" VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="12" />
                     </Grid>
                     <TextBlock Grid.ColumnSpan="3" Text="{Binding QCompactText}" FontFamily="{Binding UiFontFamily}" FontSize="{Binding CompactPrimaryFontSize}" FontWeight="SemiBold" Foreground="{Binding PrimaryTextBrush}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8,0" Visibility="{Binding ShowCompactHolePunchQOutput, Converter={StaticResource BoolToVisibility}}" />
@@ -547,15 +548,15 @@
                         <views:CompactEqualizerView x:Name="CompactEqualizerLane" Active="{Binding ShowCompactEqualizer}" ReducedMotion="{Binding IsReducedMotion}" VerticalAlignment="Center" />
                         <Border Width="1" Height="30" Margin="0,0,12,0" Background="{Binding IslandDividerBrush}" Visibility="{Binding ShowCompactRam, Converter={StaticResource BoolToVisibility}}" />
                         <StackPanel Margin="0,0,13,0" Visibility="{Binding ShowCompactRam, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock Text="RAM" FontFamily="{Binding UiFontFamily}" FontSize="8" Foreground="{Binding SecondaryTextBrush}" HorizontalAlignment="Right" />
+                            <TextBlock Text="RAM" FontFamily="{Binding UiFontFamily}" FontSize="{Binding IslandFontSizeFactor, Mode=OneWay, Converter={StaticResource IslandFontSize}, ConverterParameter=8}" Foreground="{Binding SecondaryTextBrush}" HorizontalAlignment="Right" />
                             <TextBlock Text="{Binding RamText}" Margin="0,1,0,0" FontFamily="{Binding UiFontFamily}" FontSize="{Binding CompactSecondaryFontSize}" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" HorizontalAlignment="Right" />
                         </StackPanel>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock x:Name="CompactClockText" Text="{Binding ClockTimeText}" FontFamily="{Binding UiFontFamily}" FontSize="{Binding CompactClockFontSize}" FontWeight="SemiBold" Visibility="{Binding ShowClock, Converter={StaticResource BoolToVisibility}}" Foreground="{Binding PrimaryTextBrush}" HorizontalAlignment="Right" />
-                            <TextBlock Text="{Binding CompactDateText}" ToolTip="{Binding DateToolTip}" FontFamily="{Binding UiFontFamily}" FontSize="9" TextTrimming="CharacterEllipsis" MaxWidth="105" Foreground="{Binding SecondaryTextBrush}" HorizontalAlignment="Right" Visibility="{Binding ShowCompactDate, Converter={StaticResource BoolToVisibility}}" />
+                            <TextBlock Text="{Binding CompactDateText}" ToolTip="{Binding DateToolTip}" FontFamily="{Binding UiFontFamily}" FontSize="{Binding IslandFontSizeFactor, Mode=OneWay, Converter={StaticResource IslandFontSize}, ConverterParameter=9}" TextTrimming="CharacterEllipsis" MaxWidth="105" Foreground="{Binding SecondaryTextBrush}" HorizontalAlignment="Right" Visibility="{Binding ShowCompactDate, Converter={StaticResource BoolToVisibility}}" />
                             <StackPanel Orientation="Horizontal" Margin="0,2,0,0" HorizontalAlignment="Right" Visibility="{Binding ShowCompactBattery, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="{Binding BatteryGlyph}" FontFamily="Segoe Fluent Icons" FontSize="10" Foreground="{Binding SecondaryTextBrush}" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding BatteryText}" Margin="4,0,0,0" FontFamily="{Binding UiFontFamily}" FontSize="9.5" Foreground="{Binding SecondaryTextBrush}" />
+                                <TextBlock Text="{Binding BatteryText}" Margin="4,0,0,0" FontFamily="{Binding UiFontFamily}" FontSize="{Binding IslandFontSizeFactor, Mode=OneWay, Converter={StaticResource IslandFontSize}, ConverterParameter=9.5}" Foreground="{Binding SecondaryTextBrush}" />
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
@@ -577,12 +578,12 @@
                                 </Image>
                             </Grid>
                             <StackPanel Grid.Column="1" Margin="8,0,8,0" VerticalAlignment="Center">
-                                <TextBlock Text="AIRPODS CONNECTED" FontFamily="Segoe UI Variable Text" FontSize="8" FontWeight="SemiBold" Foreground="#FF9EE2AD" />
-                                <TextBlock Text="{Binding AirPodsName}" Margin="0,1,0,0" FontFamily="Segoe UI Variable Text" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource AppleWhite}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="AIRPODS CONNECTED" FontFamily="{Binding UiFontFamily, Mode=OneWay}" FontSize="{Binding IslandFontSizeFactor, Mode=OneWay, Converter={StaticResource IslandFontSize}, ConverterParameter=8}" FontWeight="SemiBold" Foreground="#FF9EE2AD" />
+                                <TextBlock Text="{Binding AirPodsName}" Margin="0,1,0,0" FontFamily="{Binding UiFontFamily, Mode=OneWay}" FontSize="{Binding IslandFontSizeFactor, Mode=OneWay, Converter={StaticResource IslandFontSize}, ConverterParameter=10.5}" FontWeight="SemiBold" Foreground="{StaticResource AppleWhite}" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Ellipse Width="6" Height="6" Margin="0,0,5,0" Fill="#FF30D158" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding AirPodsCompactBatteryText}" FontFamily="Segoe UI Variable Text" FontSize="9" FontWeight="SemiBold" Foreground="#FF9EE2AD" TextTrimming="CharacterEllipsis" MaxWidth="142" />
+                                <TextBlock Text="{Binding AirPodsCompactBatteryText}" FontFamily="{Binding UiFontFamily, Mode=OneWay}" FontSize="{Binding IslandFontSizeFactor, Mode=OneWay, Converter={StaticResource IslandFontSize}, ConverterParameter=9}" FontWeight="SemiBold" Foreground="#FF9EE2AD" TextTrimming="CharacterEllipsis" MaxWidth="142" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -603,17 +604,17 @@
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
                         <views:CompactEqualizerView x:Name="StatsCompactEqualizerLane" Active="{Binding ShowCompactEqualizer}" ReducedMotion="{Binding IsReducedMotion}" VerticalAlignment="Center" />
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Right">
-                        <TextBlock Text="{Binding ClockTimeText}" FontFamily="{Binding UiFontFamily}" FontSize="{Binding CompactClockFontSize}" Visibility="{Binding ShowClock, Converter={StaticResource BoolToVisibility}}" FontWeight="SemiBold" Foreground="{Binding PrimaryTextBrush}" HorizontalAlignment="Right" /><TextBlock Text="{Binding CompactDateText}" ToolTip="{Binding DateToolTip}" FontSize="9" Foreground="{Binding SecondaryTextBrush}" HorizontalAlignment="Right" Visibility="{Binding ShowCompactDate, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock Text="{Binding ClockTimeText}" FontFamily="{Binding UiFontFamily}" FontSize="{Binding CompactClockFontSize}" Visibility="{Binding ShowClock, Converter={StaticResource BoolToVisibility}}" FontWeight="SemiBold" Foreground="{Binding PrimaryTextBrush}" HorizontalAlignment="Right" /><TextBlock Text="{Binding CompactDateText}" ToolTip="{Binding DateToolTip}" FontSize="{Binding IslandFontSizeFactor, Mode=OneWay, Converter={StaticResource IslandFontSize}, ConverterParameter=9}" Foreground="{Binding SecondaryTextBrush}" HorizontalAlignment="Right" Visibility="{Binding ShowCompactDate, Converter={StaticResource BoolToVisibility}}" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Visibility="{Binding ShowCompactBattery, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="{Binding BatteryGlyph}" FontFamily="Segoe Fluent Icons" FontSize="10" Foreground="{Binding SecondaryTextBrush}" />
-                            <TextBlock Text="{Binding BatteryText}" Margin="4,1,0,0" FontFamily="{Binding UiFontFamily}" FontSize="9.5" Foreground="{Binding SecondaryTextBrush}" />
+                            <TextBlock Text="{Binding BatteryText}" Margin="4,1,0,0" FontFamily="{Binding UiFontFamily}" FontSize="{Binding IslandFontSizeFactor, Mode=OneWay, Converter={StaticResource IslandFontSize}, ConverterParameter=9.5}" Foreground="{Binding SecondaryTextBrush}" />
                         </StackPanel>
                     </StackPanel>
                     </StackPanel>
                 </Grid>
 
                 <!-- Expanded: one focused now-playing card. -->
-                <ScrollViewer x:Name="ExpandedViewport" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" HorizontalAlignment="Center" VerticalAlignment="Top" Visibility="Collapsed" CanContentScroll="False"><Grid x:Name="ExpandedContent" Margin="28,22" Opacity="0" IsHitTestVisible="False">
+                <ScrollViewer x:Name="ExpandedViewport" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" HorizontalAlignment="Center" VerticalAlignment="Top" Visibility="Hidden" UseLayoutRounding="True" SnapsToDevicePixels="True" CanContentScroll="False"><Grid x:Name="ExpandedContent" Margin="28,22" Opacity="0" IsHitTestVisible="False">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -1358,11 +1359,12 @@
 
         <!-- Apple-style compact timer activity. It is deliberately outside GlassShell so it remains
              a separate orb instead of changing the user's compact island width or media layout. -->
-        <Border x:Name="UrgentAlertStrip" Panel.ZIndex="100" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="12,78,12,4" Padding="10,6" CornerRadius="12" Background="#FF25201A" BorderBrush="#FFFF9F0A" BorderThickness="1" MaxWidth="650" Visibility="Collapsed" Opacity="0" RenderTransformOrigin="0.5,0">
+        <Border x:Name="UrgentAlertStrip" Panel.ZIndex="100" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="12,0,12,0" Padding="10,6" CornerRadius="12" Background="#FF25201A" BorderBrush="#FFFF9F0A" BorderThickness="1" MaxWidth="650" Visibility="Collapsed" Opacity="0" RenderTransformOrigin="0.5,0">
             <Border.RenderTransform>
                 <TransformGroup>
                     <ScaleTransform x:Name="UrgentAlertScale" ScaleX="1" ScaleY="1" />
                     <TranslateTransform x:Name="UrgentAlertTranslate" Y="0" />
+                    <TranslateTransform x:Name="UrgentAlertAnchor" />
                 </TransformGroup>
             </Border.RenderTransform>
 <DockPanel><Button DockPanel.Dock="Right" Content="Dismiss" Command="{Binding DismissUrgentCommand}" Style="{StaticResource TimerSurfaceButton}" Width="78" Height="32" Margin="6,0,0,0" /><Button DockPanel.Dock="Right" Content="Snooze 5m" Command="{Binding SnoozeUrgentCommand}" Style="{StaticResource TimerSurfaceButton}" Width="92" Height="32" Visibility="{Binding CanSnoozeUrgent, Converter={StaticResource BoolToVisibility}}" /><TextBlock Text="{Binding UrgentAlertText}" Margin="0,0,12,0" Foreground="#FFFFC775" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" /></DockPanel>
@@ -1393,7 +1395,10 @@
         <TextBlock Text="{Binding TimerCountText}" HorizontalAlignment="Right" VerticalAlignment="Top" Foreground="{Binding AccentBrush}" FontWeight="Bold" FontSize="11" /></Grid>
 
         <!-- Notifications retain their real system behaviour, but use the same quiet black material. -->
-        <views:NotificationMorphHost x:Name="NotifBanner" Margin="0,70,0,0" VerticalAlignment="Top" HorizontalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False">
+        <views:NotificationMorphHost x:Name="NotifBanner" VerticalAlignment="Top" HorizontalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False">
+            <views:NotificationMorphHost.RenderTransform>
+                <TranslateTransform x:Name="NotificationAnchor" />
+            </views:NotificationMorphHost.RenderTransform>
             <Border x:Name="NotifCard" MinWidth="300" MaxWidth="480" Padding="14,10" CornerRadius="18" Background="Transparent" BorderThickness="1" Opacity="0" Cursor="Hand" PreviewMouseLeftButtonDown="OpenNotification_Click">
                 <Grid>
                     <StackPanel x:Name="NotifContent" Margin="0,0,30,0">

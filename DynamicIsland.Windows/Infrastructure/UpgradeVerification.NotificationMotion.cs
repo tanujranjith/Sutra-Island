@@ -59,7 +59,10 @@ internal static partial class UpgradeVerification
         await Task.Delay(300); window.UpdateLayout();
         check(host.RevealProgress == 1 && !host.HasConnection && host.IsHitTestVisible && card.Opacity == 1,
             "Notification motion: final card releases the connection and enables controls");
-        check(Math.Abs(host.Margin.Top - shell.Margin.Top - shell.ActualHeight - 12) < 0.1
+        var root = (UIElement)window.Content;
+        var notificationTop = host.TranslatePoint(new System.Windows.Point(), root).Y;
+        var islandBottom = shell.TranslatePoint(new System.Windows.Point(0, shell.ActualHeight), root).Y;
+        check(Math.Abs(notificationTop - islandBottom - 12) < 0.1
             && host.CurrentSurfaceBounds == new Rect(0, 0, host.ActualWidth, host.ActualHeight),
             "Notification motion: settles at full size with a 12 DIP gap");
 

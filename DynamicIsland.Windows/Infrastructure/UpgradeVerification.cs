@@ -133,10 +133,13 @@ internal static partial class UpgradeVerification
         settings.AnimationIntensity = AnimationIntensity.Expressive;
         vm.IsExpanded = false; window.ApplySettings();
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        var shellShadow = shell.Effect;
         vm.IsExpanded = true; window.UpdateLayout();
         var stableShellClip = shell.Clip;
         Check(!shell.UseLayoutRounding && !shell.SnapsToDevicePixels, "Main island permits fractional motion during expansion");
+        Check(viewport.UseLayoutRounding && viewport.SnapsToDevicePixels, "The expanded viewport keeps its layout rounding during the morph");
         Check(expandedContent.CacheMode is null, "Expanded content stays sharp without a temporary bitmap cache");
+        Check(shellShadow is not null && shell.Effect is null, "Expansion avoids compositing the full shell through a shadow effect");
         var stableViewport = viewport.RenderSize;
         var stableShellSize = shell.RenderSize;
         Check(shell.VisibleSize.Width < stableShellSize.Width, "Expansion starts at compact visual bounds");
@@ -146,7 +149,7 @@ internal static partial class UpgradeVerification
         expandedContent.SizeChanged += countResize;
         for (var frame = 0; frame < 5; frame++)
         {
-            await Task.Delay(50); window.UpdateLayout();
+            await Task.Delay(35); window.UpdateLayout();
             Check(viewport.ComputedVerticalScrollBarVisibility != Visibility.Visible && viewport.ComputedHorizontalScrollBarVisibility != Visibility.Visible,
                 $"Expansion frame {frame}: no outer scrollbar");
             Check(viewport.RenderSize == stableViewport, $"Expansion frame {frame}: stable content viewport ({stableViewport} to {viewport.RenderSize})");
@@ -160,12 +163,14 @@ internal static partial class UpgradeVerification
         Check(contentResizes <= 1, "Expanded content avoids per-frame layout resizing");
         Check(ReferenceEquals(shell.Clip, stableShellClip), "Main island reuses the rounded clip across expansion frames");
         Check(shell.UseLayoutRounding && shell.SnapsToDevicePixels, "Main island restores sharp pixel alignment after expansion");
+        Check(ReferenceEquals(shell.Effect, shellShadow), "The settled island restores its original shadow");
         Check(Math.Abs(shell.ActualWidth - viewport.ActualWidth) < 1 && Math.Abs(shell.ActualHeight - viewport.ActualHeight) < 1,
             "Expansion lands on the content viewport bounds");
         await Capture("expansion-settled");
         vm.IsExpanded = false; await Task.Delay(70); window.UpdateLayout();
         var midCollapse = shell.VisibleSize;
         var midCollapseOpacity = expandedContent.Opacity;
+        Check(shell.Effect is null, "Collapse also skips the full-shell shadow effect");
         window.ApplySettings();
         Check(shell.VisibleSize == midCollapse && Math.Abs(expandedContent.Opacity - midCollapseOpacity) < 0.001,
             "An unrelated layout refresh leaves the running collapse intact");
@@ -183,6 +188,9 @@ internal static partial class UpgradeVerification
         await Task.Delay(360); window.UpdateLayout();
         Check(Math.Abs(shell.ActualWidth - settings.IslandWidth) < 1 && compactContent.Visibility == Visibility.Visible,
             "Collapse commits the compact layout after the morph");
+        Check(viewport.Visibility == Visibility.Hidden && !expandedContent.IsVisible && !expandedContent.IsHitTestVisible
+            && expandedContent.IsMeasureValid && expandedContent.RenderSize.Width > 0,
+            "The compact island retains measured expanded content without exposing it");
         File.WriteAllLines(Path.Combine(output, "motion-checks.txt"), report);
         await VerifyNotificationListenerAsync(log, Check);
         await VerifyTimerMotionAsync(settings, vm, window, Check, output);

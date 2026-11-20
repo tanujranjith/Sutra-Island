@@ -225,6 +225,16 @@ public sealed partial class SettingsViewModel : ObservableObject
     public System.Windows.CornerRadius PreviewMiniCorner => new(ClampedIslandRadius * 0.5);
     public bool ScrollLongTitles { get => _settings.ScrollLongTitles; set { Set(v => _settings.ScrollLongTitles = v, value); _apply(); } }
     public AnimationIntensity AnimationIntensity { get => _settings.AnimationIntensity; set => Set(v => _settings.AnimationIntensity = v, value); }
+    public int IslandOpeningSpeedPercent
+    {
+        get => _settings.IslandOpeningSpeedPercent;
+        set
+        {
+            var speed = Math.Clamp(value, AppSettings.MinimumIslandOpeningSpeedPercent, AppSettings.MaximumIslandOpeningSpeedPercent);
+            if (_settings.IslandOpeningSpeedPercent != speed)
+                Set(v => _settings.IslandOpeningSpeedPercent = v, speed);
+        }
+    }
     public bool TopNotchMode
     {
         get => _settings.TopNotchMode;
@@ -312,7 +322,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         get => _settings.TextColorHex;
         set { if (string.IsNullOrWhiteSpace(value) || IsHex(value)) { _settings.TextColorHex = value ?? ""; RaisePropertyChanged(); _apply(); } }
     }
-    public string FontFamilyName { get => _settings.FontFamilyName; set { Set(v => _settings.FontFamilyName = v, value); _apply(); } }
+    public string FontFamilyName { get => _settings.FontFamilyName; set => Set(v => _settings.FontFamilyName = v, value); }
+    public int IslandFontSizePercent
+    {
+        get => _settings.IslandFontSizePercent;
+        set => SetSize(v => _settings.IslandFontSizePercent = v, value,
+            AppSettings.MinimumIslandFontSizePercent, AppSettings.MaximumIslandFontSizePercent);
+    }
     public ObservableCollection<string> FontOptions { get; } = [];
     public string[] AccentSwatches { get; } =
         ["#5AA7FF", "#30D158", "#FF375F", "#BF5AF2", "#FF9F0A", "#64D2FF", "#FFD60A", "#FF6482"];
@@ -823,7 +839,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private void InitLists()
     {
         foreach (var f in new[] { "Segoe UI Variable Text", "Segoe UI", "Segoe UI Variable Display",
-            "Cascadia Code", "Consolas", "Arial", "Calibri", "Georgia", "Verdana", "Comic Sans MS" })
+            "Cascadia Code", "Consolas", "Arial", "Calibri", "Georgia", "Times New Roman", "Verdana", "Comic Sans MS" })
             FontOptions.Add(f);
 
         MonitorOptions.Add("Primary");

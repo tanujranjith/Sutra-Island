@@ -229,9 +229,28 @@ internal static partial class UpgradeVerification
                 "Screenshot session history has a searchable toggle and adjustable capture limit");
             await CaptureSutraAsync(editor, output, "feature-settings-screenshots");
 
+            editor.OpenSearch(nameof(SettingsViewModel.IslandOpeningSpeedPercent)); await Layout();
+            editorVm.AnimationIntensity = AnimationIntensity.Normal;
+            var speed = Bound<Slider>(RangeBase.ValueProperty, nameof(SettingsViewModel.IslandOpeningSpeedPercent));
+            var opening = island.MainIslandMorphDuration(expanded: true);
+            var closing = island.MainIslandMorphDuration(expanded: false);
+            check(editorVm.SelectedSectionKey == "appearance" && speed.Minimum == 50 && speed.Maximum == 150
+                && speed.Value == 100 && speed.IsEnabled && opening.TotalMilliseconds == 190,
+                "Appearance exposes a searchable opening-speed slider with the current timing at 100 percent");
+            speed.SetCurrentValue(RangeBase.ValueProperty, 150d);
+            speed.GetBindingExpression(RangeBase.ValueProperty)?.UpdateSource();
+            check(vm.Settings.IslandOpeningSpeedPercent == 150 &&
+                Math.Abs(island.MainIslandMorphDuration(expanded: true).TotalMilliseconds - 190d / 1.5) < .01 &&
+                island.MainIslandMorphDuration(expanded: false) == closing,
+                "Changing the slider speeds up the next opening and preserves closing duration");
+            editorVm.AnimationIntensity = AnimationIntensity.Reduced; await Layout();
+            check(!speed.IsEnabled && speed.Value == 150, "Reduced motion disables the slider and retains the selected speed");
+            editorVm.AnimationIntensity = AnimationIntensity.Normal;
+
             // Persist the isolated fixture directly; never touch Windows startup registration.
             await persistence.SaveAsync(vm.Settings);
             var reloaded = await persistence.LoadAsync();
+            check(reloaded.IslandOpeningSpeedPercent == 150, "Opening speed survives settings save and reload");
             check(!reloaded.GoogleSearchEnabled && !reloaded.GoogleSearchOpenHomepageWhenEmpty
                 && reloaded.GoogleSearchSafeSearch && reloaded.GoogleSearchLanguage == "hi",
                 "All four Google customization options survive settings save and reload");
