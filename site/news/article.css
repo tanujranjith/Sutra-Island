@@ -1,0 +1,125 @@
+/* Launch article only. The paper and the art fade share one cover, never a viewport-sized overlay. */
+.si-story {
+  --story-paper: #f6f8fa;
+  --story-ink: #171e30;
+  --story-text: #27354a;
+  --story-meta: #485b75;
+  --story-head-width: 750px;
+  --story-read-width: 680px;
+  background: var(--story-paper);
+}
+.si-story .ed-top {
+  background: var(--story-paper);
+  border-color: #d2dce6;
+}
+.si-story .ed-nav { min-height: 66px; }
+.si-story .ed-nav-link { gap: 7px; font-size: 15px; }
+
+.si-story-cover {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  overflow: hidden;
+  padding-block: clamp(42px, 6vw, 74px) clamp(35px, 5vw, 65px);
+  background: var(--story-paper);
+}
+.si-story-cover::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  /*
+   * These layers all fill the same content-sized element. The first layer
+   * is solid paper at the lower edge, including when the photo is scaled.
+   */
+  background:
+    linear-gradient(
+      to bottom,
+      rgb(246 248 250 / 69%) 0%,
+      rgb(246 248 250 / 76%) 39%,
+      rgb(246 248 250 / 93%) 78%,
+      var(--story-paper) 100%
+    ) center / 100% 100% no-repeat,
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(246 248 250 / 46%) 33%,
+      rgb(246 248 250 / 54%) 64%,
+      rgb(246 248 250 / 28%) 100%
+    ) center / 100% 100% no-repeat,
+    url("./tidal-fold-background.webp") center 44% / cover no-repeat;
+}
+.si-story-heading {
+  width: min(var(--story-head-width), 100%);
+  margin-inline: auto;
+}
+.si-story-kicker {
+  margin: 0 0 clamp(13px, 1.5vw, 20px);
+  color: #294b81;
+  font: 500 13px/1.4 var(--ed-mono);
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
+.si-story-heading h1 {
+  margin: 0;
+  color: var(--story-ink);
+  font: 600 clamp(39px, 5vw, 70px)/1.045 var(--ed-font);
+  letter-spacing: -.042em;
+  text-wrap: balance;
+}
+.si-story-heading .ed-deck {
+  max-width: 43ch;
+  margin: clamp(14px, 1.75vw, 23px) 0 0;
+  color: var(--story-text);
+  font-size: clamp(18px, 2vw, 25px);
+  line-height: 1.46;
+}
+.si-story-byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 11px;
+  margin: clamp(18px, 2.1vw, 28px) 0 0;
+  color: var(--story-meta);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.si-story-byline span:first-child { color: var(--story-text); font-weight: 600; }
+.si-story-byline time { white-space: nowrap; }
+.si-story-product {
+  width: min(840px, 100%);
+  margin: clamp(24px, 4.1vw, 47px) auto 0;
+}
+.si-story-product img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 2.3% / 6.75%;
+  box-shadow: 0 8px 20px rgb(21 35 56 / 20%), 0 24px 43px -16px rgb(29 52 93 / 28%);
+}
+.si-story .ed-article-copy {
+  width: min(var(--story-read-width), 100%);
+  margin: clamp(10px, 2vw, 27px) auto clamp(56px, 8vw, 108px);
+  color: var(--story-text);
+  font-size: clamp(18px, 1.8vw, 20px);
+  line-height: 1.72;
+}
+.si-story .ed-article-copy h2 {
+  margin: clamp(36px, 5vw, 60px) 0 12px;
+  color: var(--story-ink);
+  font-size: clamp(29px, 3.6vw, 41px);
+  letter-spacing: -.03em;
+}
+.si-story .ed-detail-shot { margin: 25px 0 28px; }
+
+@media (max-width: 560px) {
+  .si-story .ed-nav { min-height: 58px; }
+  .si-story .ed-nav-link { font-size: 14px; }
+  .si-story-cover::before { background-position: center, center, 41% 45%; }
+  .si-story-heading h1 { letter-spacing: -.035em; }
+  .si-story-byline { font-size: 14px; }
+}
+@media (forced-colors: active) {
+  .si-story-cover::before { display: none; }
+}
