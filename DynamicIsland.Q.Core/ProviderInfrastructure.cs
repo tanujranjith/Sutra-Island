@@ -201,7 +201,7 @@ public abstract partial class HttpQProvider(HttpClient? httpClient = null) : IQP
         return QPromptComposer.ContextText(request.ScreenContext) + imageNote;
     }
 
-    protected static string TextPrompt(QRequest request) => $"{ContextPrompt(request)}\n\nUser request:\n{request.Prompt}";
+    protected static string TextPrompt(QRequest request) => QPromptComposer.UserText(request, ContextPrompt(request));
 
     protected static object[] OpenAiChatMessages(QRequest request)
     {

@@ -98,8 +98,10 @@ public static partial class FlowTextCleaner
             if (ratio < 0.15 || !CorrectionCue().IsMatch(basic) || NovelShare(basic, ai) > 0.2) return false;
         }
         if (a < 6 && b > a + 6) return false;
+        // Cleanup only reuses the speaker's words; a mostly-new output is the model replying to the dictation.
+        if (a >= 5 && NovelShare(basic, ai) > 0.5) return false;
         var lower = ai.TrimStart().ToLowerInvariant();
-        string[] tells = ["sure", "here is", "here's", "certainly", "i can't", "i cannot", "as an ai", "cleaned text", "```"];
+        string[] tells = ["sure", "here is", "here's", "certainly", "i can't", "i cannot", "as an ai", "cleaned text", "of course", "let me", "i'd be happy", "i would be happy", "<transcript", "```"];
         return !tells.Any(t => lower.StartsWith(t) && !basic.TrimStart().ToLowerInvariant().StartsWith(t));
     }
 

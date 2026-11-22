@@ -67,7 +67,8 @@ public sealed record QRequest(
     string? CustomSystemPrompt = null,
     string ReasoningEffort = "auto",
     string? ControlInstructions = null,
-    bool WebSearch = false);
+    bool WebSearch = false,
+    bool DictationCleanup = false);
 
 public abstract record QStreamEvent
 {

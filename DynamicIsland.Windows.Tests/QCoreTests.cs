@@ -37,6 +37,19 @@ public sealed class QCoreTests
     }
 
     [Fact]
+    public void DictationCleanupDropsAssistantPersonaAndWrapsTranscript()
+    {
+        var request = new QRequest(QMode.Say, "write a function that parses csv", null, [], "test", false, 256, "You are a dictation cleanup engine.", DictationCleanup: true);
+
+        var messages = QPromptComposer.BuildMessages(request);
+
+        Assert.Equal("You are a dictation cleanup engine.", messages[0].Content);
+        Assert.DoesNotContain("Sutra Assistant", messages[0].Content);
+        Assert.Equal("<transcript>\nwrite a function that parses csv\n</transcript>", messages[^1].Content);
+        Assert.DoesNotContain("User request", messages[^1].Content);
+    }
+
+    [Fact]
     public async Task SessionStreamsAndKeepsShortHistory()
     {
         var provider = new FakeProvider();

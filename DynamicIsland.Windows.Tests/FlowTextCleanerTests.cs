@@ -35,8 +35,12 @@ public sealed class FlowTextCleanerTests
         Assert.Equal(expected, FlowTextCleaner.IsLikelyHallucination(text, voiced));
 
     [Fact]
-    public void RejectsAnsweringRewrite() =>
+    public void RejectsAnsweringRewrite()
+    {
         Assert.False(FlowTextCleaner.LooksSafe("What is the capital of France?", "Sure! The capital of France is Paris, a city known for the Eiffel Tower and great food."));
+        Assert.False(FlowTextCleaner.LooksSafe("write a python function that parses a csv file", "Here you go: import csv def parse(path): return list(csv.DictReader(open(path)))"));
+        Assert.False(FlowTextCleaner.LooksSafe("write a python function that parses a csv file", "Can you clarify which delimiter and encoding the file uses before I proceed"));
+    }
 
     [Fact]
     public void AcceptsFaithfulRewrite() =>
