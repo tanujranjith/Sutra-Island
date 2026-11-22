@@ -1,3 +1,8 @@
+# Sutra Island v1.4.6
+
+- Improve Sutraflow dictation cleanup so prompts and questions are preserved as text instead of answered.
+
+---
 # Sutra Island v1.4.5
 
 - Make the Island open smoothly after it has been closed for a while.
