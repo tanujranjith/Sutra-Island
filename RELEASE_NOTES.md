@@ -1,3 +1,8 @@
+# Sutra Island v1.4.7
+
+- Check for new releases in **Settings → Advanced → App Updates**, then update and restart Island in place.
+
+---
 # Sutra Island v1.4.6
 
 - Improve Sutraflow dictation cleanup so prompts and questions are preserved as text instead of answered.

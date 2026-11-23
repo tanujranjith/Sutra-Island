@@ -909,8 +909,22 @@
                     <!-- Advanced -->
                     <StackPanel x:Name="AdvancedPage" Visibility="Collapsed">
                         <TextBlock Text="Advanced" Style="{StaticResource PageTitle}" />
-                        <TextBlock Text="Search, screenshot history, media detail, profiles, backup, and diagnostics." Style="{StaticResource PageDescription}" />
-                        <TextBlock Text="GOOGLE SEARCH" Style="{StaticResource GroupLabel}" Margin="0,0,0,9" />
+                        <TextBlock Text="Manage updates, search, screenshot history, media, profiles, backup, and diagnostics." Style="{StaticResource PageDescription}" />
+                        <TextBlock Text="APP UPDATES" Style="{StaticResource GroupLabel}" Margin="0,0,0,9" />
+                        <Border Style="{StaticResource InsetGroup}">
+                            <Border Style="{StaticResource LastPreferenceRow}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,16,0">
+                                        <TextBlock Text="Sutra Island" Style="{StaticResource RowTitle}" />
+                                        <TextBlock x:Name="IslandUpdateVersion" Style="{StaticResource RowDescription}" />
+                                        <TextBlock x:Name="IslandUpdateStatus" Style="{StaticResource RowDescription}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                                    </StackPanel>
+                                    <Button x:Name="IslandUpdateButton" Grid.Column="1" Content="Check for updates" Click="IslandUpdate_Click" Style="{StaticResource ActionButton}" VerticalAlignment="Top" />
+                                </Grid>
+                            </Border>
+                        </Border>
+                        <TextBlock Text="GOOGLE SEARCH" Style="{StaticResource GroupLabel}" />
                         <Border Style="{StaticResource InsetGroup}"><StackPanel>
                             <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel Margin="0,0,16,0"><TextBlock Text="Google search in command palette" Style="{StaticResource RowTitle}" /><TextBlock Text="Type google followed by your query. Island opens Google in your Windows default browser." Style="{StaticResource RowDescription}" TextWrapping="Wrap" /></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding GoogleSearchEnabled}" /></Grid></Border>
                             <Border Style="{StaticResource PreferenceRow}"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel Margin="0,0,16,0"><TextBlock Text="Open Google when no query is entered" Style="{StaticResource RowTitle}" /><TextBlock Text="Turn off to require search text after the command." Style="{StaticResource RowDescription}" TextWrapping="Wrap" /></StackPanel><CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}" IsChecked="{Binding GoogleSearchOpenHomepageWhenEmpty}" /></Grid></Border>

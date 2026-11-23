@@ -75,6 +75,11 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (e.Args.FirstOrDefault() == IslandUpdateService.ApplyArgument)
+        {
+            Shutdown(IslandUpdateService.Apply(e.Args));
+            return;
+        }
         if (e.Args.Contains("--verify-web-search") || e.Args.Contains("--verify-math"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -307,6 +312,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             ShowSettings();
             if (openVoiceSettingsFromCommandLine) _settingsWindow?.OpenQSettings();
         }
+        IslandUpdateService.CleanAfterRestart(e.Args);
         // WinRT media discovery is independent of the requested Settings window.
         if (!_isShuttingDown) await mediaStart;
     }
@@ -668,6 +674,9 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         brush.Freeze();
         Resources[key] = brush;
     }
+
+    internal void RestartForUpdate() => ShutdownApplication();
+    internal void LogUpdateFailure(Exception ex) => _log?.Error("Island update failed", ex);
 
     private void ShutdownApplication()
     {

@@ -50,6 +50,7 @@ jobs:
 
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "app_version=$appVersion" >> $env:GITHUB_OUTPUT
+          "prerelease=$($appVersion.Split('+')[0].Contains('-').ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
@@ -124,7 +125,8 @@ jobs:
           name: ${{ steps.version.outputs.tag }}
           body_path: dist/RELEASE_NOTES.md
           generate_release_notes: true
-          make_latest: true
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          make_latest: ${{ steps.version.outputs.prerelease == 'true' && 'false' || 'true' }}
           fail_on_unmatched_files: true
           files: |
             dist/DynamicIsland.exe

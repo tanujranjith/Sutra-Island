@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.ComponentModel;
+using DynamicIsland.Windows.Services;
 using DynamicIsland.Windows.ViewModels;
 
 namespace DynamicIsland.Windows.Views;
@@ -15,6 +16,7 @@ public partial class SettingsWindow : Window
     private readonly IslandWindow _islandWindow;
     private bool _previewExpanded;
     private bool _previewPaneCollapsed;
+    private IslandUpdate? _availableUpdate;
 
     public event EventHandler? OpenTimerRequested;
 
@@ -29,6 +31,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow(SettingsViewModel settingsViewModel, IslandViewModel islandViewModel, IslandWindow islandWindow)
     {
         InitializeComponent();
+        IslandUpdateVersion.Text = $"Installed version {IslandUpdateService.CurrentVersion.ToString(3)}";
 
         SizeChanged += (_, _) => GraphiteSettingsShell.Clip = new RectangleGeometry(new Rect(0, 0, GraphiteSettingsShell.ActualWidth, GraphiteSettingsShell.ActualHeight), 25, 25);
         _islandViewModel = islandViewModel;
@@ -50,6 +53,50 @@ public partial class SettingsWindow : Window
         SetPreviewExpanded(false, animate: false);
         ShowSection("content");
         UpdateNavigationFilter(string.Empty);
+    }
+
+    private async void IslandUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        if (System.Windows.Application.Current is not App app || app.IsShuttingDown) return;
+
+        var update = _availableUpdate;
+        IslandUpdateButton.IsEnabled = false;
+        try
+        {
+            if (update is null)
+            {
+                IslandUpdateStatus.Text = "Checking for updates…";
+                _availableUpdate = await IslandUpdateService.CheckAsync();
+                IslandUpdateStatus.Text = _availableUpdate is { } latest
+                    ? $"Version {latest.Version.ToString(3)} is available. Island will restart after installing."
+                    : "You're up to date.";
+                return;
+            }
+
+            IslandUpdateStatus.Text = "Downloading update…";
+            var progress = new Progress<int>(percent => IslandUpdateStatus.Text =
+                percent < 100 ? $"Downloading update… {percent}%" : "Verifying update…");
+            await IslandUpdateService.PrepareRestartAsync(update, progress);
+            IslandUpdateStatus.Text = "Restarting Island…";
+            app.RestartForUpdate();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            IslandUpdateStatus.Text = "Windows blocked changes to Island's folder. Try running Island from a folder you can write to.";
+        }
+        catch (Exception ex)
+        {
+            _availableUpdate = null;
+            var reason = ex is InvalidDataException ? ex.Message : "Try again in a moment.";
+            var action = update is null ? "check for updates" : "install the update";
+            IslandUpdateStatus.Text = $"Couldn't {action}. {reason}";
+            app.LogUpdateFailure(ex);
+        }
+        finally
+        {
+            IslandUpdateButton.Content = _availableUpdate is null ? "Check for updates" : "Update and restart";
+            IslandUpdateButton.IsEnabled = !app.IsShuttingDown;
+        }
     }
 
     private void TogglePreviewPane_Click(object sender, RoutedEventArgs e)
@@ -317,7 +364,7 @@ public partial class SettingsWindow : Window
         QTab.Visibility = Matches(QTab, "q", "assistant", "provider", "model", "api", "prompt", "response", "tokens", "screen", "voice", "speech", "wake", "hey sutra", "training", "cooldown", "confidence") ? Visibility.Visible : Visibility.Collapsed;
         FlowTab.Visibility = Matches(FlowTab, "flow", "sutra flow", "dictation", "dictate", "whisper", "voice", "speech", "transcribe", "push-to-talk", "microphone", "vocabulary") ? Visibility.Visible : Visibility.Collapsed;
         ShortcutsTab.Visibility = Matches(ShortcutsTab, "shortcuts", "behavior", "command palette", "startup", "hotkey", "hover", "click-through", "always on top", "expand") ? Visibility.Visible : Visibility.Collapsed;
-        AdvancedTab.Visibility = Matches(AdvancedTab, "advanced", "developer", "backup", "profiles", "warnings", "debug", "import", "export", "reset", "volume warning", "battery warning") ? Visibility.Visible : Visibility.Collapsed;
+        AdvancedTab.Visibility = Matches(AdvancedTab, "advanced", "update", "check for updates", "version", "developer", "backup", "profiles", "warnings", "debug", "import", "export", "reset", "volume warning", "battery warning") ? Visibility.Visible : Visibility.Collapsed;
 
         var showIslandGroup = query.Length == 0 || "island content appearance position".Contains(query, StringComparison.OrdinalIgnoreCase);
         IslandNavLabel.Visibility = showIslandGroup ? Visibility.Visible : Visibility.Collapsed;
