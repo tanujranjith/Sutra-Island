@@ -304,7 +304,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         _ => "Sutra Assistant · Ready"
     };
     public bool IsQActive => QState != QRunState.Idle;
-    public bool ShowQSurface => IsQActive && !TimerEditorOpen;
+    public bool ShowQSurface => IsQActive && !_qInSearch && !TimerEditorOpen;
     public bool QIsAsk => QCurrentMode == DynamicIsland.Q.Core.QMode.Ask;
     public bool QIsSay => QCurrentMode == DynamicIsland.Q.Core.QMode.Say;
     public bool QIsListening => QState == QRunState.Listening;
@@ -425,7 +425,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     public bool IsHolePunchMode => Settings.IslandWidth <= 90 && Settings.IslandHeight <= 48;
     // While the compact voice orb owns a voice turn, the island underneath keeps its media/system
     // content, so it fades back in unchanged when the orb hands the island back.
-    private bool ShowQInCompact => IsQActive && !_compactVoice.IsActive;
+    private bool ShowQInCompact => IsQActive && !_qInSearch && !_compactVoice.IsActive;
     public bool ShowCompactMediaContent => ShowMedia && !ShowQInCompact && !IsHolePunchMode;
     public bool ShowCompactQContent => ShowQInCompact && (!IsHolePunchMode || QCompareEnabled);
     public bool ShowCompactHolePunchQOutput => ShowQInCompact && IsHolePunchMode && !QCompareEnabled;
@@ -1298,6 +1298,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
             return;
         }
         if (!Settings.QEnabled) return;
+        _qInSearch = false;
         _qScreenSession = true; QUseScreenNext = false;
         CancelQActivation();
         var activation = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Clamp(Settings.QTimeoutSeconds, 5, 300)));
@@ -1353,8 +1354,9 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         }
     }
 
-    public async Task SubmitQAsync(string prompt)
+    public async Task SubmitQAsync(string prompt, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(prompt) || QState is QRunState.Capturing or QRunState.Listening or QRunState.Thinking or QRunState.Streaming) return;
         if (!Settings.QDisclosureAccepted)
         {
@@ -1366,10 +1368,12 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
         QUseScreenNext = false;
         var localControl = !captureScreen && _qSnapshot.Mode == QMode.Ask && _assistantControls?.CanHandleDirect(prompt) == true;
         if (!localControl) await RefreshCodexModelsAsync().ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         var baseUrl = string.Equals(Settings.QSelectedProvider, "ollama", StringComparison.OrdinalIgnoreCase) ? Settings.QOllamaBaseUrl : null;
         var credential = localControl ? null : _qSecrets.Get(Settings.QSelectedProvider);
         var customSystemPrompt = _qSnapshot.Mode == QMode.Say ? Settings.QSaySystemPrompt : Settings.QAskSystemPrompt;
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(Settings.QTimeoutSeconds));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(Settings.QTimeoutSeconds));
         await _qSession.SubmitAsync(prompt, _qSnapshot.Mode, Settings.QSelectedProvider, Settings.QSelectedModel, credential, baseUrl,
             Settings.QIncludeScreenImage,
             token => _qScreen.CaptureAsync(_qTargetWindow, Settings.QCaptureMode == Models.QCaptureMode.ActiveMonitor ? DynamicIsland.Q.Core.QCaptureMode.ActiveMonitor : DynamicIsland.Q.Core.QCaptureMode.ActiveWindow, token),
@@ -1603,7 +1607,7 @@ public sealed partial class IslandViewModel : ObservableObject, IDisposable
     private void UpdateQAutoCloseTimer()
     {
         _qAutoCloseTimer.Stop();
-        if (!CompactVoicePolicy.AllowPanelAutoClose(Settings.QAutoCloseAfterResponse, VoiceBusy, CompactVoiceActive, QState)) return;
+        if (_qInSearch || !CompactVoicePolicy.AllowPanelAutoClose(Settings.QAutoCloseAfterResponse, VoiceBusy, CompactVoiceActive, QState)) return;
         _qAutoCloseTimer.Interval = TimeSpan.FromSeconds(Math.Clamp(Settings.QAutoCloseDelaySeconds, 1, 300));
         _qAutoCloseTimer.Start();
     }

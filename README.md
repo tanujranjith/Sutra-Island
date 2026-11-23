@@ -2,7 +2,7 @@
 
 Sutra Island is a Windows desktop companion: a compact, always-on-top island that expands into media controls, system information, timers, and other live activities. It also includes Sutra Assistant and a searchable command palette.
 
-Built with C#, WPF, and .NET 10. The current source version is **1.4.7**. See [release notes](RELEASE_NOTES.md) for changes, [Sutra Assistant](Q.md) for provider setup and privacy details, and [Sutra Flow](SUTRA_FLOW.md) for dictation.
+Built with C#, WPF, and .NET 10. The current source version is **1.4.8**. See [release notes](RELEASE_NOTES.md) for changes, [Sutra Assistant](Q.md) for provider setup and privacy details, and [Sutra Flow](SUTRA_FLOW.md) for dictation.
 
 ![Current graphite island with fixture media](media/graphite-island.png)
 
@@ -90,6 +90,8 @@ In assistant chat, Enter sends the prompt and Shift+Enter inserts a new line.
 Download **Sutra-Island-Setup** from the [latest release](../../releases/latest) for a guided installation with local voices included. The self-contained **DynamicIsland.exe** is also available as a portable option; on its first spoken reply it downloads the approximately 126 MB local voice model. Once installed, voice synthesis runs offline. Each release includes `SHA256SUMS.txt` for verifying the downloads.
 
 Starting with v1.4.7, open **Settings → Advanced → App Updates** and select **Check for updates**. When a new stable GitHub release is available, choose **Update and restart**. Island verifies the download, replaces its executable in place, and reopens with your existing settings. Users on older versions need to install an updater-enabled release once.
+
+Starting with v1.4.8, Island also checks shortly after startup and every six hours while it runs. When it finds a newer stable release, it sends a Windows notification. Click the notification to open **App Updates**, where you can choose when to install.
 
 For the assistant, open **Settings → Sutra Assistant**, choose a provider and model, and add an API key if required. The Codex provider uses an installed supported official Codex runtime or the separately packaged Codex test bundle. Read the [assistant guide](Q.md) before using sign-in or screen help.
 

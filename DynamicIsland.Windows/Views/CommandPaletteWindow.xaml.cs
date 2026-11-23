@@ -17,19 +17,20 @@ public partial class CommandPaletteWindow : Window
     public bool IsPriming { get; private set; }
     public bool IsPresentationReady => _primeTask?.IsCompletedSuccessfully == true;
 
-    public CommandPaletteWindow(CommandPaletteViewModel viewModel, Func<bool>? showInScreenshots = null)
+    public CommandPaletteWindow(CommandPaletteViewModel viewModel, Func<bool>? showInScreenshots = null, IslandViewModel? assistant = null)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _showInScreenshots = showInScreenshots;
         DataContext = _viewModel;
+        AttachSearch(assistant);
 
         // Keep the morph surface stable throughout its opening animation.
         _viewModel.CloseRequested += (_, _) => SafeClose();
         _viewModel.SuggestionsRefreshed += (_, _) => SyncListFromViewModel();
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         Closed += (_, _) => { StopPresentationMaintenance(); _viewModel.ClosePanel(); _viewModel.PropertyChanged -= ViewModel_PropertyChanged; };
-        IsVisibleChanged += (_, _) => { if (!IsVisible) { ResetPresentationMotion(); _viewModel.Reset(); } };
+        IsVisibleChanged += (_, _) => { if (!IsVisible) { ResetSearch(); ResetPresentationMotion(); _viewModel.Reset(); } };
         Deactivated += (_, _) => SafeClose();
         SourceInitialized += (_, _) => ApplyCaptureAffinity();
         SizeChanged += (_, _) => { if (IsVisible && !IsPriming && _paletteWorkArea is not null) KeepOnScreen(); };
@@ -64,6 +65,13 @@ public partial class CommandPaletteWindow : Window
 
     private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
+        if (_searchMode is not null)
+        {
+            if (e.Key == Key.Escape) { e.Handled = true; SafeClose(); }
+            else if (e.Key == Key.Enter && Keyboard.FocusedElement == SearchBox)
+            { e.Handled = true; if (!e.IsRepeat) _ = SubmitSearchAsync(); }
+            return;
+        }
         if (_viewModel.HasPanel)
         {
             if (ToolsView.HasOpenDropdown) return;
@@ -109,6 +117,7 @@ public partial class CommandPaletteWindow : Window
     private async System.Threading.Tasks.Task ExecuteAsync()
     {
         if(!_viewModel.HasPanel) _commandHistory.Remember(_viewModel.Query);
+        if (!_viewModel.HasPanel && await TryOpenSearchCommandAsync()) return;
         if (_viewModel.SelectedSuggestion is { IsCalculation: true, CalculationValue: { } value })
         {
             try
@@ -159,6 +168,11 @@ public partial class CommandPaletteWindow : Window
     private void KeepOnScreen()
     {
         var area = _paletteWorkArea ?? SystemParameters.WorkArea;
+        if (_searchMode is not null && _paletteAnchor is { } anchor)
+        {
+            Top = anchor.Bottom - 2;
+            Left = anchor.Left + (anchor.Width - ActualWidth) / 2;
+        }
         Top = Math.Max(area.Top + 8, Math.Min(Top, area.Bottom - ActualHeight - 8));
         Left = Math.Max(area.Left + 8, Math.Min(Left, area.Right - ActualWidth - 8));
     }
@@ -192,7 +206,7 @@ public partial class CommandPaletteWindow : Window
     }
 
     public void PrepareForShow()
-    { if (_viewModel.HasPanel || _viewModel.Query.Length != 0 || _viewModel.HasStatus) _viewModel.Reset(); Width = 640; ApplyCaptureAffinity(); }
+    { ResetSearch(); if (_viewModel.HasPanel || _viewModel.Query.Length != 0 || _viewModel.HasStatus) _viewModel.Reset(); Width = 640; ApplyCaptureAffinity(); RefreshSearchAvailability(); }
     public void WarmLayout()
     {
         // Measure and render the content offscreen. Measuring a hidden Window alone

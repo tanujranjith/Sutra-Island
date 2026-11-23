@@ -1,3 +1,8 @@
+# Sutra Island v1.4.8
+
+- Automatically check for updates and send a Windows notification when a new release is available. Click it to open App Updates and install when you're ready.
+
+---
 # Sutra Island v1.4.7
 
 - Check for new releases in **Settings → Advanced → App Updates**, then update and restart Island in place.

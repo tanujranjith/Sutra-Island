@@ -180,12 +180,31 @@ public sealed partial class IslandViewModel
     }
     public Task ReadReplyAsync() => _wakeTraining ? Task.CompletedTask : _voice?.ReadAsync(CleanQResponseText(QResponse)) ?? Task.CompletedTask;
     public void StopAssistant() { _voice?.Stop(); CancelQ(); }
-    public async Task StartChatAsync(string? prompt = null, bool useScreen = false, bool newConversation = false, bool expand = true)
+    public Task StartChatAsync(string? prompt = null, bool useScreen = false, bool newConversation = false, bool expand = true) =>
+        StartChatCoreAsync(prompt, useScreen, newConversation, expand, inSearch: false, CancellationToken.None);
+
+    private bool _qInSearch;
+
+    internal Task StartSearchChatAsync(string prompt, CancellationToken cancellationToken) =>
+        StartChatCoreAsync(prompt, useScreen: false, newConversation: !_qInSearch, expand: false, inSearch: true, cancellationToken);
+
+    internal void CloseSearchChat()
+    {
+        if (!_qInSearch) return;
+        _qInSearch = false;
+        _qSession.Clear();
+        _responsePresentation.Clear();
+        RaiseQProperties();
+    }
+
+    private async Task StartChatCoreAsync(string? prompt, bool useScreen, bool newConversation, bool expand, bool inSearch, CancellationToken cancellationToken)
     {
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
         if (dispatcher is not null && !dispatcher.CheckAccess())
-        { await dispatcher.InvokeAsync(() => StartChatAsync(prompt, useScreen, newConversation, expand)).Task.Unwrap(); return; }
+        { await dispatcher.InvokeAsync(() => StartChatCoreAsync(prompt, useScreen, newConversation, expand, inSearch, cancellationToken)).Task.Unwrap(); return; }
+        cancellationToken.ThrowIfCancellationRequested();
         if (!Settings.QEnabled) return;
+        _qInSearch = inSearch;
         CancelQActivation(); _qAutoCloseTimer.Stop();
         if (!string.IsNullOrWhiteSpace(prompt) && QCanStop) StopAssistant();
         if (newConversation) { _voice?.Stop(); _qSession.Clear(); _qComparison.Clear(); }
@@ -194,11 +213,12 @@ public sealed partial class IslandViewModel
         QUseScreenNext = useScreen;
         QCompareEnabled = false;
         if (!IsQActive || _qSnapshot.Context is not null || newConversation)
-            await _qSession.BeginAsync(QMode.Ask, Settings.QSelectedProvider, Settings.QSelectedModel, null);
+            await _qSession.BeginAsync(QMode.Ask, Settings.QSelectedProvider, Settings.QSelectedModel, null, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         SetQMode(QMode.Ask);
         if (expand && Settings.QAutoExpandIsland) IsExpanded = true;
         RaiseQProperties();
-        if (!string.IsNullOrWhiteSpace(prompt)) await SubmitQAsync(prompt);
+        if (!string.IsNullOrWhiteSpace(prompt)) await SubmitQAsync(prompt, cancellationToken);
     }
     public async Task<string> SubmitVoiceTurnAsync(string prompt, CancellationToken cancellationToken)
     {

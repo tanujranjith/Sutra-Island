@@ -11,6 +11,7 @@ public partial class CommandPaletteWindow
     private bool _maintenanceStarted, _presentationClosed, _presentationMotionEnabled;
     private int _presentationGeneration;
     private Rect? _paletteWorkArea;
+    private Rect? _paletteAnchor;
     public bool IsDismissing { get; private set; }
     internal int HiddenWarmCount { get; private set; }
     internal double LastHiddenWarmMilliseconds { get; private set; }
@@ -54,6 +55,7 @@ public partial class CommandPaletteWindow
         var generation = ++_presentationGeneration;
         IsDismissing = false; _presentationMotionEnabled = !reducedMotion;
         _paletteWorkArea = workArea;
+        _paletteAnchor = anchor;
         PaletteMorph.BeginAnimation(NotificationMorphHost.RevealProgressProperty, null);
         PaletteMorph.RevealProgress = reducedMotion ? 1 : 0;
         Left = Math.Max(workArea.Left + 8, Math.Min(anchor.Left + anchor.Width / 2 - Width / 2, workArea.Right - Width - 8));

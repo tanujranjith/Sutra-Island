@@ -18,7 +18,7 @@
     <Product>Sutra Island</Product>
     <Company>Sutra Island</Company>
     <Description>A live desktop island for Windows</Description>
-    <Version>1.4.7</Version>
+    <Version>1.4.8</Version>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

@@ -200,6 +200,9 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         await ExecuteMatchAsync(match);
     }
 
+    internal Task OpenGoogleResultsAsync(string query) =>
+        ExecuteMatchAsync(new CommandMatch(CommandCatalog.ById(PaletteCommand.GoogleSearch), query));
+
     private async Task ExecuteMatchAsync(CommandMatch match)
     {
         if (_executing) return;

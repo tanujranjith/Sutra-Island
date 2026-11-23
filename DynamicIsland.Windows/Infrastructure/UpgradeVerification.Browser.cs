@@ -1,3 +1,5 @@
+using System.Windows;
+using DynamicIsland.Q.Core;
 using DynamicIsland.Windows.Infrastructure.CommandPalette;
 using DynamicIsland.Windows.Services;
 using DynamicIsland.Windows.ViewModels;
@@ -81,6 +83,52 @@ internal static partial class UpgradeVerification
             }
             check(!palette.IsStatusError && settings.PaletteRecents.Contains(PaletteCommand.GoogleSearch.ToString()),
                 "Google execution completes and records its recent command after persistence resumes");
+
+            var searchVm = new CommandPaletteViewModel(runner, settings);
+            var searchWindow = new CommandPaletteWindow(searchVm, () => true, island) { ShowActivated = false, Opacity = 0 };
+            try
+            {
+                var anchor = new Rect(600, 0, 240, 44);
+                var workArea = new Rect(0, 0, 1440, 900);
+                void Click(string name) => ((System.Windows.Controls.Button)searchWindow.FindName(name))
+                    .RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+                bool Visible(string name) => ((FrameworkElement)searchWindow.FindName(name)).IsVisible;
+                void ShowSearchPalette()
+                {
+                    searchWindow.PrepareForShow();
+                    searchWindow.PresentFromIsland(anchor, workArea, reducedMotion: true);
+                }
+
+                ShowSearchPalette();
+                searchVm.Query = "C# & C++";
+                Click("OpenGoogleSearch");
+                var searchBox = (System.Windows.Controls.TextBox)searchWindow.FindName("SearchBox");
+                check(searchBox.Text == "C# & C++" && Visible("SubmitSearch"), "Google search shows its results pill under the existing draft");
+                Click("SearchAiMode");
+                Click("SearchGoogleMode");
+                check(searchBox.Text == "C# & C++" && Visible("SubmitSearch"), "Switching between Google and Ask AI preserves the draft");
+                Click("SubmitSearch");
+                check(!searchWindow.IsVisible && host.LastBrowserDestination?.AbsoluteUri == "https://www.google.com/search?q=C%23%20%26%20C%2B%2B",
+                    "The search pill hands the encoded query to the browser and dismisses the palette");
+
+                ShowSearchPalette();
+                Click("OpenAiSearch");
+                searchBox.Text = "How does binary search work?";
+                Click("SubmitSearch");
+                check(Visible("SearchWorking") && !Visible("SearchComposer") && !island.ShowQSurface,
+                    "Ask AI retracts to a working pill and keeps the full chat surface closed");
+                await WaitForSutraAsync(() => island.QState == QRunState.Complete && Visible("SearchComposer"));
+                var reply = (AssistantReplyView)searchWindow.FindName("SearchReply");
+                check(!Visible("SearchWorking") && Visible("SearchAnswer") && reply.DisplayedText.Contains("Local fixture response"),
+                    "The working pill expands into the answer card and offers a follow-up");
+                searchBox.Text = "Could you give an example?";
+                Click("SubmitSearch");
+                await WaitForSutraAsync(() => island.QState == QRunState.Complete && Visible("SearchComposer"));
+                check(island.QPromptText == "Could you give an example?", "A follow-up submits from the same answer card");
+                searchWindow.Dismiss();
+                check(!searchWindow.IsVisible && !island.IsQActive, "Closing the search card clears its assistant session");
+            }
+            finally { searchWindow.Close(); }
         }
         finally
         {

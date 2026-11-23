@@ -43,6 +43,8 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     private SettingsViewModel? _settingsViewModel;
     private IslandWindow? _islandWindow;
     private SettingsWindow? _settingsWindow;
+    private IslandUpdateMonitor? _updateMonitor;
+    private CancellationTokenSource? _updateChecks;
     private WelcomeWindow? _welcomeWindow;
     private TimerAlarmViewModel? _timerViewModel;
     private TrayService? _tray;
@@ -304,6 +306,14 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _weather.Start();
         _stocks.Start();
         ApplyLiveActivitySettings();
+        if (!Infrastructure.AppDataPaths.IsPreview)
+        {
+            _updateChecks = new CancellationTokenSource();
+            _updateMonitor = new IslandUpdateMonitor(
+                Path.Combine(Infrastructure.AppDataPaths.Root, "last-update-notification.txt"),
+                IslandUpdateService.CheckAsync, _log);
+            _ = _updateMonitor.RunAsync(ReportIslandUpdate, _updateChecks.Token);
+        }
         // Media discovery continues while the modeless walkthrough is open.
         var mediaStart = _media.StartAsync();
         if (!_settings.HasOnboarded || openWelcomeFromCommandLine) await ShowWelcomeAsync();
@@ -342,6 +352,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         if (_settingsWindow is null)
         {
             _settingsWindow = new SettingsWindow(_settingsViewModel, _islandViewModel!, _islandWindow!);
+            _settingsWindow.ShowAvailableUpdate(_updateMonitor?.Available);
             _settingsWindow.ContentRendered += (_, _) => _log?.Info(
                 $"Settings rendered: pid={Environment.ProcessId}, exe={Environment.ProcessPath}, visible={_settingsWindow.IsVisible}, title={_settingsWindow.Title}, size={_settingsWindow.ActualWidth:0}x{_settingsWindow.ActualHeight:0}, flowSettingsBound={(_settingsWindow.FindName("FlowPage") as FrameworkElement)?.DataContext is FlowSettingsViewModel}.");
             _settingsWindow.OpenTimerRequested += (_, _) => ShowTimerAlarm();
@@ -360,6 +371,20 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
         _settingsViewModel.RefreshPositionControls();
         _settingsWindow.Activate();
         FadeIn(_settingsWindow);
+    }
+
+    private void ReportIslandUpdate(IslandUpdate? update, bool shouldNotify)
+    {
+        _settingsWindow?.ShowAvailableUpdate(update);
+        if (!shouldNotify || update is null) return;
+
+        var version = update.Version.ToString(3);
+        _tray?.ShowNotification("Sutra Island update available", $"Version {version} is ready. Click to open App Updates.", () =>
+        {
+            ShowSettings();
+            _settingsWindow?.OpenAppUpdates();
+        });
+        _log?.Info($"Showed update notification for version {version}.");
     }
 
     private static void FadeIn(Window window)
@@ -489,7 +514,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
             _settingsViewModel?.RefreshRuntimePreferences();
         }));
         _paletteViewModel ??= new CommandPaletteViewModel(_paletteRunner, _settings, () => _settingsService!.SaveAsync(_settings!));
-        _paletteWindow = new CommandPaletteWindow(_paletteViewModel, () => _settings?.ShowIslandInScreenshots ?? false);
+        _paletteWindow = new CommandPaletteWindow(_paletteViewModel, () => _settings?.ShowIslandInScreenshots ?? false, _islandViewModel);
         new System.Windows.Interop.WindowInteropHelper(_paletteWindow).EnsureHandle();
         _paletteWindow.Measure(new System.Windows.Size(_paletteWindow.Width, double.PositiveInfinity));
         _paletteWindow.WarmLayout();
@@ -682,6 +707,7 @@ public partial class App : System.Windows.Application, ICommandPaletteHost
     {
         if (_isShuttingDown) return;
         _isShuttingDown = true;
+        _updateChecks?.Cancel();
         _log?.Info("Application shutting down");
         _welcomeWindow?.Close();
         _paletteWindow?.Close();

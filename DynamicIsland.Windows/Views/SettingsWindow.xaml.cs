@@ -66,10 +66,7 @@ public partial class SettingsWindow : Window
             if (update is null)
             {
                 IslandUpdateStatus.Text = "Checking for updates…";
-                _availableUpdate = await IslandUpdateService.CheckAsync();
-                IslandUpdateStatus.Text = _availableUpdate is { } latest
-                    ? $"Version {latest.Version.ToString(3)} is available. Island will restart after installing."
-                    : "You're up to date.";
+                SetUpdateResult(await IslandUpdateService.CheckAsync());
                 return;
             }
 
@@ -94,10 +91,29 @@ public partial class SettingsWindow : Window
         }
         finally
         {
-            IslandUpdateButton.Content = _availableUpdate is null ? "Check for updates" : "Update and restart";
+            RefreshUpdateButton();
             IslandUpdateButton.IsEnabled = !app.IsShuttingDown;
         }
     }
+
+    internal void ShowAvailableUpdate(IslandUpdate? update)
+    {
+        if (!IslandUpdateButton.IsEnabled || (update is null && _availableUpdate is null)) return;
+
+        SetUpdateResult(update);
+        RefreshUpdateButton();
+    }
+
+    private void SetUpdateResult(IslandUpdate? update)
+    {
+        _availableUpdate = update;
+        IslandUpdateStatus.Text = update is { } latest
+            ? $"Version {latest.Version.ToString(3)} is available. Island will restart after installing."
+            : "You're up to date.";
+    }
+
+    private void RefreshUpdateButton() =>
+        IslandUpdateButton.Content = _availableUpdate is null ? "Check for updates" : "Update and restart";
 
     private void TogglePreviewPane_Click(object sender, RoutedEventArgs e)
     {
@@ -315,6 +331,14 @@ public partial class SettingsWindow : Window
     {
         if (DataContext is SettingsViewModel settings) settings.SelectedSectionKey = "q";
         ShowSection("q");
+    }
+
+    internal void OpenAppUpdates()
+    {
+        SettingsSearchBox.Clear();
+        if (DataContext is SettingsViewModel settings) settings.SelectedSectionKey = "advanced";
+        ShowSection("advanced");
+        SettingsContentScroller.ScrollToTop();
     }
 
     // Use an explicit click handler so Done always waits for the settings file to be written before

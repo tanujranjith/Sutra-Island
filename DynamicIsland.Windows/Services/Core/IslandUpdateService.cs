@@ -7,8 +7,6 @@ using System.Windows;
 
 namespace DynamicIsland.Windows.Services;
 
-internal sealed record IslandUpdate(Version Version, Uri DownloadUrl, long Size, byte[] Sha256);
-
 internal static class IslandUpdateService
 {
     internal const string ApplyArgument = "--apply-island-update";
@@ -24,12 +22,12 @@ internal static class IslandUpdateService
 
     internal static Version CurrentVersion { get; } = typeof(App).Assembly.GetName().Version!;
 
-    internal static async Task<IslandUpdate?> CheckAsync()
+    internal static async Task<IslandUpdate?> CheckAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await Http.GetAsync($"https://api.github.com/repos/{Repository}/releases/latest")
+        using var response = await Http.GetAsync($"https://api.github.com/repos/{Repository}/releases/latest", cancellationToken)
             .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        using var release = JsonDocument.Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
+        using var release = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
         return ReadRelease(release.RootElement, CurrentVersion);
     }
 
