@@ -1,6 +1,7 @@
 # Sutra Island v1.4.8
 
 - Automatically check for updates and send a Windows notification when a new release is available. Click it to open App Updates and install when you're ready.
+- Switch between Google Search and Ask AI in the command palette without losing what you've typed. Open Google results in your browser, or read AI answers and ask follow-up questions in the same panel.
 
 ---
 # Sutra Island v1.4.7
